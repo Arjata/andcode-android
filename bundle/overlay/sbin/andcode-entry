@@ -1,0 +1,35 @@
+#!/system/bin/sh
+# andcode-entry — bundle 统一入口(DESIGN §4.1, NAMING §4.2)
+# 用法: andcode-entry <sshd|shell|doctor> [args...]
+set -eu
+
+ROOT="${ANDCODE_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
+export ANDCODE_ROOT="$ROOT"
+export ANDCODE_TIER="${ANDCODE_TIER:-a}"
+[ -d "$ROOT/tmp" ] || mkdir -p "$ROOT/tmp"
+[ -d "$ROOT/home" ] || mkdir -p "$ROOT/home"
+
+cmd="${1:-shell}"; shift || true
+
+case "$cmd" in
+  mkresolv|resolv)
+    "$ROOT/sbin/andcode-mkresolv" "$@"
+    ;;
+  sshd)
+    "$ROOT/sbin/andcode-mkresolv" >/dev/null
+    # dropbear 由 pack-bundle 包装(见 manifest);HOST_KEY 放可写目录
+    HK="$ROOT/etc/dropbear_host_key"
+    [ -f "$HK" ] || "$ROOT/bin/dropbearkey.bin" -t ed25519 -f "$HK" 2>/dev/null \
+      || "$ROOT/usr/bin/dropbearkey" -t ed25519 -f "$HK"
+    exec "$ROOT/bin/dropbear" -r "$HK" -p 127.0.0.1:2222 -A -N "$ROOT/home" "$@"
+    ;;
+  shell)
+    exec "$ROOT/bin/busybox" sh -l
+    ;;
+  doctor)
+    exec "$ROOT/bin/andcode-doctor"
+    ;;
+  *)
+    echo "用法: andcode-entry <sshd|shell|doctor|mkresolv>"; exit 2
+    ;;
+esac

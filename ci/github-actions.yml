@@ -1,0 +1,103 @@
+name: andcode-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-bundle:
+    # 与基线发行版同构(DESIGN §3.2 入口 3),无需 QEMU
+    runs-on: ubuntu-24.04-arm
+    env:
+      MAX_GLIBC: "2.39"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 仓库卫生(LFS 规则,docs/LFS.md §4)
+        run: bash scripts/lfs-check.sh "$GITHUB_WORKSPACE"
+
+      - name: 生成基线 rootfs(docker export ubuntu:24.04,arm64 原生)
+        run: |
+          docker pull --platform linux/arm64 ubuntu:24.04
+          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          docker start $CID && sleep 1
+          mkdir -p work
+          docker export $CID -o work/rootfs.tar
+          docker rm -f $CID
+          mkdir -p work/rootfs
+          tar -xf work/rootfs.tar -C work/rootfs
+
+      - name: 获取 opencode 官方 linux-arm64 产物(P0 冒烟对象)
+        run: |
+          ASSET=$(curl -fsSL https://api.github.com/repos/sst/opencode/releases/latest \
+            | jq -r '.assets[] | select(.name | test("linux-arm64")) | select(.name | test("tar|zip")) | .browser_download_url' | head -n1)
+          echo "asset: $ASSET"
+          curl -fsSL "$ASSET" -o work/opencode-asset
+          mkdir -p work/stage/bin
+          (cd work/stage/bin && case "$ASSET" in
+            *.tar.gz) tar -xzf ../../opencode-asset ;;
+            *.tar.xz) tar -xJf ../../opencode-asset ;;
+            *.zip) unzip -o ../../opencode-asset ;;
+          esac)
+          # 归位:确保 stage/bin/opencode(.bin) 存在(上游资产名以实际为准,见 DESIGN §1.3)
+          [ -f work/stage/bin/opencode ] || [ -f work/stage/bin/opencode.bin ] \
+            || { find work/stage -type f | head -50; exit 1; }
+
+      - name: 获取 git 前缀(容器内复制,保 GIT_EXEC_PATH 结构)
+        run: |
+          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          docker start $CID && sleep 1
+          docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq git >/dev/null"
+          mkdir -p work/stage/usr
+          docker cp $CID:/usr/bin work/stage/usr/bin.tmp
+          docker cp $CID:/usr/libexec/git-core work/stage/usr/libexec/git-core 2>/dev/null \
+            || { docker exec $CID mkdir -p /usr/libexec && docker cp $CID:/usr/lib/git-core work/stage/usr/libexec/git-core; }
+          docker rm -f $CID
+          rm -rf work/stage/usr/bin.tmp
+
+      - name: 组装 bundle
+        run: |
+          mkdir -p dist
+          bash bundle/pack-bundle.sh \
+            --rootfs work/rootfs \
+            --stage work/stage \
+            --out dist/andcode-bundle-arm64-v0.1.0.tar.gz \
+            --shebang /bin/sh \
+            --name v0.1.0
+
+      - name: 兼容性审计(DESIGN §3.3)
+        run: |
+          mkdir -p work/audit && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/audit
+          bash baseline/check-compat.sh --page-align \
+            work/audit/andcode/bin work/audit/andcode/usr/bin work/audit/andcode/lib
+
+      - name: 命名规范门禁(NAMING §8)
+        run: bash scripts/naming-lint.sh --bundle-dir work/audit/andcode
+
+      - name: 冒烟自测(容器内 wrapper 链路,Tier A 等价)
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD/dist:/dist" -v "$PWD/scripts:/scripts:ro" \
+            -e ANDCODE_ROOT=/opt/andcode -e ANDCODE_TIER=a \
+            ubuntu:24.04 bash -c '
+              apt-get update -qq >/dev/null && apt-get install -y -qq file >/dev/null
+              mkdir -p /opt && tar -xzf /dist/andcode-bundle-arm64-v0.1.0.tar.gz -C /opt --strip-components=1
+              sh /scripts/smoke-test.sh
+            '
+
+      - name: Tier P 物理化路线甲(patchelf 重写,NAMING §6.3)
+        run: |
+          mkdir -p work/jni
+          bash bundle/pack-apk-libs.sh \
+            --bundle dist/andcode-bundle-arm64-v0.1.0.tar.gz \
+            --out work/jni
+          bash baseline/check-compat.sh --page-align work/jni/arm64-v8a
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: andcode-dist
+          path: |
+            dist/andcode-bundle-arm64-v0.1.0.tar.gz
+            dist/andcode-bundle-arm64-v0.1.0.tar.gz.sha256

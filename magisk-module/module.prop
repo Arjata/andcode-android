@@ -1,0 +1,6 @@
+id=andcode
+name=andcode host
+version=v0.1.0
+versionCode=1
+author=andcode project
+description=Self-contained opencode host: glibc sysroot + dropbear sshd (DESIGN §4.2)

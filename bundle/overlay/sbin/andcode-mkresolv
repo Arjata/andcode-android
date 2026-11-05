@@ -1,0 +1,28 @@
+#!/system/bin/sh
+# andcode-mkresolv — 从 Android 生成 resolv.conf(DESIGN §4.5, NAMING §4.2)
+# 用法: andcode-mkresolv [输出路径]  (默认 $ANDCODE_ROOT/etc/resolv.conf)
+set -eu
+OUT="${1:-${ANDCODE_ROOT:?ANDCODE_ROOT 未设置}/etc/resolv.conf}"
+
+# 优先级: 环境显式 > ndc/system 属性运行时探测 > 公共兜底
+DNS="${ANDCODE_DNS:-}"
+if [ -z "$DNS" ]; then
+  # getprop 在 shell/App 域可用;Tier P 无 shell 时由调用方注入 ANDCODE_DNS
+  if command -v getprop >/dev/null 2>&1; then
+    for i in 1 2 3 4; do
+      d="$(getprop "net.dns$i" 2>/dev/null || true)"
+      [ -n "$d" ] && DNS="$DNS $d"
+    done
+    # Android 8+ 常见: net.dns1 为空,退回 rnd0 接口 DNS 或系统兜底
+    if [ -z "$(printf '%s' "$DNS" | tr -d ' ')" ]; then
+      d="$(getprop net.dns1 2>/dev/null || true)"
+      [ -n "$d" ] && DNS="$d"
+    fi
+  fi
+fi
+[ -n "$(printf '%s' "$DNS" | tr -d ' ')" ] || DNS="1.1.1.1 8.8.8.8"
+
+{
+  for d in $DNS; do echo "nameserver $d"; done
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+echo "resolv.conf → $OUT: $(tr '\n' ' ' < "$OUT")"

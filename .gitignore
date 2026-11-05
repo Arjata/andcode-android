@@ -1,0 +1,49 @@
+# andcode — .gitignore
+# 结构约定见 docs/DESIGN.md §5;发布物命名见 docs/NAMING.md §7.1
+
+# ── 构建产物与工作目录(CI 生成,不入库)──────────────────────────
+dist/            # 发布物: andcode-bundle-*.tar.gz / .sha256
+work/            # CI/本地临时: rootfs、stage、jniLibs 中间产物
+out/
+build/
+target/
+*.tar
+*.tar.gz
+*.tar.zst
+*.tgz
+*.sha256         # 由打包脚本生成,与产物同生同弃
+manifest.farm    # Tier P 链接农场清单(由 pack-apk-libs.sh 生成)
+
+# ── Android / Gradle(app/ Tier P APK)────────────────────────────
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+local.properties
+.gradle/
+.cxx/
+.externalNativeBuild/
+captures/
+*.jks
+
+# ── IDE / 编辑器 ─────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# ── 运行期产物(真机/模拟器回传)─────────────────────────────────
+*.log
+sshd.log
+dropbear_host_key
+*.pub            # dropbear/ssh 主机密钥相关
+
+# ── shim 与基线构建中间物 ─────────────────────────────────────────
+*.o
+*.so             # 编译产物;bundle 内经 manifest 管理的库不在此列(不入库)
+!bundle/shim/**/*.so.patch

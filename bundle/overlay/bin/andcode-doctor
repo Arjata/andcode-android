@@ -1,0 +1,29 @@
+#!/system/bin/sh
+# andcode-doctor — 环境自检(DESIGN §4.4 设置页 / smoke-test 后端)
+# 输出人读诊断;--json 输出机器可读(供 APK 设置页解析)
+set -u
+JSON=0; [ "${1:-}" = "--json" ] && JSON=1
+ROOT="${ANDCODE_ROOT:?ANDCODE_ROOT 未设置}"
+pass=0; fail=0
+
+say() { [ $JSON -eq 1 ] || printf '%s\n' "$*"; }
+
+chk() { # $1=名称 $2=命令...
+  if "$@" >/dev/null 2>&1; then
+    say "ok   $1"; pass=$((pass+1)); echo "  \"$1\": true," >&2
+  else
+    say "FAIL $1"; fail=$((fail+1)); echo "  \"$1\": false," >&2
+  fi >&2
+}
+
+[ $JSON -eq 1 ] && printf '{\n'
+chk "loader"        "$ROOT/lib/ld-linux-aarch64.so.1" --version
+chk "shim"          test -f "$ROOT/shim/libandcode-shim.so"
+chk "resolv"        test -s "$ROOT/etc/resolv.conf"
+chk "opencode"      "$ROOT/bin/opencode" --version
+chk "git"           "$ROOT/bin/git" --version
+chk "busybox"       "$ROOT/bin/busybox" true
+[ $JSON -eq 1 ] && printf '  "_pass": %s, "_fail": %s\n}\n' "$pass" "$fail"
+say "----"
+say "通过 $pass / 失败 $fail"
+exit $([ "$fail" -eq 0 ] && echo 0 || echo 1)
