@@ -32,4 +32,12 @@ if "$ROOT/bin/opencode" --version >/dev/null 2>&1; then
   echo "[INFO] JIT 定级: 详见 P0 结论(BUN_JSC_useJIT 未自动探测)"
 fi
 echo "smoke-test($TIER): $([ $fail -eq 0 ] && echo ALL-PASS || echo "$fail FAILED")"
+if [ "$fail" -ne 0 ]; then
+  echo "---- 诊断 ----"
+  ls -la "$ROOT" 2>&1 | head -n 12
+  ls "$ROOT/lib" 2>&1 | head -n 8
+  ls "$ROOT/bin" 2>&1 | head -n 8
+  head -n 1 "$ROOT/bin/opencode" 2>&1
+  file -b "$ROOT/lib/ld-linux-aarch64.so.1" 2>&1 || true
+fi
 exit $([ "$fail" -eq 0 ] && echo 0 || echo 1)

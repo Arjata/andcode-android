@@ -69,7 +69,7 @@ while IFS= read -r -d '' f; do
         -e "s|@LOADER@|\$ROOT/lib/ld-linux-aarch64.so.1|" \
         -e "s|@TARGET@|$cmd.bin|" \
         -e "s|@TIER@|a|" \
-        "$BUNDLE_TPL" > "$f"
+        "$BUNDLE_TPL" | { printf '%s\n' "$SHEBANG"; tail -n +2; } > "$f"
     chmod 0755 "$f"
     echo "[包装] $cmd → $cmd.bin(位于 ${f#$B/} 目录,深度 $depth)"
   fi
