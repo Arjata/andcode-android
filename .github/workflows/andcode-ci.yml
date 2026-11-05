@@ -47,14 +47,15 @@ jobs:
           cp "$BIN" work/stage/bin/opencode
           echo "opencode ELF: $BIN"
 
-      - name: 获取静态 busybox(Alpine arm64,musl 静态;来源记入 manifest)
+      - name: 获取静态 busybox(Alpine busybox-static 包,musl 静态;来源记入 manifest)
         run: |
-          CID=$(docker create --platform linux/arm64 alpine:3.19 true)
-          docker export $CID -o work/alpine.tar && docker rm -f $CID
-          mkdir -p work/alpine && tar -xf work/alpine.tar -C work/alpine bin/busybox
-          cp work/alpine/bin/busybox work/stage/bin/busybox
+          # 注意: alpine:3.19 的 /bin/busybox 是动态链接 musl,须用 busybox-static 包
+          docker run --rm --platform linux/arm64 -v "$PWD/work:/out" alpine:3.19 \
+            sh -c "apk update -q && apk add -q busybox-static && cp /bin/busybox /out/busybox-arm64"
+          cp work/busybox-arm64 work/stage/bin/busybox
           file -b work/stage/bin/busybox | grep -q 'statically linked\|static-pie' \
-            || { echo "busybox 非静态"; exit 1; }
+            || { file -b work/stage/bin/busybox; echo "busybox 非静态"; exit 1; }
+          echo "busybox: $(work/stage/bin/busybox | head -n1)"
 
       - name: 获取 git 前缀(容器内复制,保 GIT_EXEC_PATH 结构)
         run: |
