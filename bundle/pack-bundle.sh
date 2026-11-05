@@ -177,7 +177,7 @@ while IFS= read -r -d '' f; do
   lic=AGPL-3.0-only; up=andcode; ver="$VER"
   if [ "${lp#root/lib/}" != "$lp" ]; then
     kind=glibc-lib; phys="$(lib_slug "$lp")"; lic=LGPL-2.1; up=glibc-2.39
-  elif [ "${lp#root/etc/}" != "$lp" ]; then
+  elif [ "${lp#root/etc/}" != "$lp" ] || [ "${lp#etc/}" != "$lp" ]; then
     # data 类不进 jniLibs(只读数据经 APK assets → filesDir 原样落位),物理名占位 "-"
     kind=data; phys="-"
   elif [ "$lp" = "shim/libandcode-shim.so" ]; then
