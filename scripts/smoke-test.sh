@@ -21,8 +21,8 @@ t "loader 可执行(--version)"   "$ROOT/lib/ld-linux-aarch64.so.1" --version
 t "shim 存在"                   test -f "$ROOT/shim/libandcode-shim.so"
 t "resolv.conf 已生成"          test -s "$ROOT/etc/resolv.conf"
 t "opencode --version"          "$ROOT/bin/opencode" --version
-t "git --version"               "$ROOT/bin/git" --version
-t "git https 助手(wrapper 链路)" sh -c "PATH=$ROOT/bin:\$PATH git ls-remote https://github.com/git/git.git HEAD"
+t "git --version"               "$ROOT/usr/bin/git" --version
+t "git https 助手(wrapper 链路)" sh -c "PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH git ls-remote https://github.com/git/git.git HEAD"
 t "busybox 可用"                "$ROOT/bin/busybox" true
 t "andcode-entry doctor"        sh "$ROOT/bin/andcode-doctor"
 
@@ -37,7 +37,7 @@ if [ "$fail" -ne 0 ]; then
   ls -la "$ROOT" 2>&1 | head -n 12
   ls "$ROOT/lib" 2>&1 | head -n 8
   ls "$ROOT/bin" 2>&1 | head -n 8
+  ls "$ROOT/usr/bin" 2>&1 | head -n 5
   head -n 1 "$ROOT/bin/opencode" 2>&1
-  file -b "$ROOT/lib/ld-linux-aarch64.so.1" 2>&1 || true
 fi
 exit $([ "$fail" -eq 0 ] && echo 0 || echo 1)

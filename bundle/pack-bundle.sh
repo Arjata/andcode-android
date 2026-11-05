@@ -94,7 +94,8 @@ resolve_in_rootfs() { # $1 = 库文件名 → 输出绝对路径
 }
 copy_deps() { # $1 = ELF 路径(必须在 rootfs 的 chroot 视角下解析)
   local elf="$1" needed name path
-  needed="$(readelf -d "$elf" 2>/dev/null | grep -oE '\[lib[^]]+\]' | tr -d '[]' || true)"
+  # 捕获全部 DT_NEEDED(ld-linux 开头与 lib 开头都要,不能只匹配 lib*)
+  needed="$(readelf -d "$elf" 2>/dev/null | grep -oE '\[(lib|ld-linux)[^]]+\]' | tr -d '[]' || true)"
   for name in $needed; do
     [ -n "${COPIED[$name]:-}" ] && continue
     case "$name" in
