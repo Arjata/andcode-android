@@ -1,13 +1,12 @@
 #!/system/bin/sh
 # wrapper.sh.tpl — loader 包装器模板(DESIGN §4.1.2, NAMING §6.1/§6.3.2)
-# 占位符由 pack-bundle.sh(规范布局)/ pack-apk-libs.sh(Tier P 物理化)渲染:
-#   @ROOT@      逻辑根:规范布局渲染为运行期自推导表达式;Tier P 渲染为固定路径
-#   @EXEDIR@    可执行物理目录:规范布局 = $ROOT;Tier P = nativeLibraryDir 绝对路径
-#   @TARGET@    @EXEDIR@ 内被 exec 的 ELF 物理名(如 opencode.bin / libandcode-opencode.so)
+# 占位符:
+#   @ROOT@      逻辑根:规范布局=运行期自推导表达式;Tier P=ANDCODE_ROOT 引用
+#   @EXEDIR@    可执行物理目录:规范布局=$ROOT;Tier P=$ANDCODE_EXE_DIR(nativeLibraryDir)
+#   @LOADER@    动态链接器路径:规范布局=$ROOT/lib/ld-linux-aarch64.so.1;
+#               Tier P=$ANDCODE_EXE_DIR/libandcode-ld-linux.so(NAMING §6.3)
+#   @TARGET@    @EXEDIR@ 内被 exec 的 ELF 物理名(opencode.bin / libandcode-opencode.so)
 #   @TIER@      m | a | p
-#
-# Tier P 约束(NAMING §6.3.2):脚本本体随 jniLibs 分发(物理名 libandcode-cmd-<cmd>.so),
-# 首行解释器必须是 Android 自带 shell;逻辑名由链接农场符号链接提供。
 set -eu
 
 @ROOT@
@@ -30,7 +29,7 @@ if [ -f "$SHIM" ]; then
 fi
 GIT_EXEC_PATH="$ROOT/usr/libexec/git-core"; export GIT_EXEC_PATH
 
-exec "$EXEDIR/libandcode-ld-linux.so" \
+exec "@LOADER@" \
      --library-path "$EXEDIR" \
      --inhibit-cache \
      "$EXEDIR/@TARGET@" "$@"

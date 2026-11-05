@@ -11,9 +11,10 @@ fail=0
 ok()   { echo "[PASS] $1"; }
 bad()  { echo "[FAIL] $1"; fail=$((fail+1)); }
 
-t() { # $1=描述 其余=命令
+t() { # $1=描述 其余=命令;失败时回显输出便于 CI 诊断
   d="$1"; shift
-  if "$@" >/dev/null 2>&1; then ok "$d"; else bad "$d"; fi
+  out="$("$@" 2>&1)"
+  if [ $? -eq 0 ]; then ok "$d"; else bad "$d"; printf '%s\n' "$out" | head -n 5 | sed 's/^/       | /'; fi
 }
 
 t "loader 可执行(--version)"   "$ROOT/lib/ld-linux-aarch64.so.1" --version

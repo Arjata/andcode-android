@@ -66,6 +66,7 @@ while IFS= read -r -d '' f; do
     up=""; i=0; while [ $i -lt $depth ]; do up="${up}../"; i=$((i+1)); done
     sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/${up}\" \&\& pwd)\"|" \
         -e "s|@EXEDIR@|\$ROOT|" \
+        -e "s|@LOADER@|\$ROOT/lib/ld-linux-aarch64.so.1|" \
         -e "s|@TARGET@|$cmd.bin|" \
         -e "s|@TIER@|a|" \
         "$BUNDLE_TPL" > "$f"

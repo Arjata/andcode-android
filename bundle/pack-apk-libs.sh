@@ -31,7 +31,12 @@ LIBS="$OUT/arm64-v8a"
 mkdir -p "$LIBS"
 
 # ── 1+2+3. 映射与重写 ─────────────────────────────────────────────────────
-declare -A SONAME_MAP=()   # 旧 soname → 新物理名
+TPL="$(dirname "$0")/wrapper.sh.tpl"
+declare -A SONAME_MAP=() ELF_PHYS=()   # ELF_PHYS: 逻辑路径(.bin) → jniLibs 物理名
+while IFS=$'\t' read -r lp phys kind lic ver up; do
+  case "$lp" in '#'*|"") continue ;; esac
+  ELF_PHYS["$lp"]="$phys"
+done < "$B/manifest"
 while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$lp" in '#'*|"") continue ;; esac
   case "$kind" in
@@ -60,6 +65,19 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
           ;;
       esac
       cp -f "$src" "$LIBS/$phys"
+      ;;
+    wrapper-sh)
+      # Tier P 重渲染(NAMING §6.3):ROOT/EXEDIR 来自 APK 注入的环境变量,
+      # loader/target 用 jniLibs 物理名
+      target="${ELF_PHYS["$lp.bin"]:-}"
+      [ -n "$target" ] || { echo "[FAIL] wrapper 缺少配对 .bin manifest 行: $lp"; exit 1; }
+      sed -e "s|@ROOT@|ROOT=\"\${ANDCODE_ROOT:?}\"|" \
+          -e "s|@EXEDIR@|\$ANDCODE_EXE_DIR|" \
+          -e "s|@LOADER@|\$ANDCODE_EXE_DIR/libandcode-ld-linux.so|" \
+          -e "s|@TARGET@|$target|" \
+          -e "s|@TIER@|p|" \
+          "$TPL" > "$LIBS/$phys"
+      chmod 0755 "$LIBS/$phys"
       ;;
     *)
       cp -f "$src" "$LIBS/$phys"
