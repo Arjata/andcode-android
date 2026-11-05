@@ -39,6 +39,8 @@ command -v readelf >/dev/null || { echo "需要 binutils(readelf)"; exit 1; }
 BUNDLE_TPL="$(dirname "$0")/wrapper.sh.tpl"
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+ORIG_PWD="$PWD"
+case "$OUT" in /*) ABS_OUT="$OUT" ;; *) ABS_OUT="$ORIG_PWD/$OUT" ;; esac
 B="$WORK/andcode"; mkdir -p "$B"
 
 # ── 1. 载荷 + overlay + ELF→.bin/包装器变换 ──────────────────────────────
@@ -201,7 +203,7 @@ while IFS= read -r -d '' f; do
 done < <(find "$B" -type f -print0 | sort -z)
 
 # ── 5. 打包 ──────────────────────────────────────────────────────────────
-mkdir -p "$(dirname "$OUT")"
-( cd "$WORK" && tar -czf "$OUT" andcode )
-sha256sum "$OUT" | tee "$OUT.sha256"
-echo "bundle 就绪: $OUT(条目 $(wc -l < "$MF") )"
+mkdir -p "$(dirname "$ABS_OUT")"
+( cd "$WORK" && tar -czf "$ABS_OUT" andcode )
+sha256sum "$ABS_OUT" | tee "$ABS_OUT.sha256"
+echo "bundle 就绪: $ABS_OUT(条目 $(wc -l < "$MF") )"
