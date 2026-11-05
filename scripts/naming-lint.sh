@@ -34,7 +34,7 @@ done < "$DIR/manifest"
 while IFS= read -r -d '' f; do
   rel="${f#$DIR/}"
   case "$rel" in
-    manifest|root/etc/*|root/home/*|root/tmp/*|root/lib/*|shim/*|*.so*) continue ;;
+    manifest|root/etc/*|root/home/*|root/tmp/*|root/lib/*|etc/*|home/*|tmp/*|lib/*|shim/*|*.so*) continue ;;
   esac
   n="$(basename "$rel")"
   case "$n" in
@@ -56,8 +56,8 @@ if [ -n "$BLACKLIST" ] && [ -f "$BLACKLIST" ]; then
   done < <(find "$DIR/bin" "$DIR/sbin" -type f -print0 2>/dev/null || true)
 fi
 
-# 4. 仓库脚本位置规则(.sh 仅 scripts/)
-off="$(find . -name '*.sh' ! -path './scripts/*' ! -path './baseline/*' ! -path './bundle/*' ! -path './runtime/*' ! -path './.git/*' 2>/dev/null || true)"
+# 4. 仓库脚本位置规则(.sh 仅 scripts/;magisk-module 为 Magisk 平台约定豁免)
+off="$(find . -name '*.sh' ! -path './scripts/*' ! -path './baseline/*' ! -path './bundle/*' ! -path './runtime/*' ! -path './magisk-module/*' ! -path './work/*' ! -path './.git/*' 2>/dev/null || true)"
 if [ -n "$off" ]; then
   # 豁免:模板/模块目录内文件不检查;其余违规
   echo "[提示] scripts 之外的 .sh(人工复核): $off"

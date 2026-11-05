@@ -180,7 +180,7 @@ while IFS= read -r -d '' f; do
     # data 类不进 jniLibs(只读数据经 APK assets → filesDir 原样落位),物理名占位 "-"
     kind=data; phys="-"
   elif [ "$lp" = "shim/libandcode-shim.so" ]; then
-    kind=preload-lib; phys="$lp"
+    kind=preload-lib; phys="libandcode-shim.so"
   elif file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64'; then
     kind=elf-exec; phys="$(slug "$lp")"
     case "$(basename "$lp")" in
