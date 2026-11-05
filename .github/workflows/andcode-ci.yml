@@ -49,9 +49,9 @@ jobs:
 
       - name: 获取静态 busybox(Alpine busybox-static 包,musl 静态;来源记入 manifest)
         run: |
-          # 注意: alpine:3.19 的 /bin/busybox 是动态链接 musl,须用 busybox-static 包
+          # 注意: alpine:3.19 的 /bin/busybox 是动态链接 musl;busybox-static 包提供 /bin/busybox.static
           docker run --rm --platform linux/arm64 -v "$PWD/work:/out" alpine:3.19 \
-            sh -c "apk update -q && apk add -q busybox-static && cp /bin/busybox /out/busybox-arm64"
+            sh -c "apk update -q && apk add -q busybox-static && cp /bin/busybox.static /out/busybox-arm64"
           cp work/busybox-arm64 work/stage/bin/busybox
           file -b work/stage/bin/busybox | grep -q 'statically linked\|static-pie' \
             || { file -b work/stage/bin/busybox; echo "busybox 非静态"; exit 1; }
