@@ -5,6 +5,7 @@
 #   @EXEDIR@    可执行物理目录:规范布局=$ROOT;Tier P=$ANDCODE_EXE_DIR(nativeLibraryDir)
 #   @LOADER@    动态链接器路径:规范布局=$ROOT/lib/ld-linux-aarch64.so.1;
 #               Tier P=$ANDCODE_EXE_DIR/libandcode-ld-linux.so(NAMING §6.3)
+#   @LIBPATH@   --library-path:规范布局=$ROOT/lib;Tier P=$ANDCODE_EXE_DIR(路线甲:库全在 jniLibs)
 #   @TARGET@    @EXEDIR@ 内被 exec 的 ELF 物理名(opencode.bin / libandcode-opencode.so)
 #   @TIER@      m | a | p
 set -eu
@@ -30,6 +31,6 @@ fi
 GIT_EXEC_PATH="$ROOT/usr/libexec/git-core"; export GIT_EXEC_PATH
 
 exec "@LOADER@" \
-     --library-path "$EXEDIR" \
+     --library-path "@LIBPATH@" \
      --inhibit-cache \
      "$EXEDIR/@TARGET@" "$@"

@@ -74,6 +74,7 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
       sed -e "s|@ROOT@|ROOT=\"\${ANDCODE_ROOT:?}\"|" \
           -e "s|@EXEDIR@|\$ANDCODE_EXE_DIR|" \
           -e "s|@LOADER@|\$ANDCODE_EXE_DIR/libandcode-ld-linux.so|" \
+          -e "s|@LIBPATH@|\$ANDCODE_EXE_DIR|" \
           -e "s|@TARGET@|$target|" \
           -e "s|@TIER@|p|" \
           "$TPL" > "$LIBS/$phys"

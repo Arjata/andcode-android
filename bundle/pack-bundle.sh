@@ -67,6 +67,7 @@ while IFS= read -r -d '' f; do
     sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/${up}\" \&\& pwd)\"|" \
         -e "s|@EXEDIR@|\$ROOT|" \
         -e "s|@LOADER@|\$ROOT/lib/ld-linux-aarch64.so.1|" \
+        -e "s|@LIBPATH@|\$ROOT/lib|" \
         -e "s|@TARGET@|$rel.bin|" \
         -e "s|@TIER@|a|" \
         "$BUNDLE_TPL" | { printf '%s\n' "$SHEBANG"; tail -n +2; } > "$f"
