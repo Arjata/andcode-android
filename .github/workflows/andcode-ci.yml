@@ -65,16 +65,14 @@ jobs:
           CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq git >/dev/null"
-          mkdir -p work/stage/usr/libexec work/stage/usr/lib
-          docker cp $CID:/usr/bin work/stage/usr/bin.tmp
-          docker cp $CID:/usr/libexec/git-core work/stage/usr/libexec/git-core 2>/dev/null \
-            || { docker exec $CID mkdir -p /usr/libexec && docker cp $CID:/usr/lib/git-core work/stage/usr/libexec/git-core; }
+          # 只取 git 家族二进制(/usr/bin/git 与 git-* 助手);/usr/bin 全量拷贝会带入 apt/dpkg
+          docker exec $CID bash -c "mkdir -p /tmp/gitbin && cp -a /usr/bin/git /usr/bin/git-* /tmp/gitbin/ 2>/dev/null || true"
+          docker cp $CID:/tmp/gitbin/. work/stage/usr/bin/
           # git 的私有依赖(libcurl-gnutls/libexpat 等)在 git 容器,rootfs 里没有;
           # 作为解析源交给 pack-bundle(--extralib),不进 bundle 树
           mkdir -p work/git-libs
           docker cp $CID:/usr/lib/aarch64-linux-gnu work/git-libs/aarch64-linux-gnu
           docker rm -f $CID
-          rm -rf work/stage/usr/bin.tmp
 
       - name: 组装 bundle
         run: |

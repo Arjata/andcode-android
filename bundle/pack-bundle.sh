@@ -67,11 +67,11 @@ while IFS= read -r -d '' f; do
     sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/${up}\" \&\& pwd)\"|" \
         -e "s|@EXEDIR@|\$ROOT|" \
         -e "s|@LOADER@|\$ROOT/lib/ld-linux-aarch64.so.1|" \
-        -e "s|@TARGET@|$cmd.bin|" \
+        -e "s|@TARGET@|$rel.bin|" \
         -e "s|@TIER@|a|" \
         "$BUNDLE_TPL" | { printf '%s\n' "$SHEBANG"; tail -n +2; } > "$f"
     chmod 0755 "$f"
-    echo "[包装] $cmd → $cmd.bin(位于 ${f#$B/} 目录,深度 $depth)"
+    echo "[包装] $rel → $rel.bin(深度 $depth)"
   fi
 done < <(find "$B" -type f ! -name '*.bin' -print0 | while IFS= read -r -d '' f; do
   file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64' && printf '%s\0' "$f"
