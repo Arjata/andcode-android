@@ -21,6 +21,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -29,6 +30,8 @@ static const char *const REDIRECT_BASENAMES[] = {
     "resolv.conf", "hosts", "host.conf", "nsswitch.conf",
     "passwd", "group", "services", NULL,
 };
+
+static int getenv_flag(void) { return getenv("ANDCODE_ETC_DIR") != NULL; }
 
 /* /etc/ssl/ 整段前缀重定向(CA 证书树;pack-bundle 已收入 $ANDCODE_ETC_DIR/ssl) */
 static int redirect_ssl(const char *path, char *buf, size_t buflen) {
@@ -42,8 +45,6 @@ static int redirect_ssl(const char *path, char *buf, size_t buflen) {
     { struct stat st; if (stat(buf, &st) != 0) return 0; } /* 副本存在才重定向 */
     return 1;
 }
-
-static int getenv_flag(void) { return getenv("ANDCODE_ETC_DIR") != NULL; }
 
 /* 返回重定向后的路径;不需重定向返回 NULL */
 static const char *redirect_path(const char *path, char *buf, size_t buflen) {

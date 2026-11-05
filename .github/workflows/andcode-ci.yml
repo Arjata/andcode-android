@@ -62,10 +62,14 @@ jobs:
           CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq git >/dev/null"
-          mkdir -p work/stage/usr/libexec
+          mkdir -p work/stage/usr/libexec work/stage/usr/lib
           docker cp $CID:/usr/bin work/stage/usr/bin.tmp
           docker cp $CID:/usr/libexec/git-core work/stage/usr/libexec/git-core 2>/dev/null \
             || { docker exec $CID mkdir -p /usr/libexec && docker cp $CID:/usr/lib/git-core work/stage/usr/libexec/git-core; }
+          # git 的私有依赖(libcurl-gnutls/libexpat 等)在 git 容器,rootfs 里没有;
+          # 作为解析源交给 pack-bundle(--extralib),不进 bundle 树
+          mkdir -p work/git-libs
+          docker cp $CID:/usr/lib/aarch64-linux-gnu work/git-libs/aarch64-linux-gnu
           docker rm -f $CID
           rm -rf work/stage/usr/bin.tmp
 
@@ -75,6 +79,7 @@ jobs:
           bash bundle/pack-bundle.sh \
             --rootfs work/rootfs \
             --stage work/stage \
+            --extralib work/git-libs/aarch64-linux-gnu \
             --out dist/andcode-bundle-arm64-v0.1.0.tar.gz \
             --shebang /bin/sh \
             --name v0.1.0

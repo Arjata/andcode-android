@@ -21,6 +21,7 @@
 set -euo pipefail
 
 ROOTFS="" STAGE="" OUT="" SHEBANG="/system/bin/sh" VER="0.0.0+dev"
+EXTRA_LIBS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --rootfs) ROOTFS="$2"; shift 2 ;;
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
     --out)    OUT="$2";    shift 2 ;;
     --shebang) SHEBANG="$2"; shift 2 ;;
     --name)   VER="$2";    shift 2 ;;
+    --extralib) EXTRA_LIBS+=("$2"); shift 2 ;;
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
@@ -75,10 +77,15 @@ done)
 # ── 2. glibc 闭包(root/lib,保持 soname)─────────────────────────────────
 mkdir -p "$B/lib"
 declare -A COPIED=()
-# 在 rootfs 内按 NEEDED 名解析(不经宿主缓存,保证使用基线版本);
-# -L 跟随 /lib → /usr/lib 符号链接;lib 落点直接用 soname 原名(路线乙)
-resolve_in_rootfs() { # $1 = 库文件名 → 输出 rootfs 内绝对路径
-  local name="$1"
+# 依赖解析顺序: --extralib(上游容器私有库)→ 基线 rootfs;
+# -L 跟随符号链接;lib 落点用 soname 原名(路线乙)
+resolve_in_rootfs() { # $1 = 库文件名 → 输出绝对路径
+  local name="$1" d p
+  for d in "${EXTRA_LIBS[@]:-}"; do
+    [ -n "$d" ] || continue
+    p="$(find -L "$d" -name "$name" -type f 2>/dev/null | head -n1)"
+    [ -n "$p" ] && { printf '%s\n' "$p"; return 0; }
+  done
   find -L "$ROOTFS/lib" "$ROOTFS/usr/lib" "$ROOTFS/usr/lib/aarch64-linux-gnu" \
        -name "$name" -type f 2>/dev/null | head -n1
 }
