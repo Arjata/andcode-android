@@ -53,13 +53,20 @@ while IFS= read -r -d '' elf; do
   # 2) NEEDED 清单
   needed="$(readelf -d "$elf" 2>/dev/null | grep -oE 'NEEDED.*\[(.+)\]' | sed 's/.*\[\(.*\)\]/\1/' | tr '\n' ' ' || true)"
   [ -n "$needed" ] && echo "       NEEDED: $needed"
-  # 3) 16K 段对齐
+  # 3) 16K 段对齐(数值比较;0x10000=64K 是合规的,勿用前缀通配)
   if [ "$PAGE_ALIGN" = 1 ]; then
-    minalign="$(readelf -lW "$elf" 2>/dev/null | awk '/LOAD/{print $NF}' | sort -uV | head -n1 || true)"
-    case "$minalign" in
-      0x1000|0x1000*) echo "[FAIL] PT_LOAD p_align=$minalign < 16K(16K 页设备不可加载)  $elf"; fail=1 ;;
-      *) [ -n "$minalign" ] && echo "[ok]   PT_LOAD p_align=$minalign ≥ 16K  $elf" ;;
-    esac
+    min=""
+    for a in $(readelf -lW "$elf" 2>/dev/null | awk '/LOAD/{print $NF}'); do
+      d="$(printf '%d' "$a" 2>/dev/null)" || continue
+      if [ -z "$min" ] || [ "$d" -lt "$min" ]; then min="$d"; fi
+    done
+    if [ -z "$min" ]; then
+      echo "[info] 无 LOAD 段(非 ELF?)  $elf"
+    elif [ "$min" -lt 16384 ]; then
+      echo "[FAIL] PT_LOAD p_align=$min < 16K(16K 页设备不可加载)  $elf"; fail=1
+    else
+      echo "[ok]   PT_LOAD p_align=$min ≥ 16K  $elf"
+    fi
   fi
 done < <(collect_elfs)
 
