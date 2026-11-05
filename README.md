@@ -27,5 +27,5 @@ bundle/         自包含交付包(glibc 闭包 + loader 包装器 + LD_PRELOAD 
 magisk-module/  Tier M:root 设备的 Magisk 模块(开机自启,零 App)
 scripts/        adb 直推(Tier A)与冒烟测试
 app/            Tier P:自研最小 APK(minSdk 31 / targetSdk 37.2,内嵌终端与交付包)
-ci/             GitHub Actions
+.github/workflows/ CI(andcode-ci.yml)
 ```

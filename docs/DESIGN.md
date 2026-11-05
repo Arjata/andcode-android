@@ -321,7 +321,7 @@ andcode/
 │   └── smoke-test.sh         # 三形态共用验收(§6)
 ├── app/                      # Tier P 自研 APK(§4.4, Kotlin + jackpal 终端库 fork)
 ├── third_party/              # 指南与补丁(不 vendoring 源码,只放构建配方)
-└── ci/github-actions.yml     # 基线 → 交付包 → 审计 → 冒烟 → 发布
+└── .github/workflows/andcode-ci.yml  # 基线 → 交付包 → 审计 → 冒烟 → 发布
 ```
 
 ---
