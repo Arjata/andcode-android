@@ -22,7 +22,8 @@ t "shim 存在"                   test -f "$ROOT/shim/libandcode-shim.so"
 t "resolv.conf 已生成"          test -s "$ROOT/etc/resolv.conf"
 t "opencode --version"          "$ROOT/bin/opencode" --version
 t "git --version"               "$ROOT/usr/bin/git" --version
-t "git https 助手(wrapper 链路)" sh -c "PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH git ls-remote https://github.com/git/git.git HEAD"
+t "DNS 解析(bundle resolv.conf)" sh -c "PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH getent hosts github.com || getent hosts github.com"
+t "git https 助手(wrapper 链路)" sh -c "PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=30 timeout 90 git ls-remote https://github.com/git/git.git HEAD"
 t "busybox 可用"                "$ROOT/bin/busybox" true
 t "andcode-entry doctor"        sh "$ROOT/bin/andcode-doctor"
 
