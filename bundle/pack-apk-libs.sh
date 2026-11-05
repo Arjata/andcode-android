@@ -35,6 +35,7 @@ declare -A SONAME_MAP=()   # 旧 soname → 新物理名
 while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$lp" in '#'*|"") continue ;; esac
   case "$kind" in
+    data) continue ;;   # data 不进 jniLibs(NAMING §6.2;APK assets 原样落位 filesDir)
     glibc-lib|preload-lib|elf-exec|wrapper-sh|script|alias) ;;
     *) echo "[FAIL] manifest 未知 kind: $kind($lp)"; exit 1 ;;
   esac
@@ -90,6 +91,6 @@ for f in "$LIBS"/*.so; do
 done
 [ $bad -eq 0 ] || exit 1
 
-# ── 5. link-farm 清单(逻辑路径 → 物理名)────────────────────────────────
-awk -F'\t' '$1 !~ /^#/ && $1 != "" {print $1 "\t" $2}' "$B/manifest" > "$OUT/manifest.farm"
+# ── 5. link-farm 清单(逻辑路径 → 物理名;data 类排除,物理为 "-")────────
+awk -F'\t' '$1 !~ /^#/ && $1 != "" && $2 != "-" {print $1 "\t" $2}' "$B/manifest" > "$OUT/manifest.farm"
 echo "jniLibs 就绪: $LIBS($(ls "$LIBS" | wc -l) 项);farm 清单: $OUT/manifest.farm"

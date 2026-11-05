@@ -30,11 +30,25 @@ static const char *const REDIRECT_BASENAMES[] = {
     "passwd", "group", "services", NULL,
 };
 
+/* /etc/ssl/ 整段前缀重定向(CA 证书树;pack-bundle 已收入 $ANDCODE_ETC_DIR/ssl) */
+static int redirect_ssl(const char *path, char *buf, size_t buflen) {
+    const char *dir;
+    size_t n;
+    if (!path || !getenv_flag()) return 0;
+    if (strncmp(path, "/etc/ssl/", 9) != 0) return 0;
+    dir = getenv("ANDCODE_ETC_DIR");
+    n = (size_t)snprintf(buf, buflen, "%s/ssl/%s", dir, path + 9);
+    if (n >= buflen) return 0;
+    { struct stat st; if (stat(buf, &st) != 0) return 0; } /* 副本存在才重定向 */
+    return 1;
+}
+
 static int getenv_flag(void) { return getenv("ANDCODE_ETC_DIR") != NULL; }
 
 /* 返回重定向后的路径;不需重定向返回 NULL */
 static const char *redirect_path(const char *path, char *buf, size_t buflen) {
     if (!path || !getenv_flag()) return NULL;
+    if (redirect_ssl(path, buf, buflen)) return buf;   /* /etc/ssl/ 前缀整段 */
     /* 只处理绝对 /etc/<name>;符号链接与相对路径透传 */
     if (strncmp(path, "/etc/", 5) != 0 || strchr(path + 5, '/')) return NULL;
     const char *base = path + 5;

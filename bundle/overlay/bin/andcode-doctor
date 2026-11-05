@@ -1,29 +1,43 @@
 #!/system/bin/sh
-# andcode-doctor — 环境自检(DESIGN §4.4 设置页 / smoke-test 后端)
-# 输出人读诊断;--json 输出机器可读(供 APK 设置页解析)
+# andcode-doctor — 环境自检(DESIGN §4.4 设置页 / smoke-test 后端, NAMING §4.1)
+# 用法: andcode-doctor [--json]
+#   无参数:人读报告(stdout);--json:机器可读,仅 stdout,单一 JSON 对象。
+# 诊断项(loader/shim/resolv/opencode/git/busybox)与 AGENTS §5 待办对齐。
 set -u
 JSON=0; [ "${1:-}" = "--json" ] && JSON=1
 ROOT="${ANDCODE_ROOT:?ANDCODE_ROOT 未设置}"
+
 pass=0; fail=0
+json="{"
+sep=" "
 
-say() { [ $JSON -eq 1 ] || printf '%s\n' "$*"; }
+add() { # $1=名称 $2=true|false
+  json="$json$sep\"$1\": $2"
+  sep=", "
+  if [ "$2" = true ]; then pass=$((pass+1)); else fail=$((fail+1)); fi
+}
+human() { [ $JSON -eq 1 ] && return; printf '%s %s\n' "$1" "$2"; }
 
-chk() { # $1=名称 $2=命令...
+chk() { # $1=名称 其余=命令
+  n="$1"; shift
   if "$@" >/dev/null 2>&1; then
-    say "ok   $1"; pass=$((pass+1)); echo "  \"$1\": true," >&2
+    add "$n" true;  human "ok  " "$n"
   else
-    say "FAIL $1"; fail=$((fail+1)); echo "  \"$1\": false," >&2
-  fi >&2
+    add "$n" false; human "FAIL" "$n"
+  fi
 }
 
-[ $JSON -eq 1 ] && printf '{\n'
-chk "loader"        "$ROOT/lib/ld-linux-aarch64.so.1" --version
-chk "shim"          test -f "$ROOT/shim/libandcode-shim.so"
-chk "resolv"        test -s "$ROOT/etc/resolv.conf"
-chk "opencode"      "$ROOT/bin/opencode" --version
-chk "git"           "$ROOT/bin/git" --version
-chk "busybox"       "$ROOT/bin/busybox" true
-[ $JSON -eq 1 ] && printf '  "_pass": %s, "_fail": %s\n}\n' "$pass" "$fail"
-say "----"
-say "通过 $pass / 失败 $fail"
-exit $([ "$fail" -eq 0 ] && echo 0 || echo 1)
+chk loader    "$ROOT/lib/ld-linux-aarch64.so.1" --version
+chk shim      test -f "$ROOT/shim/libandcode-shim.so"
+chk resolv    test -s "$ROOT/etc/resolv.conf"
+chk ssl-certs test -s "$ROOT/etc/ssl/certs/ca-certificates.crt"
+chk opencode  "$ROOT/bin/opencode" --version
+chk git       "$ROOT/bin/git" --version
+chk busybox   "$ROOT/bin/busybox" true
+
+if [ $JSON -eq 1 ]; then
+  printf '%s, \"_pass\": %s, \"_fail\": %s }\n' "$json" "$pass" "$fail"
+else
+  printf '----\n通过 %s / 失败 %s\n' "$pass" "$fail"
+fi
+[ "$fail" -eq 0 ]

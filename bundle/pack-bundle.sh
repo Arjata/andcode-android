@@ -50,19 +50,23 @@ fi
 is_static() { file -b "$1" | grep -q 'statically linked\|static-pie'; }
 
 # 深度优先处理:静态直通;动态 ELF 改名 .bin 并在原路径生成包装器
+# ROOT 自推导深度 = 路径在 root/ 下的目录层数(bin/x → 1 层 → "../";深路径按层数累加)
 while IFS= read -r -d '' f; do
   if is_static "$f"; then
     echo "[直通] 静态 ELF: ${f#$B/}"
   else
     mv "$f" "$f.bin"
     cmd="$(basename "$f")"
-    sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/../..\" \&\& pwd)\"|" \
+    rel="${f#"$B/"}"                     # 如 bin/opencode、usr/libexec/git-core/git-remote-https
+    depth="$(printf '%s' "$rel" | awk -F'/' '{print NF-1}')"
+    up=""; i=0; while [ $i -lt $depth ]; do up="${up}../"; i=$((i+1)); done
+    sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/${up}\" \&\& pwd)\"|" \
         -e "s|@EXEDIR@|\$ROOT|" \
         -e "s|@TARGET@|$cmd.bin|" \
         -e "s|@TIER@|a|" \
         "$BUNDLE_TPL" > "$f"
     chmod 0755 "$f"
-    echo "[包装] $cmd → $cmd.bin(位于 ${f#$B/} 目录)"
+    echo "[包装] $cmd → $cmd.bin(位于 ${f#$B/} 目录,深度 $depth)"
   fi
 done < <(find "$B" -type f ! -name '*.bin' -print0 | while IFS= read -r -d '' f; do
   file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64' && printf '%s\0' "$f"
@@ -71,10 +75,12 @@ done)
 # ── 2. glibc 闭包(root/lib,保持 soname)─────────────────────────────────
 mkdir -p "$B/lib"
 declare -A COPIED=()
-# 在 rootfs 内按 NEEDED 名解析(不经宿主缓存,保证使用基线版本)
+# 在 rootfs 内按 NEEDED 名解析(不经宿主缓存,保证使用基线版本);
+# -L 跟随 /lib → /usr/lib 符号链接;lib 落点直接用 soname 原名(路线乙)
 resolve_in_rootfs() { # $1 = 库文件名 → 输出 rootfs 内绝对路径
   local name="$1"
-  find "$ROOTFS/lib" "$ROOTFS/usr/lib" "$ROOTFS/lib64" -name "$name" -type f 2>/dev/null | head -n1
+  find -L "$ROOTFS/lib" "$ROOTFS/usr/lib" "$ROOTFS/usr/lib/aarch64-linux-gnu" \
+       -name "$name" -type f 2>/dev/null | head -n1
 }
 copy_deps() { # $1 = ELF 路径(必须在 rootfs 的 chroot 视角下解析)
   local elf="$1" needed name path
@@ -117,32 +123,74 @@ EOF
 printf 'hosts: files dns\n' > "$B/etc/nsswitch.conf"
 printf '# 运行期由 andcode-mkresolv 覆盖\nnameserver 1.1.1.1\n' > "$B/etc/resolv.conf"
 
-# ── 4. manifest(NAMING §7.2)────────────────────────────────────────────
-slug() { # $1 = bundle 内逻辑路径(root/ 相对)
-  local p="${1#root/}" s
-  case "$p" in
-    bin/*|usr/bin/*|usr/libexec/git-core/*|sbin/*) p="${p#bin/}"; p="${p#usr/bin/}"; p="${p#usr/libexec/git-core/}"; p="${p#sbin/}" ;;
-  esac
-  s="$(printf '%s' "$p" | tr '/' '-')"
-  printf 'libandcode-%s.so' "$s"
-}
+# CA 证书(git/https 必需;shim 对 /etc/ssl/ 前缀整段重定向,DESIGN §4.5)
+# -L 解引用:/etc/ssl/certs 常为符号链接,内部哈希链接指向 rootfs 他处
+if [ -e "$ROOTFS/etc/ssl/certs" ] || [ -e "$ROOTFS/usr/lib/ssl/certs" ]; then
+  SRC="$ROOTFS/etc/ssl/certs"; [ -e "$SRC" ] || SRC="$ROOTFS/usr/lib/ssl/certs"
+  mkdir -p "$B/etc/ssl"
+  cp -aL "$SRC" "$B/etc/ssl/certs" 2>/dev/null || cp -aL "$SRC/." "$B/etc/ssl/certs/"
+  cp -fL "$ROOTFS/etc/ssl/openssl.cnf" "$B/etc/ssl/" 2>/dev/null || true
+  echo "[etc] CA 证书已收录($(find "$B/etc/ssl/certs" -type f | wc -l) 项)"
+fi
+
+# ── 4. manifest(NAMING §7.2;kind/物理名判定见 NAMING §6.2)───────────────
 MF="$B/manifest"
 printf '# logical-path\tphysical-tier-p\tkind\tlicense\tversion\tupstream\n' > "$MF"
+
+slug() { # $1 = bundle 内逻辑路径(root/ 相对) → 物理名(NAMING §6.2)
+  local p="${1#root/}" base s
+  case "$p" in
+    *.bin) base="${p%.bin}" ;;                      # ELF 本体:剥 .bin
+    *)    base="$p" ;;
+  esac
+  case "$base" in
+    bin/*|usr/bin/*|sbin/*) p="${base#bin/}"; p="${p#usr/bin/}"; p="${p#sbin/}" ;;
+    *)                      p="$base" ;;
+  esac
+  s="$(printf '%s' "$p" | tr '/' '-')"
+  s="$(printf '%s' "$s" | tr -c 'a-z0-9A-Z-' '-')"   # 字符净化(NAMING §6.2)
+  printf 'libandcode-%s.so' "$s"
+}
+lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版本尾)
+  local b="$(basename "$1")"
+  case "$b" in
+    ld-linux*) printf 'libandcode-ld-linux.so' ;;
+    *)         b="${b%.so.*}"; b="${b%.so}"; printf 'libandcode-%s.so' "$b" ;;
+  esac
+}
+
 while IFS= read -r -d '' f; do
   lp="${f#$B/}"
   case "$lp" in
-    root/etc/*|root/home/*|root/tmp/*|manifest) continue ;;
+    root/home/*|root/tmp/*|manifest) continue ;;
   esac
-  phys="$(slug "$lp")"
-  case "$lp" in
-    *.bin) kind=elf-exec; lic=MIT; up=sst/opencode ;;
-    */libexec/git-core/*) kind=elf-exec; lic=GPL-2.0-or-later; up=git/git ;;
-    root/lib/*) kind=glibc-lib; lic=LGPL-2.1; up=glibc-2.39 ;;
-    */libandcode-shim.so) kind=preload-lib; lic=AGPL-3.0-only; up=andcode ;;
-    root/sbin/*|root/bin/*) kind=wrapper-sh; lic=AGPL-3.0-only; up=andcode ;;
-    *) kind=script; lic=AGPL-3.0-only; up=andcode ;;
-  esac
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$lp" "$phys" "$kind" "$lic" "$VER" "$up" >> "$MF"
+  lic=AGPL-3.0-only; up=andcode; ver="$VER"
+  if [ "${lp#root/lib/}" != "$lp" ]; then
+    kind=glibc-lib; phys="$(lib_slug "$lp")"; lic=LGPL-2.1; up=glibc-2.39
+  elif [ "${lp#root/etc/}" != "$lp" ]; then
+    # data 类不进 jniLibs(只读数据经 APK assets → filesDir 原样落位),物理名占位 "-"
+    kind=data; phys="-"
+  elif [ "$lp" = "shim/libandcode-shim.so" ]; then
+    kind=preload-lib; phys="$lp"
+  elif file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64'; then
+    kind=elf-exec; phys="$(slug "$lp")"
+    case "$(basename "$lp")" in
+      busybox*)            lic=GPL-2.0;         up=busybox.net/alpine ;;
+      dropbear*|dbclient*) lic=MIT;             up=mkj/dropbear ;;
+      *libexec/git-core/*) lic=GPL-2.0-or-later; up=git/git ;;
+      *)                   lic=MIT;             up=sst/opencode ;;
+    esac
+  elif [ -f "$f.bin" ]; then
+    # 有同名 .bin ⇒ 本文件是上游命令的包装器(NAMING §6.2:bin/usr/bin 下加 cmd-)
+    case "$lp" in
+      root/bin/*|root/usr/bin/*) phys="libandcode-cmd-$(printf '%s' "${lp#root/}" | sed 's#^bin/##; s#^usr/bin/##' | tr '/' '-' | tr -c 'a-z0-9A-Z-' '-').so" ;;
+      *) phys="$(slug "$lp")" ;;
+    esac
+    kind=wrapper-sh
+  else
+    kind=script; phys="$(slug "$lp")"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$lp" "$phys" "$kind" "$lic" "$ver" "$up" >> "$MF"
 done < <(find "$B" -type f -print0 | sort -z)
 
 # ── 5. 打包 ──────────────────────────────────────────────────────────────

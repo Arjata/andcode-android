@@ -98,19 +98,25 @@ shim/libandcode-shim.so      # 本项目 LD_PRELOAD 库(见 §6.3)
 
 ### 6.2 slug 派生算法(Tier P 重打包,由 `bundle/pack-apk-libs.sh` 执行)
 
-对规范布局内每个需要 exec 的文件,逻辑路径按以下顺序剥前缀:
-`bin/`、`usr/bin/`、`usr/libexec/git-core/`、`sbin/`;余下路径 `/`→`-`;
-最终物理名 = `libandcode-` + slug + `.so`。
+对规范布局内每个文件,按**文件种类**应用下表(种类由 `pack-bundle.sh` 在 manifest
+中固化,判据见括号):
 
-| 逻辑路径(规范布局) | Tier P 物理名(jniLibs) |
-|---|---|
-| `root/bin/opencode.bin` | `libandcode-opencode.so` |
-| `root/bin/opencode`(包装器) | `libandcode-cmd-opencode.so`(shebang 脚本,见 §6.3) |
-| `root/usr/bin/git` | `libandcode-git.so` |
-| `root/usr/libexec/git-core/git-remote-https` | `libandcode-git-remote-https.so` |
-| `root/sbin/andcode-entry` | `libandcode-andcode-entry.so`(slug 含 `andcode-` 前缀,允许;不剥自有前缀) |
-| `root/lib/ld-linux-aarch64.so.1` | `libandcode-ld-linux.so`(loader 特例:显式按路径调用,可自由改名) |
-| `shim/libandcode-shim.so` | `libandcode-shim.so`(原名即合规) |
+| 逻辑路径(规范布局) | kind | Tier P 物理名(jniLibs) |
+|---|---|---|
+| `root/bin/opencode.bin`(上游 ELF,`.bin` 后缀) | elf-exec | `libandcode-opencode.so`(slug **剥掉 `.bin`**) |
+| `root/bin/opencode`(上游命令包装器,同目录存在 `<name>.bin` 时判定) | wrapper-sh | `libandcode-cmd-opencode.so`(`bin/`、`usr/bin/` 下加 **`cmd-`** 段) |
+| `root/usr/bin/git` | elf-exec/wrapper-sh | 同上规则(存在 `git.bin` → wrapper) |
+| `root/usr/libexec/git-core/git-remote-https`(git 助手包装器) | wrapper-sh | `libandcode-git-remote-https.so`(libexec 下**不加** `cmd-`) |
+| `root/usr/libexec/git-core/git-remote-https.bin`(助手 ELF 本体) | elf-exec | `libandcode-usr-libexec-git-core-git-remote-https.so`(全路径 slug;与包装器不同名,无冲突) |
+| `root/sbin/andcode-entry`(本项目自有脚本,无同名 `.bin`) | script | `libandcode-andcode-entry.so`(slug 含 `andcode-` 前缀,允许) |
+| `root/lib/ld-linux-aarch64.so.1`(loader 特例:显式路径调用) | glibc-lib | `libandcode-ld-linux.so` |
+| `root/lib/libc.so.6`(DT_NEEDED 依赖库) | glibc-lib | `libandcode-libc.so`(slug **剥掉 `.so.N` 版本尾**) |
+| `root/lib/libstdc++.so.6` | glibc-lib | `libandcode-libstdc---.so`(slug 字符净化见下) |
+| `shim/libandcode-shim.so`(本项目 LD_PRELOAD 库) | preload-lib | `libandcode-shim.so`(原名即合规) |
+| `root/etc/ssl/certs/ca-certificates.crt` 等数据文件 | data | **`-`**(data 不进 jniLibs:只读数据经 APK assets → filesDir 原样落位;亦避免长路径超 64 字符) |
+
+**slug 字符净化**(在 `/`→`-` 之后):仅保留 `[a-z0-9-]`,其余逐字符替换为 `-`
+(`+`、`_`、`.` 等均逐字符替换,连续结果不合并)。物理名全长(含 `libandcode-`/`.so`)≤ 64。
 
 ### 6.3 两个关键裁定
 
@@ -165,7 +171,7 @@ shim/libandcode-shim.so	libandcode-shim.so	preload-lib	AGPL-3.0-only	1.0.0	andco
 ```
 
 规则:`physical-tier-p` 必须满足 §6.2 算法;`kind` 取值
-`elf-exec|wrapper-sh|glibc-lib|preload-lib|script|alias`;CI 以此生成
+`elf-exec|wrapper-sh|glibc-lib|preload-lib|script|data|alias`;CI 以此生成
 `THIRD-PARTY-NOTICES.md`(REUSE.md §4)。
 
 ## 8. 注册表变更流程与 CI 门禁

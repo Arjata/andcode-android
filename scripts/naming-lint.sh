@@ -15,22 +15,26 @@ done
 
 fail=0
 
-# 1. manifest 存在且物理名合规
+# 1. manifest 存在且物理名合规(data 类物理名占位 "-",docs/LFS 与 NAMING §6.2)
 [ -f "$DIR/manifest" ] || { echo "[FAIL] 缺少 manifest"; exit 1; }
 while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$lp" in '#'*|"") continue ;; esac
+  if [ "$kind" = "data" ]; then
+    [ "$phys" = "-" ] || { echo "[FAIL] data 类物理名必须为 '-': $lp"; fail=1; }
+    continue
+  fi
   printf '%s' "$phys" | grep -qE '^libandcode-[a-z0-9-]+\.so$' \
     || { echo "[FAIL] 物理名: '$phys' ← $lp"; fail=1; }
   [ ${#phys} -le 64 ] || { echo "[FAIL] 物理名超 64 字符: $phys"; fail=1; }
-  printf '%s' "$kind" | grep -qE '^(elf-exec|wrapper-sh|glibc-lib|preload-lib|script|alias)$' \
+  printf '%s' "$kind" | grep -qE '^(elf-exec|wrapper-sh|glibc-lib|preload-lib|script|data|alias)$' \
     || { echo "[FAIL] kind: '$kind' ← $lp"; fail=1; }
 done < "$DIR/manifest"
 
-# 2. bundle 内路径名规则([a-z0-9-],.bin 双名与 shim 例外)
+# 2. bundle 内路径名规则([a-z0-9-],.bin 双名与 soname/数据文件等模板例外)
 while IFS= read -r -d '' f; do
   rel="${f#$DIR/}"
   case "$rel" in
-    manifest|*/*.so|etc/*|home/*|tmp/*) continue ;;
+    manifest|root/etc/*|root/home/*|root/tmp/*|root/lib/*|shim/*|*.so*) continue ;;
   esac
   n="$(basename "$rel")"
   case "$n" in
