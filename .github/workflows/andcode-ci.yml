@@ -76,6 +76,27 @@ jobs:
           docker cp $CID:/usr/lib/aarch64-linux-gnu work/git-libs/aarch64-linux-gnu
           docker rm -f $CID
 
+      - name: 获取 proot(Termux bionic 构建,Tier A/M /etc 重定向正解)
+        run: |
+          mkdir -p work/proot work/proot-x
+          curl -sL -o work/proot/proot.deb "https://packages.termux.dev/apt/termux-main/pool/main/p/proot/proot_5.1.107.102_aarch64.deb"
+          curl -sL -o work/proot/talloc.deb "https://packages.termux.dev/apt/termux-main/pool/main/libt/libtalloc/libtalloc_2.5.0_aarch64.deb"
+          curl -sL -o work/proot/shmem.deb "https://packages.termux.dev/apt/termux-main/pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb"
+          for d in proot talloc shmem; do
+            mkdir -p work/proot-x/$d
+            ( cd work/proot-x/$d && ar x ../../../proot/$d.deb )
+            tar -xJf work/proot-x/$d/data.tar.xz -C work/proot-x/$d
+          done
+          P=work/proot-x/proot/data/data/com.termux/files/usr
+          T=work/proot-x/talloc/data/data/com.termux/files/usr
+          S=work/proot-x/shmem/data/data/com.termux/files/usr
+          mkdir -p work/proot-dir/lib work/proot-dir/libexec/proot
+          cp $P/bin/proot work/proot-dir/proot
+          cp $P/libexec/proot/loader work/proot-dir/libexec/proot/loader
+          cp $T/lib/libtalloc.so.2.5.0 work/proot-dir/lib/libtalloc.so.2
+          cp $S/lib/libandroid-shmem.so work/proot-dir/lib/
+          chmod 0755 work/proot-dir/proot work/proot-dir/libexec/proot/loader
+
       - name: 组装 bundle
         run: |
           sudo apt-get install -y -qq musl-tools >/dev/null 2>&1 || true
@@ -86,6 +107,7 @@ jobs:
             --rootfs work/rootfs \
             --stage work/stage \
             --extralib work/git-libs/aarch64-linux-gnu \
+            --proot work/proot-dir \
             --launcher work/andcode-launcher \
             --out dist/andcode-bundle-arm64-v0.1.1.tar.gz \
             --shebang /bin/sh \

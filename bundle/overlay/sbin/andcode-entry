@@ -23,6 +23,19 @@ case "$cmd" in
     exec "$ROOT/sbin/dropbear" -r "$HK" -p 127.0.0.1:2222 -A -N "$ROOT/home" "$@"
     ;;
   shell)
+    P="$ROOT/usr/lib/proot/proot"
+    if [ -x "$P" ]; then
+      export PROOT_LOADER="$ROOT/usr/lib/proot/loader"
+      exec "$P" \
+        -b "$ROOT/etc/resolv.conf:/etc/resolv.conf" \
+        -b "$ROOT/etc/ssl:/etc/ssl" \
+        -b "$ROOT/etc/ssl:/usr/lib/ssl" \
+        -b "$ROOT/etc/passwd:/etc/passwd" \
+        -b "$ROOT/etc/group:/etc/group" \
+        -b "$ROOT/etc/nsswitch.conf:/etc/nsswitch.conf" \
+        -w "$ROOT" \
+        "$ROOT/bin/busybox" sh -l
+    fi
     exec "$ROOT/bin/busybox" sh -l
     ;;
   doctor)
