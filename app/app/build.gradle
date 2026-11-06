@@ -1,0 +1,29 @@
+plugins {
+    id("com.android.application")
+}
+
+android {
+    namespace = "dev.andcode.app"
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = "dev.andcode.app"
+        minSdk = 31
+        targetSdk = 37
+        versionCode = 1
+        versionName = "0.1.1"
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    packaging {
+        jniLibs.useLegacyPackaging = false
+    }
+}
+
+dependencies {
+    implementation(project(":terminal-view"))
+    implementation(project(":terminal-emulator"))
+    implementation("androidx.appcompat:appcompat:1.7.1")
+}
