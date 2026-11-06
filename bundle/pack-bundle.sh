@@ -247,6 +247,7 @@ while IFS= read -r -d '' f; do
 done < <(find "$B" -type f -print0 | sort -z)
 
 # ── 5. 打包 ──────────────────────────────────────────────────────────────
+rm -f "$B/.kindmap"
 mkdir -p "$(dirname "$ABS_OUT")"
 ( cd "$WORK" && tar -czf "$ABS_OUT" andcode )
 sha256sum "$ABS_OUT" | tee "$ABS_OUT.sha256"
