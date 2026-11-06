@@ -60,18 +60,49 @@ int main(int argc, char **argv) {
     }
 
     /* argv: loader --library-path LIBPATH --inhibit-cache SELF argv[1..] */
-    char **nargv = malloc(sizeof(char *) * (size_t)(argc + 5));
+    char **nargv = malloc(sizeof(char *) * (size_t)(argc + 16));
     if (!nargv) { fprintf(stderr, "andcode-launcher: OOM\n"); return 127; }
     int i = 0;
-    nargv[i++] = loader;
+    nargv[i++] = (char *)loader;
     nargv[i++] = (char *)"--library-path";
-    nargv[i++] = libdir;
+    nargv[i++] = (char *)libdir;
     nargv[i++] = (char *)"--inhibit-cache";
-    nargv[i++] = self;
+    nargv[i++] = (char *)self;
+
+    /* proot bind(/etc):helper 的 glibc 内部读(/etc/resolv.conf 等)只能靠
+     * proot 用户态 bind 重定向(DESIGN §4.5 v0.4.1);嵌套由 ANDCODE_IN_PROOT 守卫 */
+    char proot[CAP], resolv[CAP], ssl[CAP], usrlibssl[CAP], pwdf[CAP], grpf[CAP], nss[CAP], wdir[CAP];
+    snprintf(proot, sizeof proot, "%s/usr/lib/proot/proot", root);
+    snprintf(resolv, sizeof resolv, "%s/etc/resolv.conf:/etc/resolv.conf", root);
+    snprintf(ssl, sizeof ssl, "%s/etc/ssl:/etc/ssl", root);
+    snprintf(usrlibssl, sizeof usrlibssl, "%s/etc/ssl:/usr/lib/ssl", root);
+    snprintf(pwdf, sizeof pwdf, "%s/etc/passwd:/etc/passwd", root);
+    snprintf(grpf, sizeof grpf, "%s/etc/group:/etc/group", root);
+    snprintf(nss, sizeof nss, "%s/etc/nsswitch.conf:/etc/nsswitch.conf", root);
+    if (!getcwd(wdir, sizeof wdir)) snprintf(wdir, sizeof wdir, "/");
+
+    if (access(proot, X_OK) == 0 && access("/system/bin/sh", F_OK) == 0
+        && getenv("ANDCODE_IN_PROOT") == NULL) {
+        char ploader[CAP], plib[CAP];
+        snprintf(ploader, sizeof ploader, "%s/usr/lib/proot/loader", root);
+        snprintf(plib, sizeof plib, "%s/usr/lib/proot", root);
+        setenv("PROOT_LOADER", ploader, 1);
+        setenv("LD_LIBRARY_PATH", plib, 1);
+        setenv("ANDCODE_IN_PROOT", "1", 1);
+        nargv[i++] = (char *)proot;
+        nargv[i++] = (char *)"-b"; nargv[i++] = (char *)resolv;
+        nargv[i++] = (char *)"-b"; nargv[i++] = (char *)ssl;
+        nargv[i++] = (char *)"-b"; nargv[i++] = (char *)usrlibssl;
+        nargv[i++] = (char *)"-b"; nargv[i++] = (char *)pwdf;
+        nargv[i++] = (char *)"-b"; nargv[i++] = (char *)grpf;
+        nargv[i++] = (char *)"-b"; nargv[i++] = (char *)nss;
+        nargv[i++] = (char *)"-w"; nargv[i++] = (char *)wdir;
+    }
+
     for (int k = 1; k < argc; k++) nargv[i++] = argv[k];
     nargv[i] = NULL;
 
-    execv(loader, nargv);
-    fprintf(stderr, "andcode-launcher: exec %s failed: %s\n", loader, strerror(errno));
+    execv(nargv[0], nargv);
+    fprintf(stderr, "andcode-launcher: exec %s failed: %s\n", nargv[0], strerror(errno));
     return 127;
 }

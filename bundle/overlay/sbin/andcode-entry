@@ -26,6 +26,7 @@ case "$cmd" in
     P="$ROOT/usr/lib/proot/proot"
     if [ -x "$P" ]; then
       export PROOT_LOADER="$ROOT/usr/lib/proot/loader"
+      export LD_LIBRARY_PATH="$ROOT/usr/lib/proot${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
       exec "$P" \
         -b "$ROOT/etc/resolv.conf:/etc/resolv.conf" \
         -b "$ROOT/etc/ssl:/etc/ssl" \

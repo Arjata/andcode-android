@@ -42,8 +42,10 @@ TARGET_PATH="$EXEDIR/@TARGET@"
 # glibc 内部 fopen("/etc/resolv.conf")(真机 P0 实测)。仅 Android 运行时
 # (存在 /system/bin/sh)启用;容器冒烟回退旧链路。
 PROOT="$ROOT/usr/lib/proot/proot"
-if [ -x "$PROOT" ] && [ -e /system/bin/sh ]; then
+if [ -x "$PROOT" ] && [ -e /system/bin/sh ] && [ -z "${ANDCODE_IN_PROOT:-}" ]; then
   export PROOT_LOADER="$ROOT/usr/lib/proot/loader"
+  export ANDCODE_IN_PROOT=1
+  export LD_LIBRARY_PATH="$ROOT/usr/lib/proot${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   exec "$PROOT" \
        -b "$ROOT/etc/resolv.conf:/etc/resolv.conf" \
        -b "$ROOT/etc/ssl:/etc/ssl" \

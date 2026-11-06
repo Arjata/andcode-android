@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
         mTerminalView = findViewById(R.id.terminal_view);
+        mTerminalView.setTextSize(30);
 
         String entry = BUNDLE_ROOT + "/sbin/andcode-entry";
         String shellCmd;
