@@ -115,9 +115,5 @@ GSI, adbd root)——Tier A 部署 + 冒烟 **7/7 全绿**;opencode(Bun v1.4.4)�
 TCP DNS)。已发布 Release v0.1.1。剩余:
 1. **P0 实机四项**(需真机):无 proot 裸 sysroot 跑 Bun、jniLibs 提取、W^X 下 JIT
    (`BUN_JSC_useJIT=0` 回退)、opencode 运行期是否释放 ELF;
-2. **已知问题(P0 跟进,真机已定位)**:`git ls-remote https` 时 dash 报
-   `/bin/sh: <stdin>[1]: capabilities: not found`,双诱饵证明 wrapper 未被 exec;
-   helper 二进制本身经 loader+shim 手动喂协议帧**应答正常**——问题锁定在 git 生成
-   helper 的 spawn 路径(疑似 ENOEXEC→`/bin/sh` 回退读 stdin)。修复候选①:规范布局
-   也应用 route-A patchelf(helper 直启 ELF);候选②:真机 strace;
-3. **P2 Tier M** 真机验证(脚本已就绪);**P3 Tier P APK** 未开工。
+2. **git https 已解决(真机 2026-11-06)**:三层修复——①helper 改静态 musl launcher;②proot bind /etc(LD_PRELOAD 无法拦截 glibc 内部 fopen,DESIGN §4.5 重写);③`options use-vc`(网络阻断 UDP 53)。`git ls-remote https://github.com/...` 真机返回 HEAD。**新发现(应用上下文)**:untrusted_app 执行 /data/local/tmp 二进制需 chcon apk_data_file;Bionic 链接器命名空间忽略 LD_LIBRARY_PATH(targetSdk 24+),proot 的 libtalloc 须入 APK jniLibs(nativeLibraryDir)——P3 完整集成路线已定;
+3. **P2 Tier M** 真机验证(脚本已就绪;设备 root 可直接做);**P3 Tier P APK 已开工并本地构建成功**(app/ 脚手架:Termux 终端核心 GPLv3 并入、CMake/NDK 编译 libtermux、specialUse FGS;app-debug.apk 7.5MB 已装机可启动终端)——剩余:bundle 完整 jniLibs 集成(opencode/git/proot 入 nativeLibraryDir,pack-apk-libs 输出对接 gradle)、TUI 会话真机截图验证、release 签名。

@@ -46,6 +46,7 @@ if [ -x "$PROOT" ] && [ -e /system/bin/sh ] && [ -z "${ANDCODE_IN_PROOT:-}" ]; t
   export PROOT_LOADER="$ROOT/usr/lib/proot/loader"
   export ANDCODE_IN_PROOT=1
   export LD_LIBRARY_PATH="$ROOT/usr/lib/proot${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export PROOT_TMP_DIR="${ANDCODE_APP_DATA:-$ROOT/tmp}"
   exec "$PROOT" \
        -b "$ROOT/etc/resolv.conf:/etc/resolv.conf" \
        -b "$ROOT/etc/ssl:/etc/ssl" \

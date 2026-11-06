@@ -89,6 +89,12 @@ int main(int argc, char **argv) {
         setenv("PROOT_LOADER", ploader, 1);
         setenv("LD_LIBRARY_PATH", plib, 1);
         setenv("ANDCODE_IN_PROOT", "1", 1);
+        if (getenv("PROOT_TMP_DIR") == NULL) {
+            const char *ad = getenv("ANDCODE_APP_DATA");
+            char ptmp[CAP];
+            snprintf(ptmp, sizeof ptmp, "%s/tmp", ad ? ad : root);
+            setenv("PROOT_TMP_DIR", ptmp, 1);
+        }
         nargv[i++] = (char *)proot;
         nargv[i++] = (char *)"-b"; nargv[i++] = (char *)resolv;
         nargv[i++] = (char *)"-b"; nargv[i++] = (char *)ssl;

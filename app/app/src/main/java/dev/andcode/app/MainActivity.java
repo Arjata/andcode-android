@@ -58,7 +58,8 @@ public class MainActivity extends AppCompatActivity {
             "HOME=" + getFilesDir().getAbsolutePath(),
             "PATH=/system/bin:/system/xbin",
             "TERM=xterm-256color",
-            "LANG=en_US.UTF-8"
+            "LANG=en_US.UTF-8",
+            "ANDCODE_APP_DATA=" + getFilesDir().getAbsolutePath()
         };
 
         mSession = new TerminalSession(
