@@ -85,6 +85,18 @@ jobs:
             --shebang /bin/sh \
             --name v0.1.0
 
+      - name: 诊断: git 助手链路(定位 capabilities not found)
+        run: |
+          mkdir -p work/dbg && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/dbg --strip-components=1
+          docker run --rm --platform linux/arm64 -v "$PWD/work/dbg:/opt" \
+            -e ANDCODE_ROOT=/opt -e ANDCODE_TIER=a ubuntu:24.04 bash -c '
+              export PATH=/opt/bin:/opt/usr/bin:$PATH
+              echo "== helper wrapper head =="; head -n 3 /opt/usr/libexec/git-core/git-remote-https
+              echo "== git --exec-path =="; git --exec-path
+              echo "== direct helper =="; GIT_EXEC_PATH=/opt/usr/libexec/git-core timeout 15 /opt/usr/libexec/git-core/git-remote-https "" https://github.com/git/git.git </dev/null 2>&1 | head -n 4; echo "rc=$?"
+              echo "== ls-remote trace =="; GIT_TRACE=1 timeout 30 git ls-remote https://github.com/git/git.git HEAD 2>&1 | head -n 14
+            '
+
       - name: 兼容性审计(DESIGN §3.3)
         run: |
           mkdir -p work/audit && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/audit
