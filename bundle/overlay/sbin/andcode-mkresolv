@@ -24,5 +24,7 @@ fi
 
 {
   for d in $DNS; do echo "nameserver $d"; done
+  # 移动网络/受管 Wi-Fi 常阻断 UDP 53 出站(ICMP/443 可通):强制 TCP DNS
+  echo "options use-vc timeout:3 attempts:2"
 } > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
 echo "resolv.conf → $OUT: $(tr '\n' ' ' < "$OUT")"
