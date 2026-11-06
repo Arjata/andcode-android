@@ -85,7 +85,7 @@ jobs:
             --shebang /bin/sh \
             --name v0.1.0
 
-      - name: 诊断: git 助手链路(定位 capabilities not found)
+      - name: 诊断 git 助手链路(定位 capabilities not found)
         run: |
           mkdir -p work/dbg && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/dbg --strip-components=1
           docker run --rm --platform linux/arm64 -v "$PWD/work/dbg:/opt" \
