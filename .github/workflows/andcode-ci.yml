@@ -128,6 +128,9 @@ jobs:
       - name: 命名规范门禁(NAMING §8)
         run: bash scripts/naming-lint.sh --bundle-dir work/audit/andcode
 
+      - name: 生成 THIRD-PARTY-NOTICES(REUSE §4)
+        run: bash scripts/gen-notices.sh work/audit/andcode/manifest > dist/THIRD-PARTY-NOTICES.md && head -n 12 dist/THIRD-PARTY-NOTICES.md
+
       - name: 冒烟自测(容器内 wrapper 链路,Tier A 等价)
         run: |
           docker run --rm --platform linux/arm64 \
@@ -153,3 +156,4 @@ jobs:
           path: |
             dist/andcode-bundle-arm64-v0.1.1.tar.gz
             dist/andcode-bundle-arm64-v0.1.1.tar.gz.sha256
+            dist/THIRD-PARTY-NOTICES.md
