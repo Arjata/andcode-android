@@ -149,7 +149,11 @@ done < <(find "$B" -type f -name '*.bin' -print0)
 if [ -n "$PROOT_DIR" ] && [ -d "$PROOT_DIR" ]; then
   mkdir -p "$B/usr/lib/proot"
   cp -f "$PROOT_DIR/proot"  "$B/usr/lib/proot/proot"
-  cp -f "$PROOT_DIR/loader" "$B/usr/lib/proot/loader" 2>/dev/null || true
+  if [ -f "$PROOT_DIR/loader" ]; then
+    cp -f "$PROOT_DIR/loader" "$B/usr/lib/proot/loader"
+  elif [ -f "$PROOT_DIR/libexec/proot/loader" ]; then
+    cp -f "$PROOT_DIR/libexec/proot/loader" "$B/usr/lib/proot/loader"
+  fi
   for l in "$PROOT_DIR"/lib/*.so*; do [ -e "$l" ] && cp -f "$l" "$B/usr/lib/proot/"; done
   chmod 0755 "$B/usr/lib/proot/proot" "$B/usr/lib/proot/loader"
 fi
