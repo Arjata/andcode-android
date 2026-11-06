@@ -34,10 +34,15 @@ if [ -f "$SHIM" ]; then
 fi
 GIT_EXEC_PATH="$ROOT/usr/libexec/git-core"; export GIT_EXEC_PATH
 
+LOADER_PATH="@LOADER@"
+LIBPATH_VALUE="@LIBPATH@"
+TARGET_PATH="$EXEDIR/@TARGET@"
+
 # proot(Tier A/M 正解):/etc 重定向走用户态 bind——LD_PRELOAD 无法拦截
-# glibc 内部 fopen("/etc/resolv.conf")(真机 P0 实测)。缺失时回退旧链路。
+# glibc 内部 fopen("/etc/resolv.conf")(真机 P0 实测)。仅 Android 运行时
+# (存在 /system/bin/sh)启用;容器冒烟回退旧链路。
 PROOT="$ROOT/usr/lib/proot/proot"
-if [ -x "$PROOT" ]; then
+if [ -x "$PROOT" ] && [ -e /system/bin/sh ]; then
   export PROOT_LOADER="$ROOT/usr/lib/proot/loader"
   exec "$PROOT" \
        -b "$ROOT/etc/resolv.conf:/etc/resolv.conf" \
@@ -47,10 +52,10 @@ if [ -x "$PROOT" ]; then
        -b "$ROOT/etc/group:/etc/group" \
        -b "$ROOT/etc/nsswitch.conf:/etc/nsswitch.conf" \
        -w "$PWD" \
-       "$LOADER" --library-path "$LIBPATH" --inhibit-cache "$EXEDIR/@TARGET@" "$@"
+       "$LOADER_PATH" --library-path "$LIBPATH_VALUE" --inhibit-cache "$TARGET_PATH" "$@"
 fi
 
-exec "@LOADER@" \
-     --library-path "@LIBPATH@" \
+exec "$LOADER_PATH" \
+     --library-path "$LIBPATH_VALUE" \
      --inhibit-cache \
-     "$EXEDIR/@TARGET@" "$@"
+     "$TARGET_PATH" "$@"
