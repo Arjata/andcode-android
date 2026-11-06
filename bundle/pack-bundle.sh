@@ -51,6 +51,15 @@ if [ -d "$(dirname "$0")/overlay" ]; then
   cp -a "$(dirname "$0")/overlay/." "$B/"
 fi
 
+# 解引用树内符号链接(git-core 的 git-remote-https → git-remote-http 等):
+# 否则 find -type f 会跳过它们,导致助手从未被包装 → https 链路断裂
+while IFS= read -r -d '' l; do
+  tgt="$(readlink -f "$l")" || continue
+  [ -f "$tgt" ] || continue
+  cp -f --remove-destination "$tgt" "$l"
+  echo "[解引用] ${l#$B/} → ${tgt#$B/}"
+done < <(find "$B" -type l -print0)
+
 is_static() { file -b "$1" | grep -q 'statically linked\|static-pie'; }
 
 # 深度优先处理:静态直通;动态 ELF 改名 .bin 并在原路径生成包装器
