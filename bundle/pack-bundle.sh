@@ -189,7 +189,9 @@ lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版�
     ld-linux*) printf 'libandcode-ld-linux.so' ;;
     *)         b="${b%.so.*}"; b="${b%.so}"; printf 'libandcode-%s.so' "$b" ;;
   esac
-}wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|libexec|sbin 剥前缀,NAMING §6.2)
+}
+
+wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|libexec|sbin 剥前缀,NAMING §6.2)
   local p="${1#root/}"
   case "$p" in
     bin/*|usr/bin/*|usr/libexec/git-core/*|sbin/*) p="${p#bin/}"; p="${p#usr/bin/}"; p="${p#usr/libexec/git-core/}"; p="${p#sbin/}" ;;
