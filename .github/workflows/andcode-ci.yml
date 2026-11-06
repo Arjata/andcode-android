@@ -96,6 +96,9 @@ jobs:
               echo "== helper wrapper head =="; head -n 3 /opt/usr/libexec/git-core/git-remote-https
               echo "== git --exec-path =="; git --exec-path
               echo "== direct helper =="; GIT_EXEC_PATH=/opt/usr/libexec/git-core timeout 15 /opt/usr/libexec/git-core/git-remote-https "" https://github.com/git/git.git </dev/null 2>&1 | head -n 4; echo "rc=$?"
+              echo "== sh -c probe (复现 git 的调用方式) =="; /bin/sh -c "git remote-https https://github.com/git/git.git https://github.com/git/git.git" </dev/null 2>&1 | head -n 6; echo "rc=$?"
+              echo "== which git =="; command -v git; ls -la /opt/usr/bin/ 2>&1 | head -n 10
+              echo "== helper stderr/stdout 分离 =="; GIT_EXEC_PATH=/opt/usr/libexec/git-core timeout 12 /opt/usr/libexec/git-core/git-remote-https origin https://github.com/git/git.git </dev/null 2>/tmp/herr >/tmp/hout; echo "helper rc=$?"; echo "-- stderr:"; head -n 5 /tmp/herr; echo "-- stdout:"; head -n 5 /tmp/hout
               echo "== ls-remote trace =="; GIT_TRACE=1 timeout 30 git ls-remote https://github.com/git/git.git HEAD 2>&1 | head -n 14
             '
 
