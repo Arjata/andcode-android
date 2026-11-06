@@ -84,7 +84,7 @@ jobs:
           curl -sL -o work/proot/shmem.deb "https://packages.termux.dev/apt/termux-main/pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb"
           for d in proot talloc shmem; do
             mkdir -p work/proot-x/$d
-            ( cd work/proot-x/$d && ar x ../../../proot/$d.deb )
+            ( cd work/proot-x/$d && ar x ../../proot/$d.deb )
             tar -xJf work/proot-x/$d/data.tar.xz -C work/proot-x/$d
           done
           P=work/proot-x/proot/data/data/com.termux/files/usr
