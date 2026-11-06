@@ -33,6 +33,17 @@ static const char *const REDIRECT_BASENAMES[] = {
 
 static int getenv_flag(void) { return getenv("ANDCODE_ETC_DIR") != NULL; }
 
+/*
+ * 自清构造器:本 shim 经 LD_PRELOAD 注入 glibc 进程后,立即从环境中移除
+ * LD_PRELOAD。否则该进程派生的 Android Bionic 子进程(/system/bin/sh 等)
+ * 会继承 LD_PRELOAD 并因无法加载 glibc 依赖而拒绝执行(真机实测:
+ * CANNOT LINK EXECUTABLE "/bin/sh": libc.so.6 not found)。子进程若需
+ * shim(如 git 助手包装器)由各自 wrapper 重新设置。
+ */
+__attribute__((constructor)) static void andcode_shim_sanitize(void) {
+    unsetenv("LD_PRELOAD");
+}
+
 /* /etc/ssl/ 整段前缀重定向(CA 证书树;pack-bundle 已收入 $ANDCODE_ETC_DIR/ssl) */
 static int redirect_ssl(const char *path, char *buf, size_t buflen) {
     const char *dir;

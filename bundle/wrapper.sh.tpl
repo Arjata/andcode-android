@@ -19,7 +19,11 @@ export ANDCODE_TIER="@TIER@"
 SHIM="$ROOT/shim/libandcode-shim.so"
 
 # 仅设置 NAMING §5 登记的运行时变量;不覆盖用户显式设置的 OPENCODE_*
-: "${HOME:=$ROOT/home}"; export HOME
+# HOME 为空或 / 时强制落到 $ROOT/home(adb shell root 环境 HOME=/ 会导致 Bun 写 /.local → EROFS)
+case "${HOME:-}" in
+  ""|"/") HOME="$ROOT/home" ;;
+esac
+export HOME
 TMPDIR="$ROOT/tmp"; mkdir -p "$TMPDIR" 2>/dev/null || true; export TMPDIR
 PATH="$ROOT/bin:$ROOT/usr/bin:$ROOT/usr/libexec/git-core:$PATH"; export PATH
 LD_LIBRARY_PATH="$EXEDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"; export LD_LIBRARY_PATH
