@@ -1,6 +1,12 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4 (设计稿) · 日期: 2026-11-06
+> 版本: v0.4.1 (设计稿) · 日期: 2026-11-06
+> v0.4.1 变更(真机 P0 三大发现,§4.5 重写): ①**LD_PRELOAD 无法拦截 glibc 内部
+> fopen("/etc/resolv.conf")**,shim 对 glibc-internal /etc 读取无效 → Tier A/M 的
+> /etc 重定向改由 **proot 用户态 bind**(Termux bionic 构建,GPL-2.0 独立聚合)承担,
+> shim 保留为深层防御;②git 助手改**静态 musl launcher**(规避 shell spawn 异常);
+> ③**移动/受管网络常阻断 UDP 53**,resolv.conf 强制 `options use-vc`(TCP DNS)。
+> 真机(Android 13 GSI)实测:冒烟 7/7、opencode 运行、git https 全链路打通。
 > v0.4 变更: **平台基线钉死 Android 12+ (minSdk 31)、APK targetSdk/compileSdk 37.2**;
 > 移除 targetSdk 28 取巧,Tier P 改用 jniLibs 提取(nativeLibraryDir 可执行)方案,
 > 新增 W^X/JIT、16K 页对齐、前台服务类型等适配项。
@@ -259,21 +265,24 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
 - UI 极简:一个终端页 + 一个"状态/设置"页(启动 sshd、注入 API key、
   phantom-killer adb 引导、工作区选择),本质上是一个"自带 opencode 的终端"。
 
-### 4.5 LD_PRELOAD 重定向 shim(替代 proot 的关键部件)
+### 4.5 /etc 重定向:proot bind(主)+ LD_PRELOAD shim(辅)
 
-自研、本项目 AGPL、数页 C 代码。拦截 `open/openat/stat/access` 等少数调用,
-把 glibc 的只读系统路径重定向进 `$ROOT/etc`:
+**架构修正(v0.4.1,真机实测)**:LD_PRELOAD 只能拦截**跨对象 PLT 调用**;
+`fopen("/etc/resolv.conf")` 等由 **glibc 内部直接发起**(隐藏别名,不走 PLT),
+shim 拦截不到——真机 TEST-NET 探针 244ms 瞬断证实。因此:
 
-| glibc 请求 | 重定向到 | 用途 |
-|---|---|---|
-| `/etc/resolv.conf` | `$ROOT/etc/resolv.conf`(由 `andcode-mkresolv` 从 Android `net.dns*` 生成) | DNS |
-| `/etc/passwd`, `/etc/group` | `$ROOT/etc/…` | getpwuid(HOME/用户名解析) |
-| `/etc/hosts`, `/etc/nsswitch.conf` | `$ROOT/etc/…` | 域名与 NSS 配置 |
+| 层 | /etc 重定向机制 |
+|---|---|
+| **Tier A/M(主)** | **proot 用户态 bind**:`proot -b $ROOT/etc/resolv.conf:/etc/resolv.conf -b $ROOT/etc/ssl:/etc/ssl …`,覆盖一切子孙进程;proot(Termux bionic 构建,GPL-2.0)+ loader + libtalloc + libandroid-shmem 随 bundle 分发(独立聚合,manifest 记录) |
+| **Tier M(root,可选)** | 真 bind mount(`mount --bind`),零开销 |
+| **shim(辅)** | 保留:拦截**非 glibc 对象**的 /etc 访问(libcrypto/libssl 等走 PLT 的调用);并承担 LD_PRELOAD 自清(Bionic 子进程保护) |
 
-- 兜底:若 shim 覆盖不全(P0 实测),退路是引入**单个静态 proot 二进制**
-  仅做 bind(见 §7 R1);proot 为 GPL-2.0,独立程序聚合 + 提供源码获取方式,合规。
-- Termux glibc 生态(`termux-pacman/glibc-packages`,MIT)作为该 shim 设计的
-  参考实现与对照测试基线。
+**已知约束**:①proot 的 ptrace 拦截**不可嵌套**——wrapper/entry 以
+`ANDCODE_IN_PROOT` 守卫,proot 内不再套 proot;②移动/受管网络常阻断 UDP 53
+出站——`andcode-mkresolv` 生成的 resolv.conf 强制 `options use-vc timeout:3
+attempts:2`(TCP DNS,真机实测必要);③Tier P(jniLibs + 数据目录)无法用
+proot 进程树包住(无终端宿主概念)——Tier P 的 /etc 方案待 P3 设计
+(候选:glibc sysconfdir 重编译或应用侧资产落位 + HOME 内配置)。
 
 ### 4.6 Android 12+ Phantom Process Killer 对策(三种形态共用)
 

@@ -109,9 +109,10 @@ feat: add serialization abstraction and JSON codec
 
 ## 5. 当前进行时(待办,动手前先认领)
 
-状态(2026-11-06):**P1 完成,CI 全绿**;**P0 真机验证进行中**(设备:Android 13 /
-TrebleDroid GSI, adbd root)——Tier A 部署 + 冒烟 **7/7 全绿**,opencode(Bun v1.4.4)
-真机运行成功。剩余:
+状态(2026-11-06):**P1 完成 + P0 真机验证完成**(设备:Android 13 / TrebleDroid
+GSI, adbd root)——Tier A 部署 + 冒烟 **7/7 全绿**;opencode(Bun v1.4.4)真机运行
+成功;**git ls-remote https 真机全链路打通**(wrapper + proot /etc bind + launcher +
+TCP DNS)。已发布 Release v0.1.1。剩余:
 1. **P0 实机四项**(需真机):无 proot 裸 sysroot 跑 Bun、jniLibs 提取、W^X 下 JIT
    (`BUN_JSC_useJIT=0` 回退)、opencode 运行期是否释放 ELF;
 2. **已知问题(P0 跟进,真机已定位)**:`git ls-remote https` 时 dash 报
