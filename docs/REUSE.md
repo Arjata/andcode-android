@@ -100,6 +100,6 @@
 - [ ] P0:实测 busybox 静态 arm64(GPL-2.0,官方 binaries 或基线自建)在 `/data/local/tmp`(Tier A)的执行情况;数据目录 exec 已被平台禁止,不再适用(Tier P 走 jniLibs)
 - [ ] P0:实测 jniLibs 提取(`lib*.so` → nativeLibraryDir)在 targetSdk 37.2 下的执行;验证 W^X 下 Bun/JSC JIT 或 `BUN_JSC_useJIT=0` 回退
 - [ ] P0:核实 opencode 运行期是否释放 ELF(TUI 等)及其预置路径机制(§4.1 约束)
-- [ ] P0:**git https 助手链路已知问题**:容器冒烟中 dash 报 `/bin/sh: 1: capabilities: not found`,双诱饵证明 git 未 exec 任何 helper 文件,核心链路(opencode/git 二进制)不受影响;真机 root 下 strace 续查
+- [ ] P0:**git https 助手链路已知问题(真机已定位)**:Android 13 真机(TrebleDroid GSI, root)实测——核心链路 7/7 全绿(loader/shim/resolv/certs/opencode/git/busybox),helper 二进制经 loader+shim 手动喂 `capabilities\n\n` 协议帧**应答正常**(stateless-connect/fetch/get/option/push);但 `git ls-remote` 时 dash 报 `/bin/sh: <stdin>[1]: capabilities: not found` 且双诱饵证明 wrapper 未被 exec——**git 生成 helper 的 spawn 路径异常**(疑似 execvp ENOEXEC→`/bin/sh` 回退读 stdin)。**修复候选①(首选)**:对规范布局也应用 route-A patchelf(helper 直启 ELF,免脚本 wrapper);候选②:真机 strace(root 可用)。证据:scripts/dev-helper-debug.sh、dev-helper-proto.sh、CI 日志
 - [ ] P3:jackpal 终端库最小 fork 建仓(Apache-2.0 保留声明),仅保留 TUI 会话所需路径;实测 UserLAnd 的执行策略作对照(仅观察)
 - [ ] 发布前:复查 dropbear/bun LGPL 部分的 notices 完整性;APK 关于页内置查看入口
