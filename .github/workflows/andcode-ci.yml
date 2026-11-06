@@ -94,7 +94,6 @@ jobs:
             -e ANDCODE_ROOT=/opt -e ANDCODE_TIER=a ubuntu:24.04 bash /scripts/ci-git-debug.sh /opt
 
       - name: 兼容性审计(DESIGN §3.3)
-      - name: 兼容性审计(DESIGN §3.3)
         run: |
           mkdir -p work/audit && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/audit
           bash baseline/check-compat.sh --page-align \
