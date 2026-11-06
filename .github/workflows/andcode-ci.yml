@@ -100,6 +100,8 @@ jobs:
               echo "== which git =="; command -v git; ls -la /opt/usr/bin/ 2>&1 | head -n 10
               echo "== helper stderr/stdout 分离 =="; GIT_EXEC_PATH=/opt/usr/libexec/git-core timeout 12 /opt/usr/libexec/git-core/git-remote-https origin https://github.com/git/git.git </dev/null 2>/tmp/herr >/tmp/hout; echo "helper rc=$?"; echo "-- stderr:"; head -n 5 /tmp/herr; echo "-- stdout:"; head -n 5 /tmp/hout
               echo "== wrapper 内容(exec 行) =="; grep -n 'exec\|TARGET\|LOADER\|LIBPATH\|@' /opt/usr/libexec/git-core/git-remote-https | head -n 8
+              echo "== wrapper 文件字节级(wc/cat -A) =="; wc -c /opt/usr/libexec/git-core/git-remote-https; cat -A /opt/usr/libexec/git-core/git-remote-https 2>&1 | head -n 40
+              echo "== git-core 目录 =="; ls -la /opt/usr/libexec/git-core/ 2>&1 | head -n 24
               echo "== wrapper sh -x 追踪 =="; ANDCODE_ROOT=/opt ANDCODE_TIER=a sh -x /opt/usr/libexec/git-core/git-remote-https '' https://github.com/git/git.git </dev/null 2>&1 | head -n 25
               echo "== ls-remote trace =="; GIT_TRACE=1 timeout 30 git ls-remote https://github.com/git/git.git HEAD 2>&1 | head -n 14
             '
