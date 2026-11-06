@@ -69,6 +69,8 @@ jobs:
           docker exec $CID bash -c "mkdir -p /tmp/gitbin && cp -a /usr/bin/git /usr/bin/git-* /tmp/gitbin/ 2>/dev/null || true"
           mkdir -p work/stage/usr/bin work/stage/usr/libexec work/git-libs
           docker cp $CID:/tmp/gitbin/. work/stage/usr/bin/
+          docker cp $CID:/usr/libexec/git-core work/stage/usr/libexec/git-core 2>/dev/null \
+            || { docker exec $CID mkdir -p /usr/libexec && docker cp $CID:/usr/lib/git-core work/stage/usr/libexec/git-core; }
           # git 的私有依赖(libcurl-gnutls/libexpat 等)在 git 容器,rootfs 里没有;
           # 作为解析源交给 pack-bundle(--extralib),不进 bundle 树
           docker cp $CID:/usr/lib/aarch64-linux-gnu work/git-libs/aarch64-linux-gnu
