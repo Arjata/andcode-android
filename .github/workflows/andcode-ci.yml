@@ -78,24 +78,28 @@ jobs:
 
       - name: 组装 bundle
         run: |
+          sudo apt-get install -y -qq musl-tools >/dev/null 2>&1 || true
+          musl-gcc -static -O2 -o work/andcode-launcher bundle/launcher/launcher.c
+          file -b work/andcode-launcher | grep -q 'statically linked\|static-pie' || { echo "launcher 非静态"; exit 1; }
           mkdir -p dist
           bash bundle/pack-bundle.sh \
             --rootfs work/rootfs \
             --stage work/stage \
             --extralib work/git-libs/aarch64-linux-gnu \
-            --out dist/andcode-bundle-arm64-v0.1.0.tar.gz \
+            --launcher work/andcode-launcher \
+            --out dist/andcode-bundle-arm64-v0.1.1.tar.gz \
             --shebang /bin/sh \
-            --name v0.1.0
+            --name v0.1.1
 
       - name: 诊断 git 助手链路(定位 capabilities not found)
         run: |
-          mkdir -p work/dbg && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/dbg --strip-components=1
+          mkdir -p work/dbg && tar -xzf dist/andcode-bundle-arm64-v0.1.1.tar.gz -C work/dbg --strip-components=1
           docker run --rm --platform linux/arm64 -v "$PWD/work/dbg:/opt" -v "$PWD/scripts:/scripts:ro" \
             -e ANDCODE_ROOT=/opt -e ANDCODE_TIER=a ubuntu:24.04 bash /scripts/ci-git-debug.sh /opt
 
       - name: 兼容性审计(DESIGN §3.3)
         run: |
-          mkdir -p work/audit && tar -xzf dist/andcode-bundle-arm64-v0.1.0.tar.gz -C work/audit
+          mkdir -p work/audit && tar -xzf dist/andcode-bundle-arm64-v0.1.1.tar.gz -C work/audit
           bash baseline/check-compat.sh --page-align \
             work/audit/andcode/bin work/audit/andcode/usr/bin work/audit/andcode/lib
 
@@ -108,7 +112,7 @@ jobs:
             -v "$PWD/dist:/dist" -v "$PWD/scripts:/scripts:ro" \
             -e ANDCODE_ROOT=/opt -e ANDCODE_TIER=a \
             ubuntu:24.04 bash -c '
-              mkdir -p /opt && tar -xzf /dist/andcode-bundle-arm64-v0.1.0.tar.gz -C /opt --strip-components=1
+              mkdir -p /opt && tar -xzf /dist/andcode-bundle-arm64-v0.1.1.tar.gz -C /opt --strip-components=1
               sh /scripts/smoke-test.sh
             '
 
@@ -117,7 +121,7 @@ jobs:
           command -v patchelf >/dev/null || sudo apt-get update -qq && sudo apt-get install -y -qq patchelf
           mkdir -p work/jni
           bash bundle/pack-apk-libs.sh \
-            --bundle dist/andcode-bundle-arm64-v0.1.0.tar.gz \
+            --bundle dist/andcode-bundle-arm64-v0.1.1.tar.gz \
             --out work/jni
           bash baseline/check-compat.sh --page-align work/jni/arm64-v8a
 
@@ -125,5 +129,5 @@ jobs:
         with:
           name: andcode-dist
           path: |
-            dist/andcode-bundle-arm64-v0.1.0.tar.gz
-            dist/andcode-bundle-arm64-v0.1.0.tar.gz.sha256
+            dist/andcode-bundle-arm64-v0.1.1.tar.gz
+            dist/andcode-bundle-arm64-v0.1.1.tar.gz.sha256

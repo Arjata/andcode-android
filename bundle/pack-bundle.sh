@@ -22,6 +22,7 @@ set -euo pipefail
 
 ROOTFS="" STAGE="" OUT="" SHEBANG="/system/bin/sh" VER="0.0.0+dev"
 EXTRA_LIBS=()
+LAUNCHER=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --rootfs) ROOTFS="$2"; shift 2 ;;
@@ -30,6 +31,7 @@ while [ $# -gt 0 ]; do
     --shebang) SHEBANG="$2"; shift 2 ;;
     --name)   VER="$2";    shift 2 ;;
     --extralib) EXTRA_LIBS+=("$2"); shift 2 ;;
+    --launcher) LAUNCHER="$2"; shift 2 ;;
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
@@ -73,15 +75,24 @@ while IFS= read -r -d '' f; do
     rel="${f#"$B/"}"                     # 如 bin/opencode、usr/libexec/git-core/git-remote-https
     depth="$(printf '%s' "$rel" | awk -F'/' '{print NF-1}')"
     up=""; i=0; while [ $i -lt $depth ]; do up="${up}../"; i=$((i+1)); done
-    sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/${up}\" \&\& pwd)\"|" \
-        -e "s|@EXEDIR@|\$ROOT|" \
-        -e "s|@LOADER@|\$ROOT/lib/ld-linux-aarch64.so.1|" \
-        -e "s|@LIBPATH@|\$ROOT/lib|" \
-        -e "s|@TARGET@|$rel.bin|" \
-        -e "s|@TIER@|a|" \
-        "$BUNDLE_TPL" | { printf '%s\n' "$SHEBANG"; tail -n +2; } > "$f"
+    if [ -n "$LAUNCHER" ] && [ -f "$LAUNCHER" ] && case "$rel" in usr/libexec/git-core/*) true ;; *) false ;; esac; then
+      # launcher 形态(NAMING §6.2):静态 musl 启动器取代 shell wrapper,
+      # 规避 git spawn 的 shell 链路(真机 P0: capabilities not found)
+      cp -f "$LAUNCHER" "$f"
+      echo "[包装] $rel → $rel.bin(launcher)"
+      printf '%s\tlauncher\n' "$rel" >> "$B/.kindmap"
+    else
+      sed -e "s|@ROOT@|ROOT=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")/${up}\" \&\& pwd)\"|" \
+          -e "s|@EXEDIR@|\$ROOT|" \
+          -e "s|@LOADER@|\$ROOT/lib/ld-linux-aarch64.so.1|" \
+          -e "s|@LIBPATH@|\$ROOT/lib|" \
+          -e "s|@TARGET@|$rel.bin|" \
+          -e "s|@TIER@|a|" \
+          "$BUNDLE_TPL" | { printf '%s\n' "$SHEBANG"; tail -n +2; } > "$f"
+      echo "[包装] $rel → $rel.bin(shell,深度 $depth)"
+      printf '%s\tshell\n' "$rel" >> "$B/.kindmap"
+    fi
     chmod 0755 "$f"
-    echo "[包装] $rel → $rel.bin(深度 $depth)"
   fi
 done < <(find "$B" -type f ! -name '*.bin' -print0 | while IFS= read -r -d '' f; do
   file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64' && printf '%s\0' "$f"
@@ -178,12 +189,27 @@ lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版�
     ld-linux*) printf 'libandcode-ld-linux.so' ;;
     *)         b="${b%.so.*}"; b="${b%.so}"; printf 'libandcode-%s.so' "$b" ;;
   esac
+}wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|libexec|sbin 剥前缀,NAMING §6.2)
+  local p="${1#root/}"
+  case "$p" in
+    bin/*|usr/bin/*|usr/libexec/git-core/*|sbin/*) p="${p#bin/}"; p="${p#usr/bin/}"; p="${p#usr/libexec/git-core/}"; p="${p#sbin/}" ;;
+  esac
+  p="$(printf '%s' "$p" | tr '/' '-' | tr -c 'a-z0-9A-Z-' '-')"
+  if [ "${1#root/bin/}" != "$1" ] || [ "${1#root/usr/bin/}" != "$1" ]; then
+    printf 'libandcode-cmd-%s.so' "$p"
+  else
+    printf 'libandcode-%s.so' "$p"
+  fi
 }
 
+declare -A KINDMAP=()
+if [ -f "$B/.kindmap" ]; then
+  while IFS=$'\t' read -r rel k; do KINDMAP["usr/libexec/git-core/$rel"]="$k"; done < "$B/.kindmap"
+fi
 while IFS= read -r -d '' f; do
   lp="${f#$B/}"
   case "$lp" in
-    root/home/*|root/tmp/*|manifest) continue ;;
+    root/home/*|root/tmp/*|manifest|.kindmap) continue ;;
   esac
   lic=AGPL-3.0-only; up=andcode; ver="$VER"
   if [ "${lp#root/lib/}" != "$lp" ]; then
@@ -201,12 +227,16 @@ while IFS= read -r -d '' f; do
       *libexec/git-core/*) lic=GPL-2.0-or-later; up=git/git ;;
       *)                   lic=MIT;             up=sst/opencode ;;
     esac
-  elif [ -f "$f.bin" ]; then
-    # 有同名 .bin ⇒ 本文件是上游命令的包装器(NAMING §6.2:bin/usr/bin 下加 cmd-)
-    case "$lp" in
-      root/bin/*|root/usr/bin/*) phys="libandcode-cmd-$(printf '%s' "${lp#root/}" | sed 's#^bin/##; s#^usr/bin/##' | tr '/' '-' | tr -c 'a-z0-9A-Z-' '-').so" ;;
-      *) phys="$(slug "$lp")" ;;
+  elif [ -n "${KINDMAP[${lp#root/}]:-}" ]; then
+    # wrapper / launcher(NAMING §6.2:bin/usr/bin 下 cmd- 前缀;libexec 直名)
+    phys="$(wrapper_slug "$lp")"
+    case "${KINDMAP[${lp#root/}]}" in
+      launcher) kind=launcher; lic=AGPL-3.0-only; up=andcode ;;
+      *)        kind=wrapper-sh ;;
     esac
+  elif [ -f "$f.bin" ]; then
+    # 有同名 .bin ⇒ 上游命令包装器(shell 形态,未登记 kindmap 的兜底)
+    phys="$(wrapper_slug "$lp")"
     kind=wrapper-sh
   else
     kind=script; phys="$(slug "$lp")"

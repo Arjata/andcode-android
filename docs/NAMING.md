@@ -73,6 +73,9 @@
 |---|---|---|
 | `ANDCODE_ROOT` | 逻辑根目录(包装器据此寻址) | `/data/adb/andcode`、`$HOME/andcode` |
 | `ANDCODE_EXE_DIR` | 可执行物理目录 | Tier P = `nativeLibraryDir`;其余 = `$ANDCODE_ROOT` |
+| `ANDCODE_LOADER` | glibc 动态链接器绝对路径(launcher 用) | `$ROOT/lib/ld-linux-aarch64.so.1` |
+| `ANDCODE_LIBPATH` | `--library-path` 值(launcher 用) | `$ROOT/lib`(规范)/`$ANDCODE_EXE_DIR`(Tier P) |
+| `ANDCODE_SHIM` | shim 绝对路径(launcher 用) | `$ROOT/shim/libandcode-shim.so` |
 | `ANDCODE_TIER` | 形态标识,单字符小写,与 DESIGN 章节一致 | `m` / `a` / `p` |
 | `ANDCODE_BUNDLE_VERSION` | bundle 语义化版本 | `1.2.0` |
 | `ANDCODE_LOG` | 日志级别 | `debug\|info\|error` |
@@ -107,6 +110,7 @@ shim/libandcode-shim.so      # 本项目 LD_PRELOAD 库(见 §6.3)
 | `root/bin/opencode`(上游命令包装器,同目录存在 `<name>.bin` 时判定) | wrapper-sh | `libandcode-cmd-opencode.so`(`bin/`、`usr/bin/` 下加 **`cmd-`** 段) |
 | `root/usr/bin/git` | elf-exec/wrapper-sh | 同上规则(存在 `git.bin` → wrapper) |
 | `root/usr/libexec/git-core/git-remote-https`(git 助手包装器) | wrapper-sh | `libandcode-git-remote-https.so`(libexec 下**不加** `cmd-`) |
+| `root/usr/libexec/git-core/git-remote-https`(同路径,**launcher 形态**:静态启动器 ELF 取代 shell 脚本,规避 git spawn 的 shell 链路;真机 P0 验证项) | launcher | `libandcode-git-remote-https.so`(同 wrapper 规则) |
 | `root/usr/libexec/git-core/git-remote-https.bin`(助手 ELF 本体) | elf-exec | `libandcode-usr-libexec-git-core-git-remote-https.so`(全路径 slug;与包装器不同名,无冲突) |
 | `root/sbin/andcode-entry`(本项目自有脚本,无同名 `.bin`) | script | `libandcode-andcode-entry.so`(slug 含 `andcode-` 前缀,允许) |
 | `root/lib/ld-linux-aarch64.so.1`(loader 特例:显式路径调用) | glibc-lib | `libandcode-ld-linux.so` |
@@ -171,7 +175,8 @@ shim/libandcode-shim.so	libandcode-shim.so	preload-lib	AGPL-3.0-only	1.0.0	andco
 ```
 
 规则:`physical-tier-p` 必须满足 §6.2 算法;`kind` 取值
-`elf-exec|wrapper-sh|glibc-lib|preload-lib|script|data|alias`;CI 以此生成
+`elf-exec|wrapper-sh|launcher|glibc-lib|preload-lib|script|data|alias`(launcher =
+静态 musl 启动器,来源 `bundle/launcher/launcher.c`,AGPL);CI 以此生成
 `THIRD-PARTY-NOTICES.md`(REUSE.md §4)。
 
 ## 8. 注册表变更流程与 CI 门禁

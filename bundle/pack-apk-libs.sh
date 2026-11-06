@@ -41,7 +41,7 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$lp" in '#'*|"") continue ;; esac
   case "$kind" in
     data) continue ;;   # data 不进 jniLibs(NAMING §6.2;APK assets 原样落位 filesDir)
-    glibc-lib|preload-lib|elf-exec|wrapper-sh|script|alias) ;;
+    glibc-lib|preload-lib|elf-exec|wrapper-sh|launcher|script|alias) ;;
     *) echo "[FAIL] manifest 未知 kind: $kind($lp)"; exit 1 ;;
   esac
   # 物理名门禁(NAMING §8)
