@@ -94,7 +94,15 @@ while IFS= read -r -d '' f; do
       echo "[包装] $rel → $rel.bin(shell,深度 $depth)"
       printf '%s\tshell\n' "$rel" >> "$B/.kindmap"
     fi
-    chmod 0755 "$f"
+    if [ -n "$LAUNCHER" ] && [ -f "$LAUNCHER" ]; then
+  # opencode 以 posix_spawn 调 'git'(无 shell,Bun 不回落 /bin/sh):
+  # bin/git 必须是 ELF launcher(target = usr/libexec/git-core/git.bin)
+  cp -f "$LAUNCHER" "$B/bin/git"
+  chmod 0755 "$B/bin/git"
+  printf '%s\tlauncher\n' "bin/git" >> "$B/.kindmap"
+  echo "[launcher] bin/git(opencode spawn 入口)"
+fi
+chmod 0755 "$f"
   fi
 done < <(find "$B" -type f ! -name '*.bin' -print0 | while IFS= read -r -d '' f; do
   file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64' && printf '%s\0' "$f"

@@ -11,7 +11,7 @@ BK="$(ls "$MODPATH"/andcode-bundle-*.tar.gz 2>/dev/null | head -n1 || true)"
 
 INSTALL_DIR=/data/adb/andcode
 mkdir -p "$INSTALL_DIR"
-tar -xzf "$BK" -C "$INSTALL_DIR"
+tar -xzf "$BK" -C "$INSTALL_DIR" --strip-components=1
 rm -f "$BK"
 chmod -R 0755 "$INSTALL_DIR/bin" "$INSTALL_DIR/sbin" "$INSTALL_DIR/usr/bin"
 
