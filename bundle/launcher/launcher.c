@@ -27,6 +27,24 @@ static char *xstrdup(const char *s) {
     return p;
 }
 
+/* 已被 ptrace 追踪(proot 父层)则禁止嵌套 proot——env 守卫(ANDCODE_IN_PROOT)
+ * 可能被上游 spawn 的 env 净化丢失,TracerPid 是与 env 无关的可靠判定(真机实测
+ * 嵌套 proot 互锁死锁) */
+static int is_traced(void) {
+    FILE *f = fopen("/proc/self/status", "r");
+    char line[256];
+    if (!f) return 0;
+    while (fgets(line, sizeof line, f)) {
+        if (strncmp(line, "TracerPid:", 10) == 0) {
+            int pid = atoi(line + 10);
+            fclose(f);
+            return pid != 0;
+        }
+    }
+    fclose(f);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *root = getenv("ANDCODE_ROOT");
     if (!root) { fprintf(stderr, "andcode-launcher: ANDCODE_ROOT not set\n"); return 127; }
@@ -82,7 +100,7 @@ int main(int argc, char **argv) {
     if (!getcwd(wdir, sizeof wdir)) snprintf(wdir, sizeof wdir, "/");
 
     if (access(proot, X_OK) == 0 && access("/system/bin/sh", F_OK) == 0
-        && getenv("ANDCODE_IN_PROOT") == NULL) {
+        && getenv("ANDCODE_IN_PROOT") == NULL && !is_traced()) {
         char ploader[CAP], plib[CAP];
         snprintf(ploader, sizeof ploader, "%s/usr/lib/proot/loader", root);
         snprintf(plib, sizeof plib, "%s/usr/lib/proot", root);
