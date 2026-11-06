@@ -1,3 +1,5 @@
+[![CI](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml/badge.svg)](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml)
+
 # andcode
 
 将 [opencode](https://github.com/sst/opencode)(终端 AI 编码代理)移植到 Android arm64,

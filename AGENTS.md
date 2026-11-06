@@ -107,10 +107,14 @@ feat: add serialization abstraction and JSON codec
 - 用户中文交流;文档、注释、commit 正文中英文皆可,但**术语与 NAMING.md 注册表
   保持一致**(`andcode-`、`libandcode-*`、`ANDCODE_*`、Tier M/A/P)。
 
-## 5. 当前进行时(P0/P1 待办,动手前先认领)
+## 5. 当前进行时(待办,动手前先认领)
 
-见 REUSE.md §4 行动项与 DESIGN.md §6 计划表。最高优先:
-1. CI 首跑修正 opencode 官方资产名识别(`ci/github-actions.yml` 中 `test("linux-arm64")`);
-2. P0 实测:无 proot 裸 sysroot 跑 Bun、jniLibs 提取、W^X 下 JIT(`BUN_JSC_useJIT=0` 回退)、
-   opencode 运行期是否释放 ELF;
-3. `andcode-doctor` JSON 输出(stdout/stderr 混用)收敛。
+状态(2026-11-06):**P1 已完成,CI 全绿**(rootfs→bundle→审计→门禁→冒烟→Tier P
+patchelf→发布工件)。剩余:
+1. **P0 实机四项**(需真机):无 proot 裸 sysroot 跑 Bun、jniLibs 提取、W^X 下 JIT
+   (`BUN_JSC_useJIT=0` 回退)、opencode 运行期是否释放 ELF;
+2. **已知问题(P0 跟进)**:容器冒烟中 `git ls-remote https` 报
+   `/bin/sh: 1: capabilities: not found`,双诱饵证明 git 未 exec 任何 helper 文件,
+   核心链路(opencode/git 二进制)不受影响;证据在 CI 日志,真机 root 环境可用
+   strace 续查;
+3. **P2 Tier M** 真机验证(脚本已就绪);**P3 Tier P APK** 未开工。

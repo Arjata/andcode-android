@@ -87,12 +87,19 @@
 
 ## 4. 行动项
 
+状态(2026-11-06):**P1 完成,CI 全绿**(run 42142198520)。已完成:
+- [x] CI 全链路(rootfs→bundle→审计→门禁→冒烟→Tier P patchelf 路线甲→发布工件);opencode 资产名实测核实为 `opencode-linux-arm64.tar.gz`(v1.19.5)
+- [x] busybox 静态来源落地:Alpine `busybox-static` 包(`busybox.static`,manifest 记录来源)
+- [x] `bundle/manifest` + naming-lint + check-compat 门禁随 CI 强制
+- [x] `andcode-doctor` JSON 输出收敛(仅 stdout 单一对象)
+
+待办:
 - [ ] P0:精读 `Happ1ness-dev/bun-termux`(MIT,首选)与 `claude-code-termux`(MIT)的 shim/环境处理,验证"无 proot 裸 sysroot 跑 Bun"路线
 - [ ] P0:对照 `termux-exec`(Apache-2.0)设计 shim 拦截面(open/openat/stat/execve),列出坑位清单
 - [ ] P0:核实 `proot-me/proot` LICENSE 原文(only vs or-later),决定兜底路径的分发措辞
 - [ ] P0:实测 busybox 静态 arm64(GPL-2.0,官方 binaries 或基线自建)在 `/data/local/tmp`(Tier A)的执行情况;数据目录 exec 已被平台禁止,不再适用(Tier P 走 jniLibs)
 - [ ] P0:实测 jniLibs 提取(`lib*.so` → nativeLibraryDir)在 targetSdk 37.2 下的执行;验证 W^X 下 Bun/JSC JIT 或 `BUN_JSC_useJIT=0` 回退
 - [ ] P0:核实 opencode 运行期是否释放 ELF(TUI 等)及其预置路径机制(§4.1 约束)
-- [ ] P1:`bundle/manifest` 与 `THIRD-PARTY-NOTICES.md` 自动生成脚本;CI 增加 16K 段对齐检查;CI 集成 patchelf(NixOS/patchelf,GPL-3.0,仅构建期)执行 NAMING §6.3 路线甲
+- [ ] P0:**git https 助手链路已知问题**:容器冒烟中 dash 报 `/bin/sh: 1: capabilities: not found`,双诱饵证明 git 未 exec 任何 helper 文件,核心链路(opencode/git 二进制)不受影响;真机 root 下 strace 续查
 - [ ] P3:jackpal 终端库最小 fork 建仓(Apache-2.0 保留声明),仅保留 TUI 会话所需路径;实测 UserLAnd 的执行策略作对照(仅观察)
 - [ ] 发布前:复查 dropbear/bun LGPL 部分的 notices 完整性;APK 关于页内置查看入口
