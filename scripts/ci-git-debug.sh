@@ -24,10 +24,13 @@ echo "  helper rc=$?"
 echo "  -- stderr:"; head -n 5 /tmp/herr | sed 's/^/    | /'
 echo "  -- stdout:"; head -n 5 /tmp/hout | sed 's/^/    | /'
 
-echo "== 诱饵测试: 替换 helper 为探针,确认 git 实际 exec 的文件 =="
-printf '#!/bin/sh\necho "BAIT argv0=$0 args=$*" >&2\nexit 42\n' > "$ROOT/usr/libexec/git-core/git-remote-https"
+echo "== 诱饵测试: bin 与 libexec 双探针,确认 git 实际 exec 的文件 =="
+printf '#!/bin/sh\necho "BAIT-BIN argv0=$0" >&2\nexit 42\n' > "$ROOT/bin/git-remote-https"
+chmod +x "$ROOT/bin/git-remote-https"
+printf '#!/bin/sh\necho "BAIT-LIBEXEC argv0=$0" >&2\nexit 42\n' > "$ROOT/usr/libexec/git-core/git-remote-https"
 chmod +x "$ROOT/usr/libexec/git-core/git-remote-https"
 GIT_TRACE=1 timeout 20 git ls-remote https://github.com/git/git.git HEAD 2>&1 | head -n 10
+rm -f "$ROOT/bin/git-remote-https"
 
 echo "== sh -x 追踪(诱饵前保留的 wrapper 已被覆盖,此处追踪诱饵) =="
 ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a sh -x "$ROOT/usr/libexec/git-core/git-remote-https" \
