@@ -23,6 +23,7 @@ set -euo pipefail
 ROOTFS="" STAGE="" OUT="" SHEBANG="/system/bin/sh" VER="0.0.0+dev"
 EXTRA_LIBS=()
 LAUNCHER=""
+PROOT_DIR=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --rootfs) ROOTFS="$2"; shift 2 ;;
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
     --name)   VER="$2";    shift 2 ;;
     --extralib) EXTRA_LIBS+=("$2"); shift 2 ;;
     --launcher) LAUNCHER="$2"; shift 2 ;;
+    --proot)    PROOT_DIR="$2"; shift 2 ;;
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
@@ -140,7 +142,17 @@ while IFS= read -r -d '' f; do
   case "$f" in *.bin) copy_deps "$f" ;; esac
 done < <(find "$B" -type f -name '*.bin' -print0)
 
-# ── 3. shim + etc 模板 ───────────────────────────────────────────────────
+# ── 3. proot(bionic 构建,Tier A/M 的 /etc 重定向正解)+ shim + etc 模板 ──
+# 依据(真机 P0 结论):LD_PRELOAD 无法拦截 glibc 内部 fopen("/etc/resolv.conf"),
+# shim 对 glibc-internal /etc 读取无效;proot 用户态 bind 是无 root 正解。
+# 组件:Termux proot(bionic)+ loader + libtalloc + libandroid-shmem,独立聚合。
+if [ -n "$PROOT_DIR" ] && [ -d "$PROOT_DIR" ]; then
+  mkdir -p "$B/usr/lib/proot"
+  cp -f "$PROOT_DIR/proot"  "$B/usr/lib/proot/proot"
+  cp -f "$PROOT_DIR/loader" "$B/usr/lib/proot/loader" 2>/dev/null || true
+  for l in "$PROOT_DIR"/lib/*.so*; do [ -e "$l" ] && cp -f "$l" "$B/usr/lib/proot/"; done
+  chmod 0755 "$B/usr/lib/proot/proot" "$B/usr/lib/proot/loader"
+fi
 make -C "$(dirname "$0")/shim" CC="${CC:-gcc}" >/dev/null
 mkdir -p "$B/shim" "$B/etc" "$B/home" "$B/tmp"
 cp "$(dirname "$0")/shim/../libandcode-shim.so" "$B/shim/"
@@ -224,10 +236,13 @@ while IFS= read -r -d '' f; do
   elif file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64'; then
     kind=elf-exec; phys="$(slug "$lp")"
     case "$(basename "$lp")" in
-      busybox*)            lic=GPL-2.0;         up=busybox.net/alpine ;;
-      dropbear*|dbclient*) lic=MIT;             up=mkj/dropbear ;;
-      *libexec/git-core/*) lic=GPL-2.0-or-later; up=git/git ;;
-      *)                   lic=MIT;             up=sst/opencode ;;
+      busybox*)            lic=GPL-2.0;            up=busybox.net/alpine ;;
+      dropbear*|dbclient*) lic=MIT;                up=mkj/dropbear ;;
+      *libexec/git-core/*) lic=GPL-2.0-or-later;  up=git/git ;;
+      *lib/proot/proot|*lib/proot/loader) lic=GPL-2.0; up=proot-me/proot\(termux-build\) ;;
+      *lib/proot/libtalloc*) lic=LGPL-3.0-or-later; up=samba.org/talloc ;;
+      *lib/proot/libandroid-shmem*) lic=BSD-2-Clause; up=termux/libandroid-shmem ;;
+      *)                   lic=MIT;                up=sst/opencode ;;
     esac
   elif [ -n "${KINDMAP[${lp#root/}]:-}" ]; then
     # wrapper / launcher(NAMING §6.2:bin/usr/bin 下 cmd- 前缀;libexec 直名)

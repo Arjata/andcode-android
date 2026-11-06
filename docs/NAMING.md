@@ -111,6 +111,7 @@ shim/libandcode-shim.so      # 本项目 LD_PRELOAD 库(见 §6.3)
 | `root/usr/bin/git` | elf-exec/wrapper-sh | 同上规则(存在 `git.bin` → wrapper) |
 | `root/usr/libexec/git-core/git-remote-https`(git 助手包装器) | wrapper-sh | `libandcode-git-remote-https.so`(libexec 下**不加** `cmd-`) |
 | `root/usr/libexec/git-core/git-remote-https`(同路径,**launcher 形态**:静态启动器 ELF 取代 shell 脚本,规避 git spawn 的 shell 链路;真机 P0 验证项) | launcher | `libandcode-git-remote-https.so`(同 wrapper 规则) |
+| `root/usr/lib/proot/proot`(proot-me v5.5 不可用,x86-64;采用 **Termux proot 5.1.107 bionic 构建** + loader + libtalloc + libandroid-shmem,GPL-2.0 独立聚合) | elf-exec(bionic) | `libandcode-usr-lib-proot-proot.so`(全路径 slug;**bionic 二进制,不经 glibc loader,Tier P 需单列**) |
 | `root/usr/libexec/git-core/git-remote-https.bin`(助手 ELF 本体) | elf-exec | `libandcode-usr-libexec-git-core-git-remote-https.so`(全路径 slug;与包装器不同名,无冲突) |
 | `root/sbin/andcode-entry`(本项目自有脚本,无同名 `.bin`) | script | `libandcode-andcode-entry.so`(slug 含 `andcode-` 前缀,允许) |
 | `root/lib/ld-linux-aarch64.so.1`(loader 特例:显式路径调用) | glibc-lib | `libandcode-ld-linux.so` |
