@@ -77,15 +77,12 @@ int main(int argc, char **argv) {
         setenv("ANDCODE_ETC_DIR", etc, 0);
     }
 
-    /* argv: loader --library-path LIBPATH --inhibit-cache SELF argv[1..] */
+    /* argv: [proot -b ... -w DIR] loader --library-path LIBPATH --inhibit-cache SELF argv[1..]
+     * argv[0] 槽位必须是 proot/loader 本身;先前把 loader 选项前置导致 execv(proot)
+     * 时 argv 全错位(git.bin 收到 argv[0]=loader、"git: '...proot' is not a git command") */
     char **nargv = malloc(sizeof(char *) * (size_t)(argc + 16));
     if (!nargv) { fprintf(stderr, "andcode-launcher: OOM\n"); return 127; }
     int i = 0;
-    nargv[i++] = (char *)loader;
-    nargv[i++] = (char *)"--library-path";
-    nargv[i++] = (char *)libdir;
-    nargv[i++] = (char *)"--inhibit-cache";
-    nargv[i++] = (char *)self;
 
     /* proot bind(/etc):helper 的 glibc 内部读(/etc/resolv.conf 等)只能靠
      * proot 用户态 bind 重定向(DESIGN §4.5 v0.4.1);嵌套由 ANDCODE_IN_PROOT 守卫 */
@@ -122,6 +119,12 @@ int main(int argc, char **argv) {
         nargv[i++] = (char *)"-b"; nargv[i++] = (char *)nss;
         nargv[i++] = (char *)"-w"; nargv[i++] = (char *)wdir;
     }
+
+    nargv[i++] = (char *)loader;
+    nargv[i++] = (char *)"--library-path";
+    nargv[i++] = (char *)libdir;
+    nargv[i++] = (char *)"--inhibit-cache";
+    nargv[i++] = (char *)self;
 
     for (int k = 1; k < argc; k++) nargv[i++] = argv[k];
     nargv[i] = NULL;

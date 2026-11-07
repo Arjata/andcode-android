@@ -46,8 +46,12 @@ public class MainActivity extends AppCompatActivity {
         mTerminalView.setTextSize(30);
 
         String entry = BUNDLE_ROOT + "/sbin/andcode-entry";
+        String launcher = "/data/local/tmp/launch-oc.sh";
         String shellCmd;
-        if (new File(entry).exists()) {
+        if (new File(launcher).exists()) {
+            // 直接启动 opencode TUI(脚本内设 PATH/HOME/代理并 exec opencode)
+            shellCmd = "exec sh " + launcher;
+        } else if (new File(entry).exists()) {
             shellCmd = "exec " + entry + " shell";
         } else {
             Toast.makeText(this, "bundle 未部署(adb 推送),回退普通 shell", Toast.LENGTH_LONG).show();
