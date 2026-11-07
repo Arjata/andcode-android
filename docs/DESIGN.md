@@ -1,6 +1,19 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.1 (设计稿) · 日期: 2026-11-06
+> 版本: v0.4.2 (设计稿) · 日期: 2026-11-08
+> v0.4.2 变更(真机 Tier P 应用域攻坚,§4.4/§4.6 扩充): ①**wrapper 渲染补回
+> `#!` 前缀**(pack-bundle printf 丢 `#!` 导致真 tty 下裸 `/bin/sh` 变交互式
+> shell 卡死整条链);②launcher proot 分支 argv 错位修复(argv[0] 槽位必须
+> 是 proot/loader 本身);③**应用域 seccomp 兼容**: 部分 4.9-perf 内核 + GSI
+> 的 zygote seccomp 策略对 set_robust_list/rseq/clone3 直接 TRAP(SIGSYS),
+> glibc 二进制启动即死 —— bundle 的 ld.so/libc.so.6 需打 seccomp 兼容补丁
+> (scripts/patch-seccomp.sh,set_robust_list/rseq→sched_yield、clone3→
+> close_range 触发 ENOSYS 回退)+ `GLIBC_TUNABLES=glibc.pthread.rseq=0`;
+> ④**BUN_TMPDIR 必须指向应用可写目录**(Bun 提取 libopentui 等内嵌原生库
+> 用 BUN_TMPDIR 而非 TMPDIR,否则 dlopen 拿到 /$bunfs 虚拟路径报 ENOENT);
+> ⑤TUI 模式跳过 proot(ANDCODE_IN_PROOT=1),可写状态(HOME/TMPDIR/
+> PROOT_TMP_DIR)全部位于应用 filesDir(bundle 本体 apk_data_file 只读)。
+> 真机实测:opencode TUI 于自研 APK 终端内完整渲染并可用会话。
 > v0.4.1 变更(真机 P0 三大发现,§4.5 重写): ①**LD_PRELOAD 无法拦截 glibc 内部
 > fopen("/etc/resolv.conf")**,shim 对 glibc-internal /etc 读取无效 → Tier A/M 的
 > /etc 重定向改由 **proot 用户态 bind**(Termux bionic 构建,GPL-2.0 独立聚合)承担,

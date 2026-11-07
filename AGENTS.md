@@ -109,11 +109,27 @@ feat: add serialization abstraction and JSON codec
 
 ## 5. 当前进行时(待办,动手前先认领)
 
-状态(2026-11-06):**P1 完成 + P0 真机验证完成**(设备:Android 13 / TrebleDroid
-GSI, adbd root)——Tier A 部署 + 冒烟 **7/7 全绿**;opencode(Bun v1.4.4)真机运行
-成功;**git ls-remote https 真机全链路打通**(wrapper + proot /etc bind + launcher +
-TCP DNS)。已发布 Release v0.1.1。剩余:
-1. **P0 实机四项**(需真机):无 proot 裸 sysroot 跑 Bun、jniLibs 提取、W^X 下 JIT
-   (`BUN_JSC_useJIT=0` 回退)、opencode 运行期是否释放 ELF;
-2. **git https 已解决(真机 2026-11-06)**:三层修复——①helper 改静态 musl launcher;②proot bind /etc(LD_PRELOAD 无法拦截 glibc 内部 fopen,DESIGN §4.5 重写);③`options use-vc`(网络阻断 UDP 53)。`git ls-remote https://github.com/...` 真机返回 HEAD。**新发现(应用上下文)**:untrusted_app 执行 /data/local/tmp 二进制需 chcon apk_data_file;Bionic 链接器命名空间忽略 LD_LIBRARY_PATH(targetSdk 24+),proot 的 libtalloc 须入 APK jniLibs(nativeLibraryDir)——P3 完整集成路线已定;
-3. **P2 Tier M** 真机验证(脚本已就绪;设备 root 可直接做);**P3 Tier P APK 已开工并本地构建成功**(app/ 脚手架:Termux 终端核心 GPLv3 并入、CMake/NDK 编译 libtermux、specialUse FGS;app-debug.apk 7.5MB 已装机可启动终端)——剩余:bundle 完整 jniLibs 集成(opencode/git/proot 入 nativeLibraryDir,pack-apk-libs 输出对接 gradle)、TUI 会话真机截图验证、release 签名。
+状态(2026-11-08):**P0/P1/P2 完成 + P3 里程碑达成**——**opencode TUI 已在
+自研 APK 终端内完整渲染并可用**(Tier P,真机截图验证;模型会话端到端 ✓)。
+Tier A 冒烟 7/7、git https、Tier M 安装+doctor 均已真机验证。Release v0.1.1。
+
+关键知识(2026-11-08 真机攻坚,详见 DESIGN v0.4.2):
+- **应用域 seccomp 陷阱**(4.9-perf 内核 + GSI):zygote seccomp 对
+  set_robust_list(99)/rseq(293)/clone3(435) 直接 SIGSYS,glibc 二进制启动即死;
+  bionic 不调用故普通 App 无感。修复 = `scripts/patch-seccomp.sh`(幂等,
+  校验后打补丁)+ `GLIBC_TUNABLES=glibc.pthread.rseq=0`。
+- **BUN_TMPDIR**(非 TMPDIR)决定 Bun 内嵌原生库(libopentui)提取目录,
+  必须应用可写;否则 dlopen 拿到 /$bunfs 虚拟路径 ENOENT。
+- **run-as ≠ 应用域**:run-as 子进程无 zygote seccomp,不能替代应用内验证。
+- pack-bundle wrapper 渲染曾丢 `#!` 前缀(真 tty 下裸 `/bin/sh` 卡死);
+  launcher proot 分支 argv 错位——均已修(见提交 b61e3d8、d226bbb)。
+- Tier M "500" 与应用域 "500" 根因相同:`--model openai/...` 指错内置
+  provider;应使用 `--model arjata/...` 或省略(走配置默认)。
+
+剩余:
+1. **P3 收尾**:bundle 完整 jniLibs 集成(opencode/git/proot/libtalloc 入
+   nativeLibraryDir,pack-apk-libs 输出对接 gradle);**seccomp 补丁并入 CI
+   打包链**(fresh bundle 部署后自动执行 patch-seccomp.sh);release 签名;
+   TUI 内adb 注入按键不可达(Termux extraKeys/IME 接线未移植,人工触屏可用)。
+2. **P2 收尾**:Tier M 会话复测(此前 "500" 系模型旗标错,修复后待真机复跑)。
+3. 用户侧:撤销已暴露的 GitHub token(`ghp_...`)与 API key(`sk-...`)。
