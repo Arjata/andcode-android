@@ -90,7 +90,7 @@ while IFS= read -r -d '' f; do
           -e "s|@LIBPATH@|\$ROOT/lib|" \
           -e "s|@TARGET@|$rel.bin|" \
           -e "s|@TIER@|a|" \
-          "$BUNDLE_TPL" | { printf '%s\n' "$SHEBANG"; tail -n +2; } > "$f"
+          "$BUNDLE_TPL" | { printf '#!%s\n' "$SHEBANG"; tail -n +2; } > "$f"
       echo "[包装] $rel → $rel.bin(shell,深度 $depth)"
       printf '%s\tshell\n' "$rel" >> "$B/.kindmap"
     fi

@@ -7,7 +7,8 @@ n=0
 for f in bin/* usr/bin/* usr/libexec/git-core/* sbin/*; do
   [ -f "$f" ] || continue
   h=$(head -n 1 "$f" 2>/dev/null)
-  if [ "$h" = '#!/bin/sh' ]; then
+  # 兼容两种损坏历史: `#!/bin/sh`(容器渲染)与 `/bin/sh`(printf 丢 #! 的旧工件)
+  if [ "$h" = '#!/bin/sh' ] || [ "$h" = '/bin/sh' ]; then
     printf '#!/system/bin/sh\n' > "$f.n"
     tail -n +2 "$f" >> "$f.n"
     cat "$f.n" > "$f"
