@@ -1,6 +1,18 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.2 (设计稿) · 日期: 2026-11-08
+> 版本: v0.4.3 (设计稿) · 日期: 2026-11-08
+> v0.4.3 变更(Tier P 桌面级 Web UI 落地,§4.4 扩充): OpenCode 2.0 桌面界面以
+> **"on-device serve + WebView"** 形态交付——`opencode serve --port 4096
+> --hostname 127.0.0.1` 由 ServeManager 在应用域托管(补丁 loader 直拉,环境同
+> scripts/app-launch-oc.sh),SessionService(specialUse FGS)承接常驻;前端
+> SPA 在 WebView 渲染,`127.0.0.1` 明文仅经 networkSecurityConfig 定向放行
+> (其余流量仍强制 https)。**配对自动化**: serve 每次启动都生成新的 server
+> password,ServeManager 从 serve stdout 实时捕获并注入轮询式 JS,WebView 自动
+> 完成"使用密码"配对(serve 经 ld-linux 直 exec 时 Bun 自 respawn 会把参数当
+> ELF 加载,/proc/self/exe 指向 loader——serve 单进程直跑可绕开,pair 及
+> 自 respawn 场景仍需 launcher ELF 包装,见待办)。真机实测:自动配对 +
+> 端到端模型会话(arjata/gpt-oss-120b)于 APK 内全通,Web 端复用 V1 同一
+> 数据目录(会话历史互通)。
 > v0.4.2 变更(真机 Tier P 应用域攻坚,§4.4/§4.6 扩充): ①**wrapper 渲染补回
 > `#!` 前缀**(pack-bundle printf 丢 `#!` 导致真 tty 下裸 `/bin/sh` 变交互式
 > shell 卡死整条链);②launcher proot 分支 argv 错位修复(argv[0] 槽位必须
@@ -275,8 +287,32 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   - scoped storage:工作区默认 `filesDir`,可选 SAF 授权 `/sdcard` 项目目录
     (noexec 限制只影响 ELF,不影响源码)。
 - 常驻:前台服务(specialUse)+ wake-lock 承载 `opencode serve`/长会话(§4.6)。
-- UI 极简:一个终端页 + 一个"状态/设置"页(启动 sshd、注入 API key、
-  phantom-killer adb 引导、工作区选择),本质上是一个"自带 opencode 的终端"。
+- **双 UI(v0.4.3)**:
+  - **终端页(TUI)**:`jackpal` 终端视图承载 opencode TUI(见上);
+  - **桌面 Web 页(v0.4.3,已实机验证)**:`opencode serve --port 4096
+    --hostname 127.0.0.1` 作为 OpenCode 2.0 桌面界面后端,前端 SPA 由 WebView
+    加载 `http://127.0.0.1:4096/` 渲染。要点:
+    - serve 由 `ServeManager` 在应用域托管:补丁 loader 直拉
+      (`ld-linux --library-path … --inhibit-cache <oc2> serve …`),环境与
+      scripts/app-launch-oc.sh 一致(HOME/TMPDIR/BUN_TMPDIR 在 filesDir,
+      `GLIBC_TUNABLES=glibc.pthread.rseq=0`,代理走设备本地);stdout 全量落盘
+      files/oc2-serve.log(不消费会撑满管道导致 serve 卡死)并从中解析
+      server password;
+    - 二进制路径解析兼容两种部署:jniLibs(`nativeLibraryDir/libandcode-oc2.so`
+      + 同目录补丁 loader,最终形态)/ `/data/local/tmp`(开发期,当前实测路径);
+    - **回环明文白名单**:manifest 用 networkSecurityConfig 仅对
+      `127.0.0.1`/`localhost` 放行 cleartext,其余域名仍强制 https;
+    - **配对自动化**:serve 每次启动生成新 server password(旧凭证失效),
+      ServeManager 从 stdout 实时捕获,WebView 注入轮询式 JS(500ms × 20s,
+      React 原生 setter 填充)自动完成"使用密码"配对;localStorage 持久登录
+      (与桌面浏览器行为一致);
+    - 已知缺口:`oc2` 经 ld-linux 直 exec 时 `/proc/self/exe` 指向 loader,
+      Bun 自 respawn(如 `pair`)会把子命令参数当 ELF 路径加载而失败——
+      serve 单进程直跑不触发;需 pair/后台自拉起时,须给 oc2 加 launcher
+      ELF 包装(复用 bundle/launcher/launcher.c 模式,同 bin/git)。
+- UI 极简:一个终端页 + 一个桌面 Web 页 + 一个"状态/设置"页(启动 sshd、
+  注入 API key、phantom-killer adb 引导、工作区选择),本质上是一个
+  "自带 opencode 的终端 + 桌面 GUI"。
 
 ### 4.5 /etc 重定向:proot bind(主)+ LD_PRELOAD shim(辅)
 

@@ -1,0 +1,224 @@
+package dev.andcode.app;
+
+import android.content.Context;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 托管 opencode V2 serve 进程(桌面级 Web UI 的后端,DESIGN §4 Tier P)。
+ *
+ * - 二进制执行走 bundle 的补丁 loader(seccomp 兼容,见 scripts/patch-seccomp.sh):
+ *   <LD> --library-path <LIB> --inhibit-cache <OC2> serve --port 4096 --hostname 127.0.0.1
+ * - server password 从 serve 的 stdout 解析("server password <PW>");
+ *   stdout 全量落盘 files/oc2-serve.log 以防管道阻塞并留证。
+ * - 就绪判定:GET http://127.0.0.1:4096/ 返回 200。
+ * - 兼容两种部署:jniLibs(nativeLibraryDir/libandcode-oc2.so + 同目录补丁 loader)
+ *   或开发期 /data/local/tmp(与 scripts/app-launch-oc.sh 同环境)。
+ */
+public final class ServeManager {
+
+    public static final int PORT = 4096;
+    public static final String BASE_URL = "http://127.0.0.1:" + PORT;
+
+    private static String sPassword;
+    private static volatile boolean sStarting;
+
+    /** 就绪回调(主线程) */
+    public interface ReadyCallback {
+        void onReady(String password);
+        void onFailed(String reason);
+    }
+
+    private ServeManager() {}
+
+    /** 当前已知密码(可能为 null:server 是上一轮遗留、stdout 未见) */
+    public static synchronized String getPassword() {
+        return sPassword;
+    }
+
+    /** 探测 server 是否已就绪 */
+    public static boolean ping() {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(BASE_URL + "/").openConnection();
+            c.setConnectTimeout(800);
+            c.setReadTimeout(800);
+            int code = c.getResponseCode();
+            c.disconnect();
+            return code == 200;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 确保 serve 已启动并在就绪后回调。若已在运行则直接回调成功。
+     * 幂等:并发调用只触发一次启动流程。
+     */
+    public static void ensureStarted(Context ctx, ReadyCallback cb) {
+        synchronized (ServeManager.class) {
+            if (sStarting) {
+                // 已有启动流程在跑,轮询等它完成
+                waitReady(cb);
+                return;
+            }
+            sStarting = true;
+        }
+        final Context app = ctx.getApplicationContext();
+        new Thread(() -> {
+            // 初始探测也在后台做(ping 是网络调用,禁止主线程)
+            if (ping()) {
+                synchronized (ServeManager.class) { sStarting = false; }
+                runOnMain(() -> cb.onReady(sPassword));
+                return;
+            }
+            String err = null;
+            try {
+                err = spawn(app);
+            } catch (Exception e) {
+                err = "spawn failed: " + e;
+            }
+            final String failure = err;
+            if (failure != null) {
+                synchronized (ServeManager.class) { sStarting = false; }
+                runOnMain(() -> cb.onFailed(failure));
+                return;
+            }
+            waitReady(cb);
+        }, "oc2-serve-starter").start();
+    }
+
+    /** 启动 serve 子进程;返回 null=成功,否则错误信息 */
+    private static String spawn(Context app) throws IOException {
+        File files = app.getFilesDir();
+        File home = new File(files, "home");
+        File tmp = new File(files, "tmp");
+        File demo = new File(home, "demo");
+        File cfg = new File(home, ".config/opencode");
+        if (!cfg.isDirectory()) cfg.mkdirs();
+        if (!tmp.isDirectory()) tmp.mkdirs();
+        if (!demo.isDirectory()) demo.mkdirs();
+        // 配置迁移:bundle 内预置 opencode.json(provider/key)→ 应用 HOME(仅首次)
+        File dstCfg = new File(cfg, "opencode.json");
+        if (!dstCfg.exists()) {
+            File srcCfg = new File("/data/local/tmp/andcode/home/.config/opencode/opencode.json");
+            if (srcCfg.exists()) copy(srcCfg, dstCfg);
+        }
+
+        Paths p = resolvePaths(app);
+        if (p == null) return "opencode V2 二进制或补丁 loader 未部署";
+
+        List<String> cmd = Arrays.asList(
+            p.ld, "--library-path", p.lib, "--inhibit-cache", p.oc2,
+            "serve", "--port", String.valueOf(PORT), "--hostname", "127.0.0.1");
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(demo);
+        Map<String, String> env = pb.environment();
+        env.put("ANDCODE_ROOT", "/data/local/tmp/andcode");
+        env.put("ANDCODE_TIER", "a"); // 开发期 bundle 在 /data/local/tmp;jniLibs 集成后切 "p"
+        env.put("ANDCODE_APP_DATA", files.getAbsolutePath());
+        env.put("PATH", "/data/local/tmp/andcode/bin:/data/local/tmp/andcode/usr/bin:/system/bin");
+        env.put("HOME", home.getAbsolutePath());
+        env.put("TMPDIR", tmp.getAbsolutePath());
+        env.put("BUN_TMPDIR", tmp.getAbsolutePath()); // Bun 内嵌原生库提取目录,必须应用可写
+        env.put("ANDCODE_IN_PROOT", "1");
+        env.put("GLIBC_TUNABLES", "glibc.pthread.rseq=0"); // zygote seccomp 对 rseq 直接 SIGSYS
+        env.put("HTTPS_PROXY", "http://127.0.0.1:7890");   // 模型 API 走设备代理
+        env.put("HTTP_PROXY", "http://127.0.0.1:7890");
+        env.put("NODE_TLS_REJECT_UNAUTHORIZED", "0");
+
+        final Process proc = pb.redirectErrorStream(true).start();
+        // 持续消费 stdout:解析 password + 全量落盘(不消费会撑满管道导致 serve 卡死)
+        final File log = new File(files, "oc2-serve.log");
+        new Thread(() -> {
+            try (InputStream in = proc.getInputStream();
+                 OutputStream out = new FileOutputStream(log, true)) {
+                BufferedReader r = new BufferedReader(new InputStreamReader(in), 8192);
+                String line;
+                while ((line = r.readLine()) != null) {
+                    out.write((line + "\n").getBytes());
+                    out.flush();
+                    if (line.startsWith("server password ")) {
+                        synchronized (ServeManager.class) {
+                            sPassword = line.substring("server password ".length()).trim();
+                        }
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }, "oc2-serve-stdout").start();
+        return null;
+    }
+
+    /** 轮询就绪(最长 40s),完成后主线程回调 */
+    private static void waitReady(ReadyCallback cb) {
+        new Thread(() -> {
+            long deadline = System.currentTimeMillis() + 40_000;
+            while (System.currentTimeMillis() < deadline) {
+                if (ping()) {
+                    runOnMain(() -> cb.onReady(getPassword()));
+                    return;
+                }
+                try { Thread.sleep(500); } catch (InterruptedException ignored) { return; }
+            }
+            runOnMain(() -> cb.onFailed("serve 启动超时(40s),见 files/oc2-serve.log"));
+        }, "oc2-serve-wait").start();
+    }
+
+    static void runOnMain(Runnable r) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(r);
+    }
+
+    private static void copy(File src, File dst) throws IOException {
+        try (InputStream in = new java.io.FileInputStream(src);
+             OutputStream out = new FileOutputStream(dst)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        }
+    }
+
+    /** 二进制/loader 路径解析:优先 jniLibs,回退 /data/local/tmp 开发部署 */
+    private static Paths resolvePaths(Context app) {
+        List<Paths> candidates = new ArrayList<>();
+        // 1) jniLibs(最终形态):libandcode-oc2.so + 补丁 loader 同目录
+        String nat = app.getApplicationInfo().nativeLibraryDir;
+        if (nat != null) {
+            candidates.add(new Paths(
+                nat + "/libandcode-loader.so",
+                nat,
+                nat + "/libandcode-oc2.so"));
+        }
+        // 2) 开发期:/data/local/tmp(与 scripts/app-launch-oc.sh / Tier A 同部署)
+        candidates.add(new Paths(
+            "/data/local/tmp/andcode/lib/ld-linux-aarch64.so.1",
+            "/data/local/tmp/andcode/lib",
+            "/data/local/tmp/oc2"));
+        for (Paths p : candidates) {
+            if (new File(p.ld).exists() && new File(p.oc2).exists()) return p;
+        }
+        return null;
+    }
+
+    private static final class Paths {
+        final String ld;
+        final String lib;
+        final String oc2;
+        Paths(String ld, String lib, String oc2) {
+            this.ld = ld;
+            this.lib = lib;
+            this.oc2 = oc2;
+        }
+    }
+}

@@ -34,6 +34,11 @@ public class SessionService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // 承接 opencode serve 常驻(桌面级 Web UI 后端);已启动则幂等
+        ServeManager.ensureStarted(this, new ServeManager.ReadyCallback() {
+            @Override public void onReady(String password) { }
+            @Override public void onFailed(String reason) { }
+        });
         return START_STICKY;
     }
 

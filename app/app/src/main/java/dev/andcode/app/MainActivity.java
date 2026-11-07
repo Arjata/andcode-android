@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -77,6 +78,9 @@ public class MainActivity extends AppCompatActivity {
         mTerminalView.attachSession(mSession);
         mTerminalView.setTerminalViewClient(new ViewClient());
         mTerminalView.requestFocus();
+
+        findViewById(R.id.btn_web_ui).setOnClickListener(v ->
+            startActivity(new Intent(this, WebActivity.class)));
     }
 
     @Override
