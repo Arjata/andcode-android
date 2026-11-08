@@ -68,6 +68,13 @@ libopentui；因此不能用“libopentui 动态加载”免除其内部 LGPL �
 (或符合适用条款的对象材料)，并核实最终 APK 对替换修改版库的限制；Bun/JSC
 亦须独立处理。仅保留下载 URL 或附一份 LGPL 文本不构成此项完成。
 
+`collect-opencode-native-sources.py` 将以上四份候选源码归档按固定 SHA-256 收入
+诊断工件，同时记录按文件名发现的声明、构建输入、全量 Cargo.lock 包索引以及
+OpenTUI 内嵌 zig-deps 归档中的声明。四份源码归档于 2026-11-09 通过 HTTPS
+下载并计算摘要后固定；它不证明 npm ELF 的可重现对应关系，不把 lockfile 全表
+误当成目标 feature 闭包，也不把声明文件名扫描当成逐文件完整版权审查。
+报告 `native-source-review.json` 的 `redistributionApproved` 始终 false。
+
 2026-11-09 Android libtinfo 自编译核验:Ubuntu
 `ncurses_6.4+20240113.orig.tar.gz` SHA-256
 `37a12a0f8ae2605012c9a164dd286b0cfa02b51b5055836d09eb3d597fc351b1`，

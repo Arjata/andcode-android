@@ -30,6 +30,7 @@ jobs:
           bun test scripts/opencode-native-imports.test.ts
           python3 scripts/audit-opencode-native.test.py
           python3 scripts/collect-opencode-native-licenses.test.py
+          python3 scripts/collect-opencode-native-sources.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
@@ -84,6 +85,7 @@ jobs:
       - name: Save prototype provenance and upstream license
         run: |
           python3 scripts/collect-opencode-native-licenses.py work/upstream work/native-prototype
+          python3 scripts/collect-opencode-native-sources.py work/native-prototype
           cp work/upstream/LICENSE work/native-prototype/upstream-LICENSE
           cp work/upstream/bun.lock work/native-prototype/upstream-bun.lock
           cp work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode work/native-prototype/
