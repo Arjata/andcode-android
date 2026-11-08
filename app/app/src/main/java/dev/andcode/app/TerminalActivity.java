@@ -4,13 +4,9 @@ import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
-import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Toast;
 
@@ -27,22 +23,21 @@ import com.termux.view.TerminalViewClient;
 import java.io.File;
 
 /**
- * Tier P MVP: 内嵌终端承载 opencode TUI。
- * 会话命令: andcode-entry shell(bundle 部署于 /data/local/tmp/andcode 时)
- * 回退:      /system/bin/sh
+ * TUI 终端页:内嵌终端承载 opencode TUI(自 MainActivity 迁移)。
+ * 会话命令: /data/local/tmp/launch-oc.sh(脚本内设 PATH/HOME/代理并 exec opencode)
+ * 回退:      bundle 的 andcode-entry shell → 普通 shell
  */
-public class MainActivity extends AppCompatActivity {
+public class TerminalActivity extends AppCompatActivity {
 
     private static final String BUNDLE_ROOT = "/data/local/tmp/andcode";
     private TerminalView mTerminalView;
     private TerminalSession mSession;
 
     @Override
-    @SuppressLint("SetJavaScriptEnabled")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_terminal);
         mTerminalView = findViewById(R.id.terminal_view);
         mTerminalView.setTextSize(30);
 
@@ -78,9 +73,6 @@ public class MainActivity extends AppCompatActivity {
         mTerminalView.attachSession(mSession);
         mTerminalView.setTerminalViewClient(new ViewClient());
         mTerminalView.requestFocus();
-
-        findViewById(R.id.btn_web_ui).setOnClickListener(v ->
-            startActivity(new Intent(this, WebActivity.class)));
     }
 
     @Override
@@ -98,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> setTitle(changedSession.getTitle()));
         }
         @Override public void onSessionFinished(@NonNull TerminalSession finishedSession) {
-            runOnUiThread(() -> Toast.makeText(MainActivity.this,
+            runOnUiThread(() -> Toast.makeText(TerminalActivity.this,
                 "会话结束(exit " + finishedSession.getExitStatus() + ")", Toast.LENGTH_LONG).show());
         }
         @Override public void onCopyTextToClipboard(@NonNull TerminalSession session, String text) {

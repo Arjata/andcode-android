@@ -34,6 +34,7 @@ public final class ServeManager {
 
     private static String sPassword;
     private static volatile boolean sStarting;
+    private static Process sProcess;
 
     /** 就绪回调(主线程) */
     public interface ReadyCallback {
@@ -60,6 +61,31 @@ public final class ServeManager {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    /** 异步探测,主线程回调(主页状态轮询用) */
+    public static void pingAsync(java.util.function.Consumer<Boolean> cb) {
+        new Thread(() -> {
+            final boolean up = ping();
+            runOnMain(() -> cb.accept(up));
+        }, "oc2-ping").start();
+    }
+
+    /**
+     * 停止 serve:优先销毁本进程拉起的子进程;遗留实例(如 run-as 起的)
+     * 退而 pkill 兜底。停止后旧 password 即失效,一并清空。
+     */
+    public static synchronized void stop(Context ctx) {
+        Process p = sProcess;
+        if (p != null) {
+            p.destroy();
+            sProcess = null;
+        }
+        try {
+            new ProcessBuilder("pkill", "-f", "oc2 serve").start();
+        } catch (IOException ignored) {
+        }
+        sPassword = null;
     }
 
     /**
@@ -139,6 +165,7 @@ public final class ServeManager {
         env.put("NODE_TLS_REJECT_UNAUTHORIZED", "0");
 
         final Process proc = pb.redirectErrorStream(true).start();
+        synchronized (ServeManager.class) { sProcess = proc; sPassword = null; }
         // 持续消费 stdout:解析 password + 全量落盘(不消费会撑满管道导致 serve 卡死)
         final File log = new File(files, "oc2-serve.log");
         new Thread(() -> {

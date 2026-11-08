@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">andcode</string>
+    <string name="app_subtitle">opencode · AI 编码代理</string>
+
+    <string name="nav_home">主页</string>
+    <string name="nav_terminal">TUI 终端</string>
+    <string name="nav_web">桌面 UI</string>
+
+    <string name="state_running">服务运行中</string>
+    <string name="state_starting">启动中…</string>
+    <string name="state_stopped">服务未运行</string>
+    <string name="address_hint">服务未启动,点"启动服务"拉起 opencode serve</string>
+    <string name="detail_prefix">详情: </string>
+
+    <string name="action_start">启动服务</string>
+    <string name="action_stop">停止服务</string>
+    <string name="action_web">桌面 UI</string>
+    <string name="action_terminal">TUI 终端</string>
+    <string name="web_card_title">opencode 桌面界面(OpenCode 2.0 Web)</string>
+    <string name="web_card_desc">本机 serve 承载,WebView 渲染,自动配对</string>
+    <string name="terminal_card_title">opencode TUI(内嵌终端)</string>
+    <string name="terminal_card_desc">jackpal 终端视图,终端会话直接可用</string>
+    <string name="serve_card_title">opencode 服务</string>
+    <string name="copied">已复制</string>
+</resources>

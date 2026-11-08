@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/navDrawer"
+    android:layout_width="280dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="start"
+    android:background="?attr/colorSurface"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- 抽屉头部:品牌区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="32dp"
+        android:paddingBottom="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnPrimary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/app_subtitle"
+            android:textSize="12sp"
+            android:alpha="0.8"
+            android:textColor="?attr/colorOnPrimary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/navHome"
+        style="@style/NavDrawerItem"
+        android:drawableStart="@drawable/ic_nav_home"
+        android:drawablePadding="14dp"
+        android:drawableTint="?attr/colorOnSurfaceVariant"
+        android:text="@string/nav_home" />
+
+    <TextView
+        android:id="@+id/navTerminal"
+        style="@style/NavDrawerItem"
+        android:drawableStart="@drawable/ic_nav_terminal"
+        android:drawablePadding="14dp"
+        android:drawableTint="?attr/colorOnSurfaceVariant"
+        android:text="@string/nav_terminal" />
+
+    <TextView
+        android:id="@+id/navWeb"
+        style="@style/NavDrawerItem"
+        android:drawableStart="@drawable/ic_nav_web"
+        android:drawablePadding="14dp"
+        android:drawableTint="?attr/colorOnSurfaceVariant"
+        android:text="@string/nav_web" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/navVersion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:textSize="11sp"
+        android:alpha="0.5"
+        android:textColor="?attr/colorOnSurface" />
+</LinearLayout>

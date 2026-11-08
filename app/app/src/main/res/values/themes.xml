@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AndCode" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!-- Material 3 主题(对齐 andapi 布局体系);终端页覆写黑色窗口背景 -->
+    <style name="Theme.AndCode" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <style name="Theme.AndCode.Terminal">
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 </resources>
