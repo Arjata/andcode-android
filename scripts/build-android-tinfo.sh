@@ -29,12 +29,18 @@ ac_cv_func_setfsuid=no CFLAGS='-O2 -fPIC' LDFLAGS='-Wl,-z,max-page-size=16384' \
   --disable-setuid-environ --disable-termcap --disable-rpath --enable-const \
   --with-default-terminfo-dir=/etc/terminfo \
   --with-terminfo-dirs='/etc/terminfo:/lib/terminfo:/usr/share/terminfo'
-grep -Eq '^(/\* #undef HAVE_SETFSUID \*/|#define HAVE_SETFSUID 0)$' include/ncurses_cfg.h
-if grep -q '^#define USE_ROOT_ACCESS 1$' include/ncurses_cfg.h; then exit 1; fi
 make -j2
+# ncurses_cfg.h only emits detected features; ncurses_def.h supplies zero
+# defaults. Verify the effective compiler configuration, not one header's text.
+cc -dM -E -Iinclude -I../src/include -include ncurses_cfg.h - </dev/null > "$WORK/macros.txt"
+grep -q '^#define HAVE_SETFSUID 0$' "$WORK/macros.txt"
+if grep -q '^#define USE_ROOT_ACCESS' "$WORK/macros.txt"; then
+  echo 'Unsafe root-access configuration' >&2; exit 1
+fi
 LIB="$WORK/build/lib/libtinfo.so.6.4"
 test -s "$LIB"
-if readelf -Ws "$LIB" | grep -Eq 'UND.*setfs[ug]id'; then
+readelf -Ws "$LIB" > "$WORK/symbols.txt"
+if grep -Eq 'UND.*setfs[ug]id' "$WORK/symbols.txt"; then
   echo 'Forbidden filesystem identity dependency' >&2; exit 1
 fi
 mkdir -p "$BUNDLE/etc/third-party"

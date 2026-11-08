@@ -1,5 +1,5 @@
 """Linux CI: exact staged libtinfo initialization must avoid fs-ID calls."""
-import ctypes
+import errno
 import os
 from pathlib import Path
 import pty
@@ -30,18 +30,34 @@ assert lib._nc_safe_open3(b'/root/andcode-forbidden',os.O_RDONLY,0)==-1
 assert ctypes.get_errno()==13
 print('ANDCODE_TINFO_NATIVE_INIT_OK')
 '''
-    subprocess.run([sys.executable, '-c', code, str(lib)], env=dict(os.environ, LD_PRELOAD=str(trap)), check=True)
+    subprocess.run([sys.executable, '-c', code, str(lib)], env=dict(os.environ, LD_PRELOAD=str(trap)), check=True, timeout=20)
     master, slave = pty.openpty()
     proc = None
     try:
         proc = subprocess.Popen(['/bin/bash', '--noprofile', '--norc', '-i'], stdin=slave, stdout=slave, stderr=slave,
             env=dict(os.environ, LD_LIBRARY_PATH=str(lib.parent), LD_PRELOAD=str(trap), TERM='xterm-256color'), start_new_session=True)
+        # Wait for the dynamic loader; require this exact staged library, not
+        # the runner's libtinfo, before accepting the interactive regression.
+        deadline = time.monotonic()+5
+        while time.monotonic()<deadline:
+            if str(lib) in Path(f'/proc/{proc.pid}/maps').read_text():
+                break
+            if proc.poll() is not None:
+                raise AssertionError('Bash exited before staged libtinfo loaded')
+            time.sleep(.02)
+        else:
+            raise AssertionError('Bash did not load staged libtinfo')
         os.write(master, b"printf 'ANDCODE_TINFO_'; printf 'BASH_OK\\n'; exit\n")
         output = bytearray()
         deadline = time.monotonic()+15
         while time.monotonic()<deadline:
             if select.select([master],[],[],.2)[0]:
-                output.extend(os.read(master,65536))
+                try:
+                    output.extend(os.read(master,65536))
+                except OSError as error:
+                    if error.errno != errno.EIO:
+                        raise
+                    break
             if b'ANDCODE_TINFO_BASH_OK' in output:break
         assert b'ANDCODE_TINFO_BASH_OK' in output, 'Real interactive Bash failed'
         assert proc.wait(timeout=5)==0
