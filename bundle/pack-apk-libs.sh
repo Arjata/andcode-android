@@ -114,4 +114,16 @@ done
 
 # ── 5. link-farm 清单(逻辑路径 → 物理名;data 类排除,物理为 "-")────────
 awk -F'\t' '$1 !~ /^#/ && $1 != "" && $2 != "-" {print $1 "\t" $2}' "$B/manifest" > "$OUT/manifest.farm"
+# Package only declared data, not a runtime-extracted executable archive.
+ASSETS="$OUT/assets/andcode-runtime"
+mkdir -p "$ASSETS"
+cp "$OUT/manifest.farm" "$ASSETS/manifest.farm"
+cp "$B/manifest" "$ASSETS/manifest"
+while IFS=$'\t' read -r lp phys kind lic ver up; do
+  [ "$kind" = data ] || continue
+  case "$lp" in etc/*) ;; *) echo "[FAIL] unsupported data path: $lp"; exit 1 ;; esac
+  file -b "$B/$lp" | grep -q ELF && { echo "[FAIL] ELF in data: $lp"; exit 1; }
+  mkdir -p "$ASSETS/$(dirname "$lp")"
+  cp "$B/$lp" "$ASSETS/$lp"
+done < "$B/manifest"
 echo "jniLibs 就绪: $LIBS($(ls "$LIBS" | wc -l) 项);farm 清单: $OUT/manifest.farm"

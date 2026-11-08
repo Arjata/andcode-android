@@ -2,6 +2,18 @@ plugins {
     id("com.android.application")
 }
 
+// Only a reviewed CI artifact supplies executable payloads. Never download
+// binaries during Gradle configuration or copy ELF into application filesDir.
+def nativePayload = providers.gradleProperty("andcodeNativeDir")
+if (nativePayload.isPresent()) {
+    def payload = file(nativePayload.get())
+    if (!new File(payload, "arm64-v8a/libandcode-ld-linux.so").isFile()
+            || !new File(payload, "arm64-v8a/libandcode-bash.so").isFile()
+            || !new File(payload, "assets/andcode-runtime/manifest.farm").isFile()) {
+        throw new GradleException("andcodeNativeDir is not a complete Tier P native intermediate artifact")
+    }
+}
+
 android {
     namespace = "dev.andcode.app"
     compileSdk = 37
@@ -12,13 +24,20 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.1"
+        ndk { abiFilters "arm64-v8a" }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     packaging {
-        jniLibs.useLegacyPackaging = false
+        // Explicit-path exec needs files in nativeLibraryDir, not only ZIP mmap.
+        jniLibs.useLegacyPackaging = true
+        jniLibs.keepDebugSymbols += ["**/libandcode-*.so"]
+    }
+    if (nativePayload.isPresent()) {
+        sourceSets.main.jniLibs.srcDir(file(nativePayload.get()))
+        sourceSets.main.assets.srcDir(new File(file(nativePayload.get()), "assets"))
     }
 }
 

@@ -1,6 +1,9 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.18 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.19 (设计稿) · 日期: 2026-11-09
+> v0.4.19 变更(§4.4/交付链):Gradle 可显式接收 CI native 中间工件,保留物理名 ELF
+> 不剥离并要求安装解压至 nativeLibraryDir;数据单独经 assets,禁止 ELF 混入数据。
+> 此为打包接线而非可用自包含交付,V2/PTY/启动器/应用首启动数据初始化仍待闭合。
 > v0.4.18 变更(交付链):修复 manifest 对扁平 lib/ 的 kind/SONAME 映射、launcher
 > 与第三方许可证误分类及 git 重复物理名;物理冲突必须失败。修复 launcher PRoot
 > argv 数组越界,新增 Linux ASan/UBSan 参数保真测试,导出 Tier P native 中间工件。
@@ -342,7 +345,12 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     首启动把包装脚本、`etc/`、shim 配置写入 `filesDir` 并回指
     `nativeLibraryDir` 内的执行体;
   - **可写数据**(`HOME`、`TMPDIR`、git 仓库、配置、生成的 `resolv.conf`)
-    → `filesDir`,绝无 ELF 落盘后 exec。
+     → `filesDir`,绝无 ELF 落盘后 exec。
+- **打包接线(v0.4.19)**:`pack-apk-libs.sh` 输出 `arm64-v8a`、`manifest.farm`
+  与只含 data 的 `assets/andcode-runtime`;Gradle 显式
+  `-PandcodeNativeDir=<工件目录>` 接收,要求基本载荷存在,不自动下载。使用
+  legacy packaging 让系统安装时提取到 nativeLibraryDir,保留 `libandcode-*`
+  文件内容不 strip。此中间工件尚非 V2/PTY 完整闭包,未宣称可用的自包含 APK。
 - 终端 UI 已改用内嵌的 Termux terminal-emulator/terminal-view 模块
   (GPLv3,保留版权与 NOTICE,合并作品 AGPL-3.0-only,见 REUSE §2.1),
   不依赖用户安装 Termux App。

@@ -85,6 +85,10 @@
 | `busybox`(root 实例副本) | 复用现有独立 BusyBox 载荷处理 Android Toybox 不兼容的 bind mount/归档提取,root:root 0700 | `/data/adb/andcode-ubuntu/busybox` |
 | `ubuntu-base-24.04.4-base-arm64.tar.gz` | 官方 Ubuntu Base 24.04.4 arm64 开发引导输入,固定 SHA-256 | 开发暂存 `/data/local/tmp/`,不入库 |
 | `andcode-bundle-android-arm64-v<semver>.tar.gz` | Android 应用域专用 seccomp 补丁副本与同名 `.sha256`;不改标准 Linux 原始 bundle | CI 工件,非已验证 locked 交付 |
+| `andcode-tier-p-native` | CI 中间工件:arm64-v8a 原生物理名、manifest.farm、assets/andcode-runtime 数据;非完整自包含 APK | Actions artifact |
+| `andcodeNativeDir` | Gradle 显式原生工件目录属性,包含 arm64-v8a/manifest.farm/assets;不设置时保留开发空载荷构建 | `-PandcodeNativeDir=<绝对目录>` |
+| `andcode-runtime` | APK assets 内 CI 生成的只读 bundle 数据与 manifest.farm,不含运行期解包 ELF | `assets/andcode-runtime/` |
+| `libandcode-git-core-git.so` | git-core/git 的自有 launcher 特例;避免与 usr/bin/git.bin 的 libandcode-git.so 冲突 | Tier P nativeLibraryDir |
 
 **豁免**:Magisk 平台固定文件名(`customize.sh`、`service.sh`、`uninstall.sh`、
 `module.prop`)遵循 Magisk 官方约定,不受第 2.1 条"无 .sh"约束。
@@ -162,6 +166,7 @@ shim/libandcode-shim.so      # 本项目 LD_PRELOAD 库(见 §6.3)
 | `root/usr/bin/git` | elf-exec/wrapper-sh | 同上规则(存在 `git.bin` → wrapper) |
 | `root/usr/libexec/git-core/git-remote-https`(git 助手包装器) | wrapper-sh | `libandcode-git-remote-https.so`(libexec 下**不加** `cmd-`) |
 | `root/usr/libexec/git-core/git-remote-https`(同路径,**launcher 形态**:静态启动器 ELF 取代 shell 脚本,规避 git spawn 的 shell 链路;真机 P0 验证项) | launcher | `libandcode-git-remote-https.so`(同 wrapper 规则) |
+| `root/usr/libexec/git-core/git`(自有 launcher) | launcher | `libandcode-git-core-git.so`(避免与 `usr/bin/git.bin` 的 ELF 物理名冲突) |
 | `root/usr/lib/proot/proot`(proot-me v5.5 不可用,x86-64;采用 **Termux proot 5.1.107 bionic 构建** + loader + libtalloc + libandroid-shmem,GPL-2.0 独立聚合) | elf-exec(bionic) | `libandcode-usr-lib-proot-proot.so`(全路径 slug;**bionic 二进制,不经 glibc loader,Tier P 需单列**) |
 | `root/usr/libexec/git-core/git-remote-https.bin`(助手 ELF 本体) | elf-exec | `libandcode-usr-libexec-git-core-git-remote-https.so`(全路径 slug;与包装器不同名,无冲突) |
 | `root/sbin/andcode-entry`(本项目自有脚本,无同名 `.bin`) | script | `libandcode-andcode-entry.so`(slug 含 `andcode-` 前缀,允许) |
