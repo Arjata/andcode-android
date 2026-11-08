@@ -26,7 +26,7 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - name: Install matching Android build tools
-        run: sdkmanager 'platforms;android-37' 'build-tools;36.1.0' 'ndk;27.0.12077973' 'cmake;3.22.1'
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;36.1.0' 'ndk;27.0.12077973' 'cmake;3.22.1'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
@@ -157,15 +157,15 @@ jobs:
         run: |
           curl -fLSs https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-linux-arm64.tar.gz -o work/oc2.tar.gz
           echo 'f2d27600c367e45057d6a16f6a5c2aa8d77b41a9b10d4bc3d849c2f88870e944  work/oc2.tar.gz' | sha256sum -c -
-          mkdir -p work/oc2 work/pty work/stage/usr/lib/opencode-pty
+          mkdir -p work/oc2 work/pty work/stage/usr/lib/opencode-pty work/stage/etc/third-party
           tar -xzf work/oc2.tar.gz -C work/oc2
           cp work/oc2/opencode work/stage/bin/oc2
           curl -fLSs https://github.com/anomalyco/opencode/releases/download/process-daemon-v0.4.0/opencode-pty-0.4.0-aarch64-unknown-linux-gnu.tar.gz -o work/pty.tar.gz
           echo '52c421672ad6fadcb87cc2e918ad55622a7da588468d8029abd031d5cc752e57  work/pty.tar.gz' | sha256sum -c -
           tar -xzf work/pty.tar.gz -C work/pty
-          cp work/pty/opencode-pty work/stage/usr/lib/opencode-pty/opencode-pty
+          cp work/pty/opencode-pty-0.4.0-aarch64-unknown-linux-gnu/opencode-pty work/stage/usr/lib/opencode-pty/opencode-pty
           curl -fLSs https://raw.githubusercontent.com/anomalyco/opencode/v2.2.6/LICENSE -o work/stage/etc/third-party/opencode-v2-license
-          curl -fLSs https://raw.githubusercontent.com/anomalyco/opencode/5e6ee370634842e0efa99ad103c4d767581b47f0/LICENSE -o work/stage/etc/third-party/opencode-pty-license
+          cp work/pty/opencode-pty-0.4.0-aarch64-unknown-linux-gnu/LICENSE work/stage/etc/third-party/opencode-pty-license
 
       - name: 获取 git 前缀(容器内复制,保 GIT_EXEC_PATH 结构)
         run: |
