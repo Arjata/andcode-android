@@ -1,0 +1,84 @@
+name: opencode-native-prototype
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prototype:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: anomalyco/opencode
+          ref: dc2ffcf8bf26f9e669b6aa22b95f50e12be15e06
+          path: work/upstream
+          persist-credentials: false
+      - name: Fixed Bun build tool (not a new shipped runtime dependency)
+        run: |
+          mkdir -p work/bun
+          curl -fLSs https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip -o work/bun.zip
+          echo 'baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e  work/bun.zip' | sha256sum -c -
+          unzip -q work/bun.zip -d work/bun
+          echo "$GITHUB_WORKSPACE/work/bun/bun-linux-aarch64" >> "$GITHUB_PATH"
+      - name: Native import plugin regression
+        run: bun test scripts/opencode-native-imports.test.ts
+      - name: Frozen upstream dependencies and explicit import paths
+        run: |
+          cd work/upstream
+          bun install --frozen-lockfile
+          cd ../..
+          python3 scripts/prepare-opencode-native-build.py work/upstream
+      - name: Build experimental source V2 including Web assets
+        env:
+          OPENCODE_CHANNEL: beta
+          OPENCODE_VERSION: 2.2.6
+          OPENCODE_TARGET: linux-arm64
+          ANDCODE_NATIVE_STAGE: ${{ github.workspace }}/work/native-prototype
+        run: |
+          cd work/upstream
+          bun run packages/cli/script/build.ts --single --skip-install
+      - name: Execution and empty extraction directory gate
+        run: |
+          set -euo pipefail
+          mkdir -p work/probe-home work/probe-tmp
+          export ANDCODE_EXE_DIR="$GITHUB_WORKSPACE/work/native-prototype/native"
+          export HOME="$GITHUB_WORKSPACE/work/probe-home" BUN_TMPDIR="$GITHUB_WORKSPACE/work/probe-tmp"
+          EXE="$GITHUB_WORKSPACE/work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode"
+          "$EXE" --version
+          "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fSs http://127.0.0.1:4096/ -o work/web-index.html; then ready=1; break; fi
+            kill -0 "$pid"
+            sleep 1
+          done
+          test "$ready" = 1
+          python3 - <<'PY'
+          from pathlib import Path
+          for f in Path('work/probe-tmp').rglob('*'):
+              if f.is_file():
+                  with f.open('rb') as src:
+                      assert src.read(4) != b'\x7fELF', f'Runtime extracted ELF: {f}'
+          print('Serve ready; no runtime ELF in isolated BUN_TMPDIR (not full closure acceptance)')
+          PY
+      - name: Save prototype provenance and upstream license
+        run: |
+          cp work/upstream/LICENSE work/native-prototype/upstream-LICENSE
+          cp work/upstream/bun.lock work/native-prototype/upstream-bun.lock
+          cp work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode work/native-prototype/
+          git -C work/upstream rev-parse HEAD > work/native-prototype/upstream-commit.txt
+          find work/native-prototype -type f -exec sha256sum {} + > work/prototype.sha256
+          echo 'DIAGNOSTIC ONLY: no compatibility, transitive license or Android acceptance approval.' > work/native-prototype/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opencode-native-prototype-diagnostic
+          path: |
+            work/native-prototype/
+            work/prototype.sha256

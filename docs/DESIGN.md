@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.29 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.30 (设计稿) · 日期: 2026-11-09
+> v0.4.30 变更(交付链):Git preload 隔离修复已通过 APK 真实应用域门禁,原生
+> PRoot 完整 apt/编译/Git HTTPS/PTY 无显式代理验收通过。新增手动固定源码
+> 构建实验,在 Bun 编译期将 .so/.node 导入换成显式预置路径,不伪装 Bun 临时文件;
+> 产物仅诊断,未通过闭包/许可/Android 准入前不得替换正式工件。
 > v0.4.29 变更(交付链):原生 APK 应用域 Bash/V2/PTY 版本执行通过;Git launcher
 > 进入 Bionic PRoot 前清除 glibc LD_PRELOAD,由 bind 提供 /etc,避免 Android
 > linker 加载 glibc shim。新增直接/PRoot 分支环境断言,Git 待新版工件实测。

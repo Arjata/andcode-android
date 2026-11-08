@@ -179,6 +179,23 @@ data 并创建 nativeLibraryDir 链接，21 项回归及真实 manifest 往返�
 PRoot 开发完整 gate 也可显式使用当前 APK 的 farm/native 库，不再混用旧开发库。
 以上仍不是正式签名、Bun 原生扩展预置闭包或 locked 整包交付结论。
 
+后续原生 run `42516603502`（`4869307`）全成功；成功工件 ZIP 已核对 API
+SHA-256 `84287a218c6c885b1e4696bb6976a4db575ee1276bb5811d7b27252aafbe5e2e`，
+本机 APK 再次编译/Lint 与原生/assets 逐字节核验通过并保留原签名覆盖安装。
+旧设备真实 `untrusted_app`/UID10348/Seccomp=2 下 Bash 5.2.21、V2.2.6、
+PTY 0.4.0/protocol7、Git 2.43.0、原生 PRoot 子进程全部通过，
+`ANDCODE_NATIVE_PAYLOAD_OK`；adb 单独确认 SELinux Enforcing（应用域无法读状态）。
+APK 原生 PRoot 的完整开发 gate 同样在真实应用域输出
+`ANDCODE_PROOT_DEVELOPMENT_OK`、`development-exit=0 network-mode=direct`：
+apt、C/C++、Make、Git HTTPS、PTY 均成功；仅未设置显式代理，设备 VPN 保留。
+
+`opencode-native-prototype.yml` 是手动固定源码构建实验：在 Bun 编译期将
+原生 .so 文件导入改为 `ANDCODE_EXE_DIR` 绝对目录下的内容寻址预置路径，
+.node 改为向同目录显式 `process.dlopen`，保留 CommonJS addon 导出语义。
+当前插件合成测试只证明改写/导出/字节保真与错误架构拒绝；CI serve 临时目录
+扫描仅覆盖启动路径，不替代工具、Web PTY、TUI 或全部传递原生库审计。
+实验不接 APK，不修改已验证官方载荷；许可证 notices/源码义务和兼容性待审查。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/

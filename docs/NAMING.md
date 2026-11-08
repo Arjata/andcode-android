@@ -96,6 +96,11 @@
 | `patch-seccomp.test.py` | Linux CI 合成字节夹具验证 seccomp 补丁、幂等、旧补丁升级及错误基线拒绝 | `scripts/` |
 | `native-payload-device-test.sh` | 从 APK 终端运行的原生载荷准入;不以 adb/run-as 代替应用域,结果仅写入私有数据日志 | `scripts/` |
 | `native-payload-test.txt` | 上述准入日志,不保存口令/模型配置 | APK filesDir |
+| `opencode-native-imports.ts`、`opencode-native-imports.test.ts` | Bun 源码构建实验插件与回归,将原生扩展导入改为显式预置路径;不修改官方二进制 | `scripts/` |
+| `prepare-opencode-native-build.py` | 固定上游提交的源码构建实验接线,拒绝不匹配锚点 | `scripts/` |
+| `opencode-native-prototype.yml` | 手动执行的原生扩展预置源码构建实验;失败/未审计工件不得接入 APK | `.github/workflows/` |
+| `libandcode-oc2-native-<sha256前16位>.so` | 实验 Bun 插件按内容命名的原生扩展预置副本,完整摘要校验去重/冲突 | 实验输出 native/ |
+| `oc2-native.tsv` | 上述副本的来源/完整摘要/长度记录;不是正式 bundle manifest | 实验输出 |
 | `libandcode-usr-lib-opencode-pty-opencode-pty.so` | 预置 process-daemon v0.4.0 ELF 本体;静态 libandcode-opencode-pty.so 入口显式调用 loader | nativeLibraryDir |
 | `oc2` | 固定 V2.2.6 ELF 本体逻辑名,用于 serve,与旧 opencode 分开;物理名 libandcode-oc2.so | bundle bin/oc2.bin |
 | `etc/third-party/opencode-v2-license`、`etc/third-party/opencode-pty-license` | 固定版本 MIT 版权许可文本,随 data 交付 | bundle/APK assets |
@@ -140,6 +145,7 @@
 | `ANDCODE_LOADER` | glibc 动态链接器绝对路径(launcher 用) | `$ROOT/lib/ld-linux-aarch64.so.1` |
 | `ANDCODE_LIBPATH` | `--library-path` 值(launcher 用) | `$ROOT/lib`(规范)/`$ANDCODE_EXE_DIR`(Tier P) |
 | `ANDCODE_SHIM` | shim 绝对路径(launcher 用) | `$ROOT/shim/libandcode-shim.so` |
+| `ANDCODE_NATIVE_STAGE` | 仅构建期 Bun 预置扩展实验插件的独立输出目录;不是 APK 运行时安装入口 | CI work/native-prototype |
 | `ANDCODE_TIER` | 形态标识,单字符小写,与 DESIGN 章节一致 | `m` / `a` / `p` |
 | `ANDCODE_UBUNTU_PROJECT_NAME` | 新终端创建时快照的私有项目名;空值不映射;入口验证目录与规范路径,拒绝符号链接/越界,不接受宿主任意路径 | `andcode-demo` → guest `/workspace/andcode-demo` |
 | `ANDCODE_BUNDLE_VERSION` | bundle 语义化版本 | `1.2.0` |
