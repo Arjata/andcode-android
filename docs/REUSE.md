@@ -45,6 +45,17 @@
 `redistributionApproved` 始终 false。它不是传递源码审查，也不覆盖 Bun/JS/Web 整体依赖，
 不能把 CI 成功或收集到 LICENSE 理解为合规交付完成。
 
+2026-11-09 Android libtinfo 自编译核验:Ubuntu
+`ncurses_6.4+20240113.orig.tar.gz` SHA-256
+`37a12a0f8ae2605012c9a164dd286b0cfa02b51b5055836d09eb3d597fc351b1`，
+包内 COPYING 为 MIT/X11 风格(含保留姓名条款)；应用 Ubuntu
+`6.4+20240113-1ubuntu2.2` 补丁集(含两个安全修复)，debian.tar.xz SHA-256
+`c7bbb8483d7ec358fb925a370575d8ebef63d6e455edce140de2ca7b86cf98d1`，
+摘要与 ports.ubuntu.com `.dsc` 一致。源码仅 CI 暂存构建，不入本仓库；保留
+Ubuntu copyright、上游 COPYING、固定摘要/配置。只对 Android bundle 的
+libtinfo 关闭 HAVE_SETFSUID，使用上游无身份变更安全打开分支，不伪造 syscall
+结果、不启用 root-access；需实际初始化和应用域复测后才批准产物。
+
 ### 2.2 独立程序聚合(GPL-2.0,只随包放二进制 + 源码指引)
 
 | 项目 | 仓库 | 许可证 | 角色 | 义务与边界 |

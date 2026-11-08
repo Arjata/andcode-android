@@ -73,8 +73,6 @@ jobs:
         run: python3 scripts/wrapper.test.py
       - name: Bash direct ELF entry argv and child environment
         run: python3 scripts/bash-launcher.test.py
-      - name: Ncurses safe-open identity and kernel permission checks
-        run: python3 scripts/shim-ncurses.test.py
       - name: PTY entry compiler checks
         run: cc -Wall -Wextra -Werror -fsyntax-only bundle/launcher/pty-launcher.c
       - name: ELF version definition repair rejects ambiguous layouts
@@ -302,6 +300,9 @@ jobs:
           # glibc baseline rather than silently distribute unpatched Android ELF.
           mkdir -p work/android-bundle
           cp -a work/audit/andcode work/android-bundle/andcode
+          bash -n scripts/build-android-tinfo.sh
+          bash scripts/build-android-tinfo.sh work/android-tinfo work/android-bundle/andcode
+          python3 scripts/android-tinfo.test.py work/android-tinfo/build/lib/libtinfo.so.6
           bash scripts/patch-seccomp.sh work/android-bundle/andcode
           sha256sum work/android-bundle/andcode/lib/ld-linux-aarch64.so.1 \
             work/android-bundle/andcode/lib/libc.so.6 > work/seccomp-after.sha256

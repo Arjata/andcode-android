@@ -259,6 +259,17 @@ NODE_TLS_REJECT_UNAUTHORIZED=0、未添加未知 CA、未修改用户配置或�
 已中断自有重试并停止隔离服务。恢复端到端验收需要可验证的 provider 证书链或
 正常可解析的直连网络，不把代理可连接误称为模型可用。
 
+静态 Bash 入口 run `42521752952` 全部 CI/本地 APK build/lint 与原签名覆盖安装
+通过；真实应用域 native gate 仍通过，持久 PTY 的 Bash `-c` 与系统 id 成功。
+但默认交互 Bash 仍退出。仅对自有应用域子进程附加 trace，确认 seccomp 在
+libtinfo 读取 terminfo 时禁止 `setfsuid/setfsgid`，未修改过滤器或身份。
+v0.4.34 的 ncurses shim 实验被 run `42523439252` 实际初始化门禁拒绝：
+libtinfo 内部绑定绕过 interposition；该实现与对应测试已移除，未部署设备。
+改为固定 Ubuntu ncurses 6.4+20240113-1ubuntu2.2 源码+安全补丁，关闭
+HAVE_SETFSUID、保留上游 safe-open 分支及内核权限检查的 Android 专用 libtinfo，
+新增真实 Bash/terminfo 无身份调用门禁；标准 Linux bundle 不变，新方案待 CI/设备。
+本轮创建的 14 个持久 PTY 诊断已通过 API 删除，不影响用户会话或终端偏好。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/

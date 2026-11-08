@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.34 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.35 (设计稿) · 日期: 2026-11-09
+> v0.4.35 变更(Android libtinfo):v0.4.34 拦截方案被实际初始化门禁证伪(内部绑定
+> 绕过 shim),已移除。改用固定 Ubuntu ncurses 源码/安全补丁自编译,关闭
+> HAVE_SETFSUID,保留上游无身份变更 safe-open 分支与内核权限检查;标准 Linux
+> bundle 不改,Android 替换库与版权/配置/manifest 同步。待 CI/真实应用域复测。
 > v0.4.34 变更(Tier P shim):真实应用域 trace 确认 libtinfo safe-open 无条件调用
 > setfsuid/setfsgid 触发 SIGSYS;仅拦截 ncurses 两个打开入口,逐次确认线程全部
 > real/effective/saved/fs 身份一致且非 root、capabilities 全空后直接内核 open。

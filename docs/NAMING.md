@@ -75,7 +75,8 @@
 | `launcher.test.py` | Linux CI 编译自有 launcher,ASan/UBSan 检查直拉及 PRoot argv 组装/参数保真 | `scripts/` |
 | `wrapper.test.py` | Linux CI 检查包装器 direct loader 的 --preload 单进程注入与 Bionic 子进程环境隔离 | `scripts/` |
 | `bash-launcher.c`、`bash-launcher.test.py` | Tier P 的 bin/bash 静态 ELF 入口及 Linux 回归,替代原 libandcode-cmd-bash.so 脚本,供 PTY daemon 直接 exec;不增加物理命令名 | `bundle/launcher/`、`scripts/` |
-| `shim-ncurses.test.py` | Linux CI 的真实 libtinfo 打开/交互初始化回归,验证无身份变更、内核权限检查与特权身份拒绝 | `scripts/` |
+| `build-android-tinfo.sh`、`android-tinfo.test.py` | Android 专用 ncurses 构建及真实初始化/内核权限/无身份调用回归;固定 Ubuntu 源码与补丁,不改标准 Linux bundle | `scripts/` |
+| `ncurses-build.txt`、`ncurses-upstream-copying` | Android libtinfo 固定源码摘要/构建配置/上游版权声明,随包 manifest 跟踪 | `etc/third-party/` |
 | `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |
 | `proot-rootfs-gate.sh` | 应用域原版 Ubuntu Base Bash 独立实例准入,不修改 SELinux 或 glibc | `scripts/` |
 | `proot-development-gate.sh`、`proot-development-gate.txt` | 应用域独立 Ubuntu 的 apt/工具链/新 ELF/PTY 验证脚本与 APK files 诊断输出 | `scripts/`、APK `files/` |
