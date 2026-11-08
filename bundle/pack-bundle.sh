@@ -232,10 +232,10 @@ lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版�
 
 wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|libexec|sbin 剥前缀,NAMING §6.2)
   local p="${1#root/}"
-  if [ "$p" = usr/libexec/git-core/git ]; then
-    printf 'libandcode-git-core-git.so'
-    return
-  fi
+  case "$p" in usr/libexec/git-core/*)
+    printf 'libandcode-git-core-%s.so' "${p#usr/libexec/git-core/}"
+    return ;;
+  esac
   case "$p" in
     bin/*|usr/bin/*|usr/libexec/git-core/*|sbin/*) p="${p#bin/}"; p="${p#usr/bin/}"; p="${p#usr/libexec/git-core/}"; p="${p#sbin/}" ;;
   esac

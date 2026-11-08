@@ -170,7 +170,7 @@ jobs:
               'lib/ld-linux-aarch64.so.1': ('libandcode-ld-linux.so', 'glibc-lib', 'LGPL-2.1'),
               'lib/libc.so.6': ('libandcode-libc.so', 'glibc-lib', 'LGPL-2.1'),
               'bin/git': ('libandcode-cmd-git.so', 'launcher', 'AGPL-3.0-only'),
-              'usr/libexec/git-core/git-remote-https': ('libandcode-git-remote-https.so', 'launcher', 'AGPL-3.0-only'),
+              'usr/libexec/git-core/git-remote-https': ('libandcode-git-core-git-remote-https.so', 'launcher', 'AGPL-3.0-only'),
           }
           for path, fields in expected.items():
               assert tuple(manifest[path][1:4]) == fields, (path, manifest[path])
