@@ -20,6 +20,12 @@ SOURCES = {
                 '62b13513f5c020ebccd6a5deb14d93301f69ce36dca3b9a4c1ee0acaa6a7bb6a'),
 }
 LIMIT = 128 * 1024 * 1024
+MEDIA_SOURCES = {
+    'ffmpeg-9.0.2.tar.xz': ('https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz',
+                          '8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e'),
+    'zlib-1.3.2.tar.gz': ('https://zlib.net/fossils/zlib-1.3.2.tar.gz',
+                        'bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16'),
+}
 
 
 def digest(data):
@@ -33,7 +39,7 @@ def inspect_archive(data, expected, depth=0):
         raise ValueError('Candidate source archive size or digest mismatch')
     notices, inputs, locks, nested = [], [], [], []
     seen, expanded = set(), 0
-    with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:*') as archive:
         for member in archive:
             path = PurePosixPath(member.name)
             if path.is_absolute() or '..' in path.parts or '\\' in member.name or member.name in seen:
@@ -86,6 +92,14 @@ def collect(stage):
         rows.append({'name': name, 'repository': repo, 'commit': commit, 'url': url,
                      'archive': filename, 'sha256': expected, 'evidence': review,
                      'status': 'blocked-build-correspondence-and-transitive-review'})
+    media = []
+    for filename, (url, expected) in MEDIA_SOURCES.items():
+        with urllib.request.urlopen(url, timeout=90) as response:
+            data = response.read(LIMIT + 1)
+        review = inspect_archive(data, expected)
+        (evidence / filename).write_bytes(data)
+        media.append({'archive': filename, 'url': url, 'sha256': expected, 'evidence': review,
+                      'status': 'blocked-actual-binary-correspondence-and-relinking'})
     (stage / 'native-source-review.json').write_text(json.dumps({
         'redistributionApproved': False,
         'scope': 'Four candidate source repositories linked by exact npm version gitHead; excludes Bun/JS/Web closure',
@@ -93,8 +107,8 @@ def collect(stage):
                         'Notice filename search is not exhaustive per-source copyright review',
                         'Lockfiles include inactive targets/features; no target closure claim',
                         'LGPL corresponding-source, relinking and replacement obligations remain open'],
-        'sources': rows}, indent=2) + '\n', encoding='utf8')
-    print('Four pinned candidate source archives collected; redistribution remains BLOCKED')
+        'sources': rows, 'opentuiStaticMediaSources': media}, indent=2) + '\n', encoding='utf8')
+    print('Four pinned candidate source archives and FFmpeg/zlib collected; redistribution remains BLOCKED')
 
 
 if __name__ == '__main__':

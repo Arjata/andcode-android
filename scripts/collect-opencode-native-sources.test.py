@@ -1,17 +1,20 @@
 import importlib.util
 import io
+import json
 from pathlib import Path
 import tarfile
+import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('native_sources', Path(__file__).with_name('collect-opencode-native-sources.py'))
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 
-def archive(entries):
+def archive(entries, mode='w:gz'):
     buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode='w:gz') as out:
+    with tarfile.open(fileobj=buffer, mode=mode) as out:
         for name, data in entries:
             item = tarfile.TarInfo(name)
             item.size = len(data)
@@ -20,6 +23,20 @@ def archive(entries):
 
 
 class SourceEvidenceTest(unittest.TestCase):
+    def test_collection_keeps_redistribution_blocked(self):
+        data = archive([('repo/LICENSE', b'license example')])
+        sha = module.digest(data)
+        with tempfile.TemporaryDirectory() as work:
+            with patch.object(module, 'SOURCES', {'fixture': ('example/repo', 'a' * 40, sha)}), \
+                 patch.object(module, 'MEDIA_SOURCES', {'media.tar.gz': ('https://example.invalid/media', sha)}), \
+                 patch.object(module.urllib.request, 'urlopen', side_effect=lambda *a, **k: io.BytesIO(data)):
+                module.collect(work)
+            report = json.loads((Path(work) / 'native-source-review.json').read_text())
+            self.assertIs(report['redistributionApproved'], False)
+            self.assertTrue(report['sources'][0]['status'].startswith('blocked-'))
+            self.assertTrue(report['opentuiStaticMediaSources'][0]['status'].startswith('blocked-'))
+            self.assertEqual((Path(work) / 'native-source-evidence/media.tar.gz').read_bytes(), data)
+
     def test_notices_build_inputs_and_nested_sources(self):
         nested = archive([('yoga/LICENSE', b'MIT example')])
         data = archive([('repo/LICENSE', b'MIT example'), ('repo/Cargo.toml', b'[package]\n'),
@@ -34,6 +51,11 @@ class SourceEvidenceTest(unittest.TestCase):
     def test_digest_mismatch(self):
         with self.assertRaises(ValueError):
             module.inspect_archive(archive([]), '0' * 64)
+
+    def test_xz_source(self):
+        data = archive([('ffmpeg/COPYING.LGPLv2.1', b'license example')], mode='w:xz')
+        result = module.inspect_archive(data, module.digest(data))
+        self.assertEqual(len(result['noticeFilesByName']), 1)
 
     def test_excessive_nesting(self):
         data = archive([('repo/LICENSE', b'MIT')])

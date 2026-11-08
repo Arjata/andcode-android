@@ -61,7 +61,8 @@ OpenTUI 上述固定构建脚本声明 FFmpeg **9.0.2**，源归档
 `8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`；
 zlib **1.3.2**，`https://zlib.net/fossils/zlib-1.3.2.tar.gz`，SHA-256
 `bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16`。
-这些是已读取脚本内的固定值，尚未在本项目完成源归档下载复核/重建。
+这些固定值已于 2026-11-09 通过对应官方 HTTPS 归档下载并复核 SHA-256，
+尚未在本项目重建或证明与平台包 ELF 对应。
 脚本对 FFmpeg 关闭 GPL/version3/nonfree，启用静态解码库并把对象逐项链接进
 libopentui；因此不能用“libopentui 动态加载”免除其内部 LGPL 静态组合义务。
 应提供该库准确对应源码、补丁、依赖、构建工具/配置及可操作的修改后重链接路径
@@ -69,7 +70,7 @@ libopentui；因此不能用“libopentui 动态加载”免除其内部 LGPL �
 亦须独立处理。仅保留下载 URL 或附一份 LGPL 文本不构成此项完成。
 
 `collect-opencode-native-sources.py` 将以上四份候选源码归档按固定 SHA-256 收入
-诊断工件，同时记录按文件名发现的声明、构建输入、全量 Cargo.lock 包索引以及
+诊断工件，并收录 FFmpeg/zlib 固定源码归档；同时记录按文件名发现的声明、构建输入、全量 Cargo.lock 包索引以及
 OpenTUI 内嵌 zig-deps 归档中的声明。四份源码归档于 2026-11-09 通过 HTTPS
 下载并计算摘要后固定；它不证明 npm ELF 的可重现对应关系，不把 lockfile 全表
 误当成目标 feature 闭包，也不把声明文件名扫描当成逐文件完整版权审查。
