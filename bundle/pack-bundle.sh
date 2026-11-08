@@ -226,7 +226,9 @@ lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版�
   local b="$(basename "$1")"
   case "$b" in
     ld-linux*) printf 'libandcode-ld-linux.so' ;;
-    *)         b="${b%.so.*}"; b="${b%.so}"; printf 'libandcode-%s.so' "$b" ;;
+    *)         b="${b%.so.*}"; b="${b%.so}"
+               b="$(printf '%s' "$b" | tr -c 'a-z0-9-' '-')"
+               printf 'libandcode-%s.so' "$b" ;;
   esac
 }
 

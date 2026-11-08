@@ -1,6 +1,8 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.19 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.20 (设计稿) · 日期: 2026-11-09
+> v0.4.20 变更(交付链):Tier P 同步改写 PRoot Bionic 私有共享库 SONAME/NEEDED,
+> glibc 库名按已注册 slug 净化;均需 CI/实机验证,不改变 guest Ubuntu ELF。
 > v0.4.19 变更(§4.4/交付链):Gradle 可显式接收 CI native 中间工件,保留物理名 ELF
 > 不剥离并要求安装解压至 nativeLibraryDir;数据单独经 assets,禁止 ELF 混入数据。
 > 此为打包接线而非可用自包含交付,V2/PTY/启动器/应用首启动数据初始化仍待闭合。

@@ -82,6 +82,17 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
           "$TPL" > "$LIBS/$phys"
       chmod 0755 "$LIBS/$phys"
       ;;
+    elf-exec)
+      # PRoot and its Bionic dependency closure live outside glibc lib/.
+      # Their renamed shared objects still require SONAME/NEEDED agreement.
+      case "$lp" in usr/lib/proot/*.so*)
+        if [ "$REWRITE" = 1 ]; then
+          SONAME_MAP["$(basename "$lp")"]="$phys"
+          patchelf --set-soname "$phys" "$src"
+        fi ;;
+      esac
+      cp -f "$src" "$LIBS/$phys"
+      ;;
     *)
       cp -f "$src" "$LIBS/$phys"
       ;;
