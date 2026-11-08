@@ -288,6 +288,15 @@ PTY 启动预置 Bash 后保持 running，stdin/out/err 均为 `/dev/pts/1`，ma
 此结果不代表官方普通 Web PTY 或源码原生扩展加载已解决；前者仍需独立修复，
 后者仍在许可/源码/闭包准入阶段。
 
+后续网络复核(同日)：宿主 DNS 当前解析到 `198.18.0.66`，使用系统默认校验的
+Python HTTPS 已成功；证书 subject 为 `one.ai.api.service.arjata`，issuer 为
+私有 `Arjata Authority` 的 `Arjata Fundamental Public Endpoint Issuer`。
+这仅证明宿主当前信任链可用，不代表 Android/Bun 信任。真实 APK 默认模型仍
+`getaddrinfo EAI_AGAIN`，隔离显式回环代理仍 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`。
+两次自有请求已 interrupt，4296 专属服务已通过其 shell API 停止；未改 4096
+默认服务的代理/CA/校验。后续需带外核对的 CA 证书与显式信任配置，或 provider
+提供 APK 默认信任的完整链；不能自动从网络/宿主导入未知 CA 或关闭 TLS 校验。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/
