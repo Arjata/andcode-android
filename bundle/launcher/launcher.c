@@ -104,6 +104,8 @@ int main(int argc, char **argv) {
         char ploader[CAP], plib[CAP];
         snprintf(ploader, sizeof ploader, "%s/usr/lib/proot/loader", root);
         snprintf(plib, sizeof plib, "%s/usr/lib/proot", root);
+        if (getenv("ANDCODE_TIER") && strcmp(getenv("ANDCODE_TIER"), "p") == 0)
+            snprintf(plib, sizeof plib, "%s", exedir);
         setenv("PROOT_LOADER", ploader, 1);
         setenv("LD_LIBRARY_PATH", plib, 1);
         setenv("ANDCODE_IN_PROOT", "1", 1);

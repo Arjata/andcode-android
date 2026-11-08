@@ -89,6 +89,8 @@
 | `andcode-apk-intermediate` | CI debug APK 与 Lint 报告,仅验证中间原生载荷打包;非正式签名/自包含产品 | Actions artifact |
 | `andcodeNativeDir` | Gradle 显式原生工件目录属性,包含 arm64-v8a/manifest.farm/assets;不设置时保留开发空载荷构建 | `-PandcodeNativeDir=<绝对目录>` |
 | `andcode-runtime` | APK assets 内 CI 生成的只读 bundle 数据与 manifest.farm,不含运行期解包 ELF | `assets/andcode-runtime/` |
+| `RuntimePayload.java`、`RuntimePayloadTest.java` | APK 只读原生载荷链接农场初始化与平台 JDK 安全回归 | `dev.andcode.app`、`app/tests/` |
+| `andcode-runtime-<sha256>`、`andcode-runtime-stage-<随机值>` | filesDir 内按 manifest/nativeLibraryDir 身份区分的链接/数据目录与原子暂存;从不复制 ELF,不删除旧版本 | APK filesDir |
 | `libandcode-git-core-<命令>.so` | git-core 包装器/自有 launcher 统一前缀;避免 git/receive-pack/upload-pack 等与 usr/bin/*.bin 冲突 | Tier P nativeLibraryDir |
 
 **豁免**:Magisk 平台固定文件名(`customize.sh`、`service.sh`、`uninstall.sh`、

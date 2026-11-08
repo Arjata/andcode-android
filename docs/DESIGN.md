@@ -1,6 +1,11 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.23 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.24 (设计稿) · 日期: 2026-11-09
+> v0.4.24 变更(§4.4/交付链):APK 首启动按 manifest/nativeLibraryDir 身份原子发布
+> 只含数据和原生目录链接的农场,拒绝越界/链接父目录/ELF 数据/manifest 冲突,不删除旧版本。
+> 原生模式禁止回退开发载荷,移除默认代理与禁 TLS 校验;Bash 已在旧设备真实应用域
+> 从 nativeLibraryDir 启动,无需 relabel。Git 首测发现 PRoot 私有库搜索旧路径并已修正,
+> 待 CI/实机重跑;V2/PTY/正式签名/locked 交付仍未闭合。
 > v0.4.23 变更(交付链):源码核实 glibc loader 用 libc.so.6 SONAME 识别 libc 并
 > 调用 __libc_early_init,因此 libc 自身 SONAME 也必须保留,仅调用者 NEEDED 改物理名。
 > 上条的重复 loader 是待证假设,不是已证实根因;实际 Bash 执行仍是强制门禁。

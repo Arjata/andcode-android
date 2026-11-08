@@ -37,6 +37,10 @@ static int fake_execv(const char *path, char *const args[]) {
     for (size_t j = 0; j < sizeof(user)/sizeof(user[0]); ++j)
         if (!args[i] || strcmp(args[i++], user[j])) exit(13);
     if (args[i] != NULL || strcmp(path, args[0])) exit(14);
+    if (!getenv("TEST_DIRECT")) {
+        const char *lib = getenv("LD_LIBRARY_PATH");
+        if (!lib || strcmp(lib, getenv("TEST_TIER_P") ? "/native" : "/fixture/usr/lib/proot")) exit(15);
+    }
     exit(0);
 }
 #define access fake_access
@@ -46,6 +50,9 @@ static int fake_execv(const char *path, char *const args[]) {
 #undef main
 int main(void) {
     setenv("ANDCODE_ROOT", "/fixture", 1);
+    if (getenv("TEST_TIER_P")) {
+        setenv("ANDCODE_TIER", "p", 1); setenv("ANDCODE_EXE_DIR", "/native", 1);
+    } else { unsetenv("ANDCODE_TIER"); unsetenv("ANDCODE_EXE_DIR"); }
     unsetenv("ANDCODE_LOADER"); unsetenv("ANDCODE_LIBPATH");
     if (getenv("TEST_DIRECT")) setenv("ANDCODE_IN_PROOT", "1", 1);
     else unsetenv("ANDCODE_IN_PROOT");
@@ -59,10 +66,13 @@ int main(void) {
             c.write_text(harness, encoding='utf-8')
             subprocess.run(['cc', '-D_GNU_SOURCE', '-g', '-O1', '-fsanitize=address,undefined',
                             '-fno-omit-frame-pointer', str(c), '-o', str(binary)], check=True)
-            for direct in (False, True):
-                with self.subTest(direct=direct):
+            for direct, tier_p in ((False, False), (True, False), (False, True), (True, True)):
+                with self.subTest(direct=direct, tier_p=tier_p):
                     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0')
                     env.pop('TEST_DIRECT', None)
+                    env.pop('TEST_TIER_P', None)
+                    if tier_p:
+                        env['TEST_TIER_P'] = '1'
                     if direct:
                         env['TEST_DIRECT'] = '1'
                     subprocess.run([str(binary)], env=env, check=True, timeout=15)

@@ -33,6 +33,12 @@ public final class AppSettings {
     }
 
     static boolean ubuntuAvailable(Context context) {
+        String nat = context.getApplicationInfo().nativeLibraryDir;
+        if (nat != null && new File(nat, "libandcode-ld-linux.so").isFile()) {
+            return new File(context.getFilesDir(), "proot-rootfs/usr/bin/bash").isFile()
+                && new File(nat, "libandcode-usr-lib-proot-proot.so").isFile()
+                && new File(nat, "libandcode-usr-lib-proot-loader.so").isFile();
+        }
         return new File(context.getFilesDir(), "proot-rootfs/usr/bin/bash").isFile()
             && new File("/data/local/tmp/andcode/usr/lib/proot/proot").isFile()
             && new File("/data/local/tmp/andcode/usr/lib/proot/loader").isFile();

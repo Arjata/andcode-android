@@ -148,6 +148,14 @@ CI 增加 Android 专用 bundle 的 seccomp 七处校验、幂等摘要检查及
 物理化，标准 Linux bundle 不变；首跑已执行该链，后续 manifest 分类修复及
 Tier P 原生中间工件仍需重跑，不代表 jniLibs 自包含已经完成。
 
+2026-11-09 原生 arm64 run `42511151241` 的 build-bundle 已通过物理化、349 ELF
+兼容审计及改名 Bash 执行（保留 libc.so.6 SONAME 后）。APK job 当时因 Action
+请求已移除的 Android SDK `tools` 包失败，已改显式安装 platform-tools，待重跑。
+真实原生工件本机 assembleDebug/lintDebug 与 APK 逐字节核验通过；首启动只写
+data 并创建 nativeLibraryDir 链接，21 项回归及真实 manifest 往返通过。
+旧设备真实应用域已运行 APK 内 Bash，无 root relabel；git 首测因 launcher
+仍搜索旧 PRoot 库目录失败，修正待验证。不代表 V2/Web PTY 或 locked 整包通过。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/

@@ -44,6 +44,14 @@ public final class ServeManager {
 
     private ServeManager() {}
 
+    /** Null means a payload-free developer APK. Partial native installs fail closed. */
+    static File prepareRuntime(Context app) throws IOException {
+        String nat = app.getApplicationInfo().nativeLibraryDir;
+        if (nat == null || !new File(nat, "libandcode-ld-linux.so").isFile()) return null;
+        return RuntimePayload.prepare(app.getFilesDir().toPath(), new File(nat).toPath(),
+            name -> app.getAssets().open("andcode-runtime/" + name)).toFile();
+    }
+
     /** 当前已知密码(可能为 null:server 是上一轮遗留、stdout 未见) */
     public static synchronized String getPassword() {
         return sPassword;
@@ -130,6 +138,7 @@ public final class ServeManager {
     /** 启动 serve 子进程;返回 null=成功,否则错误信息 */
     private static String spawn(Context app) throws IOException {
         File files = app.getFilesDir();
+        File runtime = prepareRuntime(app);
         File home = new File(files, "home");
         File tmp = new File(files, "tmp");
         File demo = new File(home, "demo");
@@ -139,7 +148,7 @@ public final class ServeManager {
         if (!demo.isDirectory()) demo.mkdirs();
         // 配置迁移:bundle 内预置 opencode.json(provider/key)→ 应用 HOME(仅首次)
         File dstCfg = new File(cfg, "opencode.json");
-        if (!dstCfg.exists()) {
+        if (runtime == null && !dstCfg.exists()) {
             File srcCfg = new File("/data/local/tmp/andcode/home/.config/opencode/opencode.json");
             if (srcCfg.exists()) copy(srcCfg, dstCfg);
         }
@@ -153,10 +162,15 @@ public final class ServeManager {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(demo);
         Map<String, String> env = pb.environment();
-        env.put("ANDCODE_ROOT", "/data/local/tmp/andcode");
-        env.put("ANDCODE_TIER", "a"); // 开发期 bundle 在 /data/local/tmp;jniLibs 集成后切 "p"
+        String root = runtime == null ? "/data/local/tmp/andcode" : runtime.getAbsolutePath();
+        env.put("ANDCODE_ROOT", root);
+        env.put("ANDCODE_TIER", runtime == null ? "a" : "p");
+        env.put("ANDCODE_EXE_DIR", p.lib);
+        env.put("ANDCODE_LOADER", p.ld);
+        env.put("ANDCODE_LIBPATH", p.lib);
+        env.put("GIT_EXEC_PATH", root + "/usr/libexec/git-core");
         env.put("ANDCODE_APP_DATA", files.getAbsolutePath());
-        env.put("PATH", "/data/local/tmp/andcode/bin:/data/local/tmp/andcode/usr/bin:/system/bin");
+        env.put("PATH", root + "/bin:" + root + "/usr/bin:/system/bin");
         env.put("HOME", home.getAbsolutePath());
         env.put("TMPDIR", tmp.getAbsolutePath());
         env.put("BUN_TMPDIR", tmp.getAbsolutePath()); // Bun 内嵌原生库提取目录,必须应用可写
@@ -172,9 +186,9 @@ public final class ServeManager {
         // v0.4.0 默认把 socket 放在 /tmp(忽略 TMPDIR),Android 下不可写。
         env.put("OPENCODE_PTY_SOCKET_DIR", ptySocketDir(app));
 
-        env.put("HTTPS_PROXY", "http://127.0.0.1:7890");   // 模型 API 走设备代理
-        env.put("HTTP_PROXY", "http://127.0.0.1:7890");
-        env.put("NODE_TLS_REJECT_UNAUTHORIZED", "0");
+        // Do not ship the development proxy or inherit a disabled TLS verifier.
+        for (String key : new String[]{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                "ALL_PROXY", "all_proxy", "NODE_TLS_REJECT_UNAUTHORIZED"}) env.remove(key);
 
         final Process proc = pb.redirectErrorStream(true).start();
         synchronized (ServeManager.class) { sProcess = proc; sPassword = null; }
@@ -291,6 +305,7 @@ public final class ServeManager {
         if (nat != null) {
             File f = new File(nat, "libandcode-opencode-pty.so");
             if (f.exists()) return f.getAbsolutePath();
+            if (new File(nat, "libandcode-ld-linux.so").isFile()) return null;
         }
         File f = new File("/data/local/tmp/andcode/lib/opencode-pty");
         return f.exists() ? f.getAbsolutePath() : null;
@@ -315,6 +330,11 @@ public final class ServeManager {
          // do not treat the legacy V1 libandcode-opencode.so as a Web backend.
         String nat = app.getApplicationInfo().nativeLibraryDir;
         if (nat != null) {
+            if (new File(nat, "libandcode-ld-linux.so").isFile()) {
+                Paths nativePaths = new Paths(nat + "/libandcode-ld-linux.so", nat,
+                    nat + "/libandcode-oc2.so");
+                return new File(nativePaths.oc2).isFile() ? nativePaths : null;
+            }
             candidates.add(new Paths(
                  nat + "/libandcode-ld-linux.so",
                 nat,

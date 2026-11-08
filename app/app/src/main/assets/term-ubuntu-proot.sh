@@ -4,6 +4,11 @@ set -eu
 FILES=${ANDCODE_APP_DATA:?missing app files directory}
 ROOT=$FILES/proot-rootfs
 P=/data/local/tmp/andcode/usr/lib/proot
+PLIB=$P
+if [ -n "${ANDCODE_ROOT:-}" ] && [ "${ANDCODE_TIER:-}" = p ]; then
+    P=$ANDCODE_ROOT/usr/lib/proot
+    PLIB=${ANDCODE_EXE_DIR:?missing native payload directory}
+fi
 [ -f "$ROOT/usr/bin/bash" ] && [ -f "$P/proot" ] && [ -f "$P/loader" ] || {
     echo 'Ubuntu PRoot 开发实例未安装；会话未启动。' >&2
     exit 1
@@ -32,6 +37,6 @@ if [ -n "$NAME" ]; then
 else
     set -- -w "$WORK" "$@"
 fi
-export PROOT_LOADER="$P/loader" LD_LIBRARY_PATH="$P" PROOT_TMP_DIR="$FILES/tmp"
+export PROOT_LOADER="$P/loader" LD_LIBRARY_PATH="$PLIB" PROOT_TMP_DIR="$FILES/tmp"
 export GLIBC_TUNABLES=glibc.pthread.rseq=0
 exec "$P/proot" --kill-on-exit -l -0 -r "$ROOT" -b /dev -b /proc "$@"

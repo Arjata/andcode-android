@@ -55,6 +55,8 @@ public class TerminalActivity extends AppCompatActivity {
     private TerminalView mTerminalView;
     private DrawerLayout mDrawer;
     private TerminalExtraKeys mExtraKeys;
+    private File mRuntimeRoot;
+    private String mRuntimeError;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -148,6 +150,8 @@ public class TerminalActivity extends AppCompatActivity {
     /** 分别生成系统 sh 和 Bash 的只读启动配置,不覆盖用户 ~/.bashrc。 */
     private void prepareEnv() {
         File files = getFilesDir();
+        try { mRuntimeRoot = ServeManager.prepareRuntime(this); }
+        catch (java.io.IOException error) { mRuntimeError = "原生载荷初始化失败: " + error.getMessage(); }
         File home = new File(files, "home");
         File tmp = new File(files, "tmp");
         if (!home.isDirectory()) home.mkdirs();
@@ -202,8 +206,12 @@ public class TerminalActivity extends AppCompatActivity {
         // PATH:bundle 部署存在则前置(git/ssh 等),否则纯系统
         StringBuilder path = new StringBuilder("/system/bin:/system/xbin");
         String[] bundleBins = {"/data/local/tmp/andcode/usr/bin", "/data/local/tmp/andcode/bin"};
-        for (String b : bundleBins) {
-            if (new File(b).isDirectory()) path.insert(0, b + ":");
+        if (mRuntimeRoot != null) {
+            path.insert(0, mRuntimeRoot + "/bin:" + mRuntimeRoot + "/usr/bin:");
+        } else if (mRuntimeError == null) {
+            for (String b : bundleBins) {
+                if (new File(b).isDirectory()) path.insert(0, b + ":");
+            }
         }
 
         List<String> env = new ArrayList<>(List.of(
@@ -216,10 +224,16 @@ public class TerminalActivity extends AppCompatActivity {
             "BUN_TMPDIR=" + new File(files, "tmp").getAbsolutePath(), // Bun 原生库提取目录
             "ENV=" + new File(files, "term-env.sh").getAbsolutePath(),
             "ANDCODE_APP_DATA=" + files.getAbsolutePath(),
-            "ANDCODE_TIER=p",
-            "HTTP_PROXY=http://127.0.0.1:7890",   // 模型 API 走设备代理
-            "HTTPS_PROXY=http://127.0.0.1:7890",
-            "NODE_TLS_REJECT_UNAUTHORIZED=0"));
+            "ANDCODE_TIER=p"));
+        if (mRuntimeRoot != null) {
+            String nat = getApplicationInfo().nativeLibraryDir;
+            env.add("ANDCODE_ROOT=" + mRuntimeRoot.getAbsolutePath());
+            env.add("ANDCODE_EXE_DIR=" + nat);
+            env.add("ANDCODE_LOADER=" + nat + "/libandcode-ld-linux.so");
+            env.add("ANDCODE_LIBPATH=" + nat);
+            env.add("GIT_EXEC_PATH=" + mRuntimeRoot + "/usr/libexec/git-core");
+            env.add("LD_LIBRARY_PATH=" + nat);
+        }
         if (p != null) {
             // glibc 子进程(opencode-pty、git 等)的库解析;文件名与 bionic 不冲突
             env.add("LD_LIBRARY_PATH=" + p.lib);
@@ -249,6 +263,11 @@ public class TerminalActivity extends AppCompatActivity {
             if (AppSettings.ubuntuProxy(this)) ubuntu.add("loopback-proxy");
             command = ubuntu.toArray(new String[0]);
             selected = null; // Host cwd is not the guest cwd; launcher owns the binding.
+        }
+        if (mRuntimeError != null) {
+            // Print through argv, never interpolate an error into shell source.
+            command = new String[]{"/system/bin/sh", "-c", "printf '%s\\n' \"$1\" >&2; exit 1",
+                "andcode", mRuntimeError};
         }
         return new TerminalSession(
             command[0],

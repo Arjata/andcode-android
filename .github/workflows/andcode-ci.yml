@@ -22,6 +22,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - name: Install matching Android build tools
         run: sdkmanager 'platforms;android-37' 'build-tools;36.1.0' 'ndk;27.0.12077973' 'cmake;3.22.1'
       - uses: gradle/actions/setup-gradle@v4
@@ -29,6 +32,13 @@ jobs:
           gradle-version: '8.14'
       - name: Build and lint intermediate APK (not a complete self-contained product)
         run: gradle -p app -PandcodeNativeDir="$GITHUB_WORKSPACE/work/native" assembleDebug lintDebug --no-daemon
+      - name: Prepare actual CI manifest as links and data only
+        run: |
+          mkdir -p "$RUNNER_TEMP/runtime-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/runtime-tests" \
+            app/app/src/main/java/dev/andcode/app/RuntimePayload.java app/tests/RuntimePayloadTest.java
+          java -cp "$RUNNER_TEMP/runtime-tests" dev.andcode.app.RuntimePayloadTest \
+            "$GITHUB_WORKSPACE/work/native/arm64-v8a" "$GITHUB_WORKSPACE/work/native/assets/andcode-runtime"
       - name: Verify APK native payload bytes and packaged data
         run: |
           python3 - <<'PY'
@@ -36,11 +46,14 @@ jobs:
           import zipfile
           native = Path('work/native')
           with zipfile.ZipFile('app/app/build/outputs/apk/debug/app-debug.apk') as apk:
+              # Android ZIP writers use raw UTF-8 names but may omit bit 11.
+              names = {(i.filename if i.flag_bits & 0x800 else i.filename.encode('cp437').decode('utf-8')): i
+                       for i in apk.infolist()}
               for f in (native / 'arm64-v8a').glob('libandcode-*.so'):
-                  assert apk.read('lib/arm64-v8a/' + f.name) == f.read_bytes(), f.name
+                  assert apk.read(names['lib/arm64-v8a/' + f.name]) == f.read_bytes(), f.name
               for f in (native / 'assets').rglob('*'):
                   if f.is_file():
-                      assert apk.read('assets/' + f.relative_to(native / 'assets').as_posix()) == f.read_bytes(), f
+                      assert apk.read(names['assets/' + f.relative_to(native / 'assets').as_posix()]) == f.read_bytes(), f
           print('APK preserves native ELF/scripts and data bytes')
           PY
       - uses: actions/upload-artifact@v4
@@ -64,6 +77,12 @@ jobs:
           java -cp "$RUNNER_TEMP/archive-tests" dev.andcode.app.ProjectArchiveTest
       - name: Web terminal IME regression tests
         run: node --test app/tests/andcode-terminal-ime.test.mjs
+      - name: Native link farm and data safety regression
+        run: |
+          mkdir -p "$RUNNER_TEMP/runtime-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/runtime-tests" \
+            app/app/src/main/java/dev/andcode/app/RuntimePayload.java app/tests/RuntimePayloadTest.java
+          java -cp "$RUNNER_TEMP/runtime-tests" dev.andcode.app.RuntimePayloadTest
 
   build-bundle:
     # 与基线发行版同构(DESIGN §3.2 入口 3),无需 QEMU
