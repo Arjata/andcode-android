@@ -11,7 +11,7 @@
 | 结论 | 说明 |
 |---|---|
 | ✅ 直接复用(并入/随包分发) | opencode(MIT)、bun(MIT)、dropbear(MIT,实测 LICENSE 原文)、jackpal 终端库(Apache-2.0)、termux-exec(Apache-2.0)——构成交付包核心,保留声明即可 |
-| ⚠️ 独立程序聚合(不并源码) | busybox(GPL-2.0,静态单文件)、proot(GPL-2.0,兜底方案)——作为独立可执行文件随包分发,提供源码获取方式即合规;**禁止把其源码复制进本仓库** |
+| ⚠️ 独立程序聚合(不并源码) | busybox(GPL-2.0,静态单文件)、proot(GPL-2.0,兜底方案)——作为独立可执行文件随包分发,仍须落实适用 GPL 对应源码交付义务;上游 URL 不是合规批准;**禁止把其源码复制进本仓库** |
 | 🔧 仅构建期使用(不随包分发) | patchelf(GPL-3.0,CI 内做 soname 重写)、termux-elf-cleaner(GPL-3.0,按需)——工具本身不进产物,无分发义务 |
 | ⚠️ 参考实现 | termux-pacman/glibc-packages(MIT)——shim 与 sysroot 的对照基线;**Happ1ness-dev/bun-termux(MIT,★85,活跃)——Bun 无 proot 的最佳先行者**;termux-exec(Apache-2.0)——LD_PRELOAD 拦截参照 |
 | ⬇️ 降级为可选 | Termux 系(GPLv3)——不再是宿主,仅作附录替代路径;作为"用户已装的第三方 App 被调用"时无义务 |
@@ -132,11 +132,14 @@ GNU GDB `gdb/top.c` 版权头及 GPLv3+ 版本输出，sourceware 的 RTEMS 只�
    jackpal fork 的修改)→ AGPL-3.0-only。
 2. **MIT/BSD/Apache 代码**(opencode、dropbear、jackpal 等)→ 可并入,保留版权
    与许可声明;并入后整体受 AGPL 约束(对下游)。
-3. **LGPL 依赖**(glibc、JavaScriptCore)→ 动态链接/随包分发允许,附许可文本与
-   对应源码获取方式。
+3. **LGPL 依赖**(glibc、JavaScriptCore)→ 逐项核实版本、静态/动态链接和变更，
+   保留声明并落实适用条款要求的准确对应源码、重链接/替换与必要安装材料；
+   仅附许可文本或上游 URL 不足以证明履约。
 4. **GPL-2.0 独立程序**(busybox、proot)→ 仅以**独立二进制聚合**方式随包分发,
-   `manifest` 提供精确版本号与源码地址(满足 GPL 源码提供义务的"书面offer"路径);
-   不修改、不并入源码。若未来必须修改,需独立 GPL-2.0 仓库分离发布。
+   `manifest` 提供精确版本号与源码地址作为追溯索引，不等同于有效的书面 offer。
+   发布须按实际交付方式落实对应源码(含下游构建补丁/脚本)或适用条款允许的有效
+   源码提供方式，未完成前不称可正式分发。不并入源码；若未来必须修改，需独立
+   GPL-2.0 仓库分离发布。
 5. **GPLv3 平台**(Magisk)→ 只写其标准格式的脚本模块(脚本归 AGPL),不碰平台源码。
 6. **无许可证仓库** → 一律不取代码,只参考行为思路。
 7. 每次发布自动生成 `THIRD-PARTY-NOTICES.md`(CI 从 `bundle/manifest` 收集),并在

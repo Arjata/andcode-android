@@ -267,8 +267,26 @@ v0.4.34 的 ncurses shim 实验被 run `42523439252` 实际初始化门禁拒绝
 libtinfo 内部绑定绕过 interposition；该实现与对应测试已移除，未部署设备。
 改为固定 Ubuntu ncurses 6.4+20240113-1ubuntu2.2 源码+安全补丁，关闭
 HAVE_SETFSUID、保留上游 safe-open 分支及内核权限检查的 Android 专用 libtinfo，
-新增真实 Bash/terminfo 无身份调用门禁；标准 Linux bundle 不变，新方案待 CI/设备。
+新增真实 Bash/terminfo 无身份调用门禁；标准 Linux bundle 不变。
 本轮创建的 14 个持久 PTY 诊断已通过 API 删除，不影响用户会话或终端偏好。
+
+修复验收：run `42524341097` (`a411328`) 全部成功，包括实际 terminfo、精确
+staged libtinfo 映射、真实交互 Bash 与 fs-ID 函数陷阱；可信 native 工件
+`13635111177` ZIP SHA-256
+`045451ed8f7d16926b2f82079536107ef198619ea9ab3b0567de855a861a39ea`。
+本地 APK assembleDebug/lintDebug 通过，403 个 native / 255 个 data 与工件
+逐字节一致，原签名覆盖安装成功，APK SHA-256
+`4bc04edc0a0e991e92c1ecb09f91a66facc8eeb7d190e8cd642e9b6a0d80d493`。
+旧设备真实 `untrusted_app` / `Seccomp=2`、SELinux Enforcing：默认无 args 持久
+PTY 启动预置 Bash 后保持 running，stdin/out/err 均为 `/dev/pts/1`，maps 确认
+来自 nativeLibraryDir 的 libandcode-libtinfo.so；WebSocket 输入、91×31 resize、
+重连回放和 snapshot 通过 `ANDCODE_NATIVE_PERSISTENT_WS_OK`。
+完整 native gate 新增强制交互初始化，得到 `ANDCODE_NATIVE_INTERACTIVE_BASH_OK`，
+其余 Bionic/PRoot 子进程及版本门禁均通过；独立终端首屏 Bash 提示符截图确认。
+完整 PRoot 无显式代理 apt/HTTPS/C/C++/Make/Git HTTPS/PTY 与 libc 8.9 回归通过，
+`development-exit=0 network-mode=direct`。新专属验收 PTY 已删除，未删用户会话。
+此结果不代表官方普通 Web PTY 或源码原生扩展加载已解决；前者仍需独立修复，
+后者仍在许可/源码/闭包准入阶段。
 
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。

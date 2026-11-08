@@ -35,6 +35,13 @@ git --version
   /system/bin/id
   echo ANDCODE_NATIVE_BIONIC_CHILD_OK
 '
+# Noninteractive -c alone never initializes readline/libtinfo. Force interactive
+# initialization in the same real application seccomp domain (not adb/run-as).
+TERM=xterm-256color "$ANDCODE_ROOT/bin/bash" --noprofile --norc -i -c '
+  test -z "${LD_PRELOAD:-}" || exit 1
+  /system/bin/id
+  echo ANDCODE_NATIVE_INTERACTIVE_BASH_OK
+'
 PROOT="$ANDCODE_EXE_DIR/libandcode-usr-lib-proot-proot.so"
 PROOT_LOADER="$ANDCODE_EXE_DIR/libandcode-usr-lib-proot-loader.so" \
 LD_LIBRARY_PATH="$ANDCODE_EXE_DIR" PROOT_TMP_DIR="$ANDCODE_APP_DATA/tmp" \
