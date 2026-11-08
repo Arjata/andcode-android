@@ -45,6 +45,29 @@
 `redistributionApproved` 始终 false。它不是传递源码审查，也不覆盖 Bun/JS/Web 整体依赖，
 不能把 CI 成功或收集到 LICENSE 理解为合规交付完成。
 
+2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
+来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
+关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。
+
+| npm 包 | 固定源码候选 | 已检查的构建输入及剩余边界 |
+|---|---|---|
+| `@opentui/core-linux-arm64@0.8.1` | `anomalyco/opentui@9a09079c0c7ad0fb2d55404f66a5c453204328dd` | `packages/native/build.zig`、`build.zig.zon`、`scripts/build-ffmpeg.ts` 与 `src/vendor/ffmpeg/README.md`；FFmpeg 为静态对象，不是独立动态依赖；还有 Yoga、Ghostty、uucode、miniaudio 等，不能只按平台包八份声明推断闭包完整 |
+| `@ff-labs/fff-bin-linux-arm64-gnu@0.10.5` | `dmtrKovalenko/fff@459ebcdbdba094843fe5339a1a7f7dae4ced2d82` | 根 `LICENSE` 为 MIT、Copyright 2025 Dmitriy Kovalenko，可作为平台包缺失声明的补充来源候选；`crates/fff-c/Cargo.toml` 和 workspace 声明 vendored-libgit2、Rust 依赖等，仍须按实际启用 feature/目标逐项追踪，根 MIT 不覆盖所有静态依赖 |
+| `bun-pty@0.4.11` | `sursaone/bun-pty@a582ae17cc6c41cb890b142c48669936541339c7` | `rust-pty/Cargo.toml` 使用 portable-pty 0.8.1、crossbeam、serde 等；须由该目录 Cargo.lock 加实际 feature/目标确定闭包，而非只读顶层 MIT |
+| `@parcel/watcher-linux-arm64-glibc@2.5.1` | `parcel-bundler/watcher@119f1ff04bb41c2369929e37274900c61b0a9f49` | `binding.gyp` 的 Linux 分支编入 watchman/BSER、BruteForce、Inotify、legacy C++ 文件，另有 node-addon-api 头文件及 C++ 运行库；须保留各源文件声明并核对实际构建版本 |
+
+OpenTUI 上述固定构建脚本声明 FFmpeg **9.0.2**，源归档
+`https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz`，SHA-256
+`8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`；
+zlib **1.3.2**，`https://zlib.net/fossils/zlib-1.3.2.tar.gz`，SHA-256
+`bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16`。
+这些是已读取脚本内的固定值，尚未在本项目完成源归档下载复核/重建。
+脚本对 FFmpeg 关闭 GPL/version3/nonfree，启用静态解码库并把对象逐项链接进
+libopentui；因此不能用“libopentui 动态加载”免除其内部 LGPL 静态组合义务。
+应提供该库准确对应源码、补丁、依赖、构建工具/配置及可操作的修改后重链接路径
+(或符合适用条款的对象材料)，并核实最终 APK 对替换修改版库的限制；Bun/JSC
+亦须独立处理。仅保留下载 URL 或附一份 LGPL 文本不构成此项完成。
+
 2026-11-09 Android libtinfo 自编译核验:Ubuntu
 `ncurses_6.4+20240113.orig.tar.gz` SHA-256
 `37a12a0f8ae2605012c9a164dd286b0cfa02b51b5055836d09eb3d597fc351b1`，
