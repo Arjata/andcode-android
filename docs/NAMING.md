@@ -93,6 +93,7 @@
 | `RuntimePayload.java`、`RuntimePayloadTest.java` | APK 只读原生载荷链接农场初始化与平台 JDK 安全回归 | `dev.andcode.app`、`app/tests/` |
 | `pty-launcher.c` | 自有静态 musl PTY 入口,由 /proc/self/exe 定位同目录 loader/daemon,不依赖固定安装路径 | `bundle/launcher/` |
 | `repair-elf-verdef.py`、`repair-elf-verdef.test.py` | 构建期校验/修复 patchelf 搬迁版本定义节后遗留的 DT_VERDEF 地址;只从 ELF 节表取地址,拒绝模糊布局 | `scripts/` |
+| `patch-seccomp.test.py` | Linux CI 合成字节夹具验证 seccomp 补丁、幂等、旧补丁升级及错误基线拒绝 | `scripts/` |
 | `libandcode-usr-lib-opencode-pty-opencode-pty.so` | 预置 process-daemon v0.4.0 ELF 本体;静态 libandcode-opencode-pty.so 入口显式调用 loader | nativeLibraryDir |
 | `oc2` | 固定 V2.2.6 ELF 本体逻辑名,用于 serve,与旧 opencode 分开;物理名 libandcode-oc2.so | bundle bin/oc2.bin |
 | `etc/third-party/opencode-v2-license`、`etc/third-party/opencode-pty-license` | 固定版本 MIT 版权许可文本,随 data 交付 | bundle/APK assets |

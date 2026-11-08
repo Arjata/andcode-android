@@ -73,6 +73,8 @@ jobs:
         run: cc -Wall -Wextra -Werror -fsyntax-only bundle/launcher/pty-launcher.c
       - name: ELF version definition repair rejects ambiguous layouts
         run: python3 scripts/repair-elf-verdef.test.py
+      - name: Seccomp patch exact bytes, idempotence and legacy migration
+        run: python3 scripts/patch-seccomp.test.py
       - name: 项目 ZIP 安全与导出往返测试(平台 JDK,无第三方测试依赖)
         run: |
           mkdir -p "$RUNNER_TEMP/archive-tests"
