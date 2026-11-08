@@ -17,7 +17,9 @@
   LOAD、capabilities 清零、prctl no-new-privs 查询、PTY/子进程及前台清理。
   **普通用户连接代理超时，默认 DNS 未通过，完整 smoke 脚本仍失败。**
   对照诊断在同样降权/清除 capabilities 条件下只更换 UID：60000 超时，实际 APK UID
-  10348 可连接；未因此改变正式开发身份或设备防火墙。认证服务需解决网络身份适配。
+   10348 可连接；未因此改变正式开发身份或设备防火墙。只读 BPF 诊断进一步确认
+   设备受限网络模式开启，全局规则 `0x220` 包含 `RESTRICTED_MATCH`，APK UID 的
+   `0xa5` 包含相应放行位而 UID 60000 无记录。认证服务需解决网络身份适配。
 - PRoot 在真实 `untrusted_app`、Seccomp=2 下通过显式代理 apt update/install、
   HTTPS 证书校验、新装 hello、gcc 编译产物执行、PTY/子进程与 glibc 8.7 → 8.9
   更新后运行，输出 `ANDCODE_PROOT_DEVELOPMENT_OK`、`development-exit=0`。
@@ -97,6 +99,14 @@ proc status 的 NoNewPrivs 字段，使用 `prctl(PR_GET_NO_NEW_PRIVS)` 验证�
 `getent`、证书校验 HTTPS、严格 apt update 与 Git HTTPS 成功。此处“无代理”只指
 未设置 HTTP/HTTPS/ALL_PROXY，设备原有 FlClash VPN 保持运行，不代表无需设备网络。
 chroot 普通用户的 UID 网络问题仍失败，不能与 PRoot 结果混为一谈。
+
+人工 root 诊断可执行 `sh /data/local/tmp/andcode-ubuntu-network-diagnose.sh`
+（从 `scripts/ubuntu-network-diagnose.sh` 部署）。它只读设备设置及三个 Android 13
+BPF map，校验 map 布局；旧 4.9 内核不支持对象信息 syscall 时读取 fdinfo。
+输出 `ANDROID13_RESTRICTED_RULE_BLOCKS_UID=60000` 表示该规则足以阻断此 UID，
+不是已排除所有其它网络问题。INTERNET 权限 map 中缺条目本身不代表拒绝。
+诊断不修改设置/BPF/防火墙，不借用 APK UID，不恢复 guest 权限；不要为了通过
+测试而关闭受限网络模式。现有模式下 chroot 联网仍记为失败，PRoot 结果不受替代。
 
 ### PRoot 应用域开发准入
 

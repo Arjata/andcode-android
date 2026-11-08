@@ -1,6 +1,8 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.16 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.17 (设计稿) · 日期: 2026-11-09
+> v0.4.17 变更(§4.8):只读诊断确认旧设备受限网络模式/BPF RESTRICTED_MATCH
+> 阻断 UID 60000;APK UID 有放行位。不改网络策略或借 UID 绕过,chroot 联网仍失败。
 > v0.4.16 变更(§4.8/交付链):CI 增加 Android 专用 bundle 副本,seccomp 七处校验
 > 与重复执行摘要不变门禁后才 Tier P 物理化;标准 Linux bundle 不打补丁。
 > 该链仍待 CI 首跑,偏移不匹配必须失败,不动态猜偏移或给 apt 更新后的系统套补丁。
