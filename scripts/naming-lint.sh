@@ -26,7 +26,7 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
   printf '%s' "$phys" | grep -qE '^libandcode-[a-z0-9-]+\.so$' \
     || { echo "[FAIL] 物理名: '$phys' ← $lp"; fail=1; }
   [ ${#phys} -le 64 ] || { echo "[FAIL] 物理名超 64 字符: $phys"; fail=1; }
-  printf '%s' "$kind" | grep -qE '^(elf-exec|wrapper-sh|glibc-lib|preload-lib|script|data|alias)$' \
+  printf '%s' "$kind" | grep -qE '^(elf-exec|wrapper-sh|launcher|glibc-lib|preload-lib|script|data|alias)$' \
     || { echo "[FAIL] kind: '$kind' ← $lp"; fail=1; }
 done < "$DIR/manifest"
 

@@ -3,7 +3,10 @@ package dev.andcode.app;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -15,6 +18,11 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Web 图形界面(OpenCode 2.0):WebView 承载本机 serve 的 SPA(DESIGN §4 Tier P)。
@@ -31,6 +39,10 @@ public class WebActivity extends AppCompatActivity {
     private TextView mStatus;
     private String mPassword;
     private DrawerLayout mDrawer;
+    private String mTerminalImeScript;
+    // Activity-owned queue: unlike View.postDelayed, all retries can be cancelled
+    // before WebView teardown, including when startup completes after navigation.
+    private final Handler mUiHandler = new Handler(Looper.getMainLooper());
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -41,13 +53,27 @@ public class WebActivity extends AppCompatActivity {
         mWebView = findViewById(R.id.web_view);
         mStatus = findViewById(R.id.web_status);
         mDrawer = findViewById(R.id.rootDrawer);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() {
+                // 抽屉优先,然后 Web 历史,最后交回 Activity 默认导航。
+                if (mDrawer.isDrawerOpen(GravityCompat.START)) {
+                    mDrawer.closeDrawer(GravityCompat.START);
+                } else if (mWebView != null && mWebView.canGoBack()) {
+                    mWebView.goBack();
+                } else {
+                    setEnabled(false);
+                    try { getOnBackPressedDispatcher().onBackPressed(); }
+                    finally { setEnabled(true); }
+                }
+            }
+        });
 
         // 悬浮抽屉球:可拖拽、贴边自动隐藏,点击打开共享抽屉(需 content 引用)
         FrameLayout content = findViewById(R.id.webContent);
         content.addView(new FloatingMenuBall(this, content, "menu_ball",
             () -> mDrawer.openDrawer(GravityCompat.START)));
         NavDrawer.bind(this, mDrawer, new NavDrawer.Callbacks() {
-            @Override public void onHomeSelected() { finish(); }
+            @Override public void onHomeSelected() { NavDrawer.goHome(WebActivity.this); }
             @Override public void onTerminalSelected() {
                 startActivity(new Intent(WebActivity.this, TerminalActivity.class));
             }
@@ -58,6 +84,15 @@ public class WebActivity extends AppCompatActivity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true); // 配对凭证存 localStorage
         s.setAllowFileAccess(false);
+        try (InputStream in = getAssets().open("andcode-terminal-ime.js");
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            mTerminalImeScript = new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            android.util.Log.e("andcode", "无法加载 Web 终端输入法适配", e);
+        }
         mWebView.setWebViewClient(new Client());
 
         // FGS 承接常驻(DESIGN §4.4):应用切后台后 serve 存活
@@ -66,6 +101,7 @@ public class WebActivity extends AppCompatActivity {
         mStatus.setText("正在启动 opencode 服务…");
         ServeManager.ensureStarted(this, new ServeManager.ReadyCallback() {
             @Override public void onReady(String password) {
+                if (!hasLiveWebView()) return;
                 mPassword = password;
                 mStatus.setVisibility(View.GONE);
                 mWebView.loadUrl(ServeManager.BASE_URL + "/");
@@ -73,10 +109,11 @@ public class WebActivity extends AppCompatActivity {
                 // "server password":就绪回调时密码可能尚未解析。定期重试注入,
                 // 页面侧 __acPair 守卫保证真正生效的只有第一次。
                 for (int i = 1; i <= 15; i++) {
-                    mWebView.postDelayed(() -> tryAutoPair(), i * 2000L);
+                    mUiHandler.postDelayed(() -> tryAutoPair(), i * 2000L);
                 }
             }
             @Override public void onFailed(String reason) {
+                if (!hasLiveWebView()) return;
                 mStatus.setText("启动失败:" + reason);
             }
         });
@@ -90,7 +127,7 @@ public class WebActivity extends AppCompatActivity {
      * click 事件会冒泡到真正的处理器;兼容中英文两种界面文案。
      */
     private void tryAutoPair() {
-        if (mPassword == null || mPassword.isEmpty()) return;
+        if (!hasLiveWebView() || mPassword == null || mPassword.isEmpty()) return;
         String pw = mPassword;
         String js = "(function(){" +
             "if(window.__acPair)return;window.__acPair=1;" +
@@ -120,32 +157,46 @@ public class WebActivity extends AppCompatActivity {
         mWebView.evaluateJavascript(js, null);
     }
 
+    private boolean hasLiveWebView() {
+        return !isFinishing() && !isDestroyed() && mWebView != null;
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (AppSettings.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
     private class Client extends WebViewClient {
         @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             // 仅本机 serve 的导航留在 WebView 内
-            return !req.getUrl().getHost().equals("127.0.0.1");
+            return !"127.0.0.1".equals(req.getUrl().getHost());
         }
         @Override public void onPageFinished(WebView view, String url) {
+            if (!hasLiveWebView() || view != mWebView) return;
+            if (url != null && url.startsWith(ServeManager.BASE_URL + "/")
+                    && mTerminalImeScript != null) {
+                view.evaluateJavascript(mTerminalImeScript, null);
+            }
             tryAutoPair();
         }
     }
 
     @Override
     protected void onDestroy() {
+        mUiHandler.removeCallbacksAndMessages(null);
+        // 先断开 Activity 回调与视图树,再销毁;serve 生命周期不受页面退出影响。
+        WebView webView = mWebView;
+        mWebView = null;
+        if (webView != null) {
+            webView.stopLoading();
+            webView.setWebViewClient(new WebViewClient());
+            if (webView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) webView.getParent()).removeView(webView);
+            }
+            webView.destroy();
+        }
         super.onDestroy();
-        // WebView 不销毁进程级状态;serve 由 SessionService/ServeManager 生命周期管理
-        if (mWebView != null) mWebView.destroy();
     }
 
-    @Override
-    public void onBackPressed() {
-        // 抽屉开着先关抽屉;WebView 有历史则回退;否则退出本页
-        if (mDrawer != null && mDrawer.isDrawerOpen(GravityCompat.START)) {
-            mDrawer.closeDrawer(GravityCompat.START);
-        } else if (mWebView != null && mWebView.canGoBack()) {
-            mWebView.goBack();
-        } else {
-            super.onBackPressed();
-        }
-    }
 }

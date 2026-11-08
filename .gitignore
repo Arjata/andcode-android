@@ -11,6 +11,9 @@ target/
 *.tar.gz
 *.tar.zst
 *.tgz
+*.img
+*.img.gz
+__pycache__/
 *.sha256         # 由打包脚本生成,与产物同生同弃
 manifest.farm    # Tier P 链接农场清单(由 pack-apk-libs.sh 生成)
 

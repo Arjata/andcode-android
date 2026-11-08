@@ -7,6 +7,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  app-data-tests:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: 项目 ZIP 安全与导出往返测试(平台 JDK,无第三方测试依赖)
+        run: |
+          mkdir -p "$RUNNER_TEMP/archive-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/archive-tests" \
+            app/app/src/main/java/dev/andcode/app/ProjectArchive.java app/tests/ProjectArchiveTest.java
+          java -cp "$RUNNER_TEMP/archive-tests" dev.andcode.app.ProjectArchiveTest
+      - name: Web terminal IME regression tests
+        run: node --test app/tests/andcode-terminal-ime.test.mjs
+
   build-bundle:
     # 与基线发行版同构(DESIGN §3.2 入口 3),无需 QEMU
     runs-on: ubuntu-24.04-arm
@@ -18,19 +31,32 @@ jobs:
       - name: 仓库卫生(LFS 规则,docs/LFS.md §4)
         run: bash scripts/lfs-check.sh "$GITHUB_WORKSPACE"
 
+      - name: 打包与 seccomp 脚本语法
+        run: |
+          bash -n bundle/pack-bundle.sh
+          bash -n scripts/patch-seccomp.sh
+
       - name: 生成基线 rootfs(docker export ubuntu:24.04,arm64 原生)
         run: |
           docker pull --platform linux/arm64 ubuntu:24.04
           CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           # 基线必须含 ca-certificates(git/https)与 zstd;纯净镜像没有
-          docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq ca-certificates zstd >/dev/null"
+          docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq ca-certificates zstd bash libtinfo6 >/dev/null"
           mkdir -p work
           docker export $CID -o work/rootfs.tar
           docker rm -f $CID
           mkdir -p work/rootfs
           tar -xf work/rootfs.tar -C work/rootfs
           test -s work/rootfs/etc/ssl/certs/ca-certificates.crt
+
+      - name: 收录基线 Bash 与许可证(不依赖第三方宿主)
+        run: |
+          mkdir -p work/stage/bin work/stage/etc/third-party
+          cp work/rootfs/usr/bin/bash work/stage/bin/bash
+          cp work/rootfs/usr/share/doc/bash/copyright work/stage/etc/third-party/bash-copyright
+          cp -L work/rootfs/usr/share/doc/libtinfo6/copyright work/stage/etc/third-party/ncurses-copyright
+          cp work/rootfs/usr/share/common-licenses/GPL-3 work/stage/etc/third-party/gpl-3
 
       - name: 获取 opencode 官方 linux-arm64 产物(P0 冒烟对象)
         run: |
@@ -128,6 +154,18 @@ jobs:
       - name: 命名规范门禁(NAMING §8)
         run: bash scripts/naming-lint.sh --bundle-dir work/audit/andcode
 
+      - name: Bash 载荷与闭包检查
+        run: |
+          B=work/audit/andcode
+          test -s "$B/bin/bash.bin"
+          test -s "$B/lib/libtinfo.so.6"
+          test -s "$B/etc/third-party/bash-copyright"
+          test -s "$B/etc/third-party/ncurses-copyright"
+          test -s "$B/etc/third-party/gpl-3"
+          grep -F 'GPL-3.0-or-later' "$B/manifest" | grep -F 'bin/bash.bin'
+          "$B/lib/ld-linux-aarch64.so.1" --library-path "$B/lib" --inhibit-cache \
+            "$B/bin/bash.bin" --noprofile --norc -c 'test -n "$BASH_VERSION"; printf "Bash %s\n" "$BASH_VERSION"'
+
       - name: 生成 THIRD-PARTY-NOTICES(REUSE §4)
         run: bash scripts/gen-notices.sh work/audit/andcode/manifest > dist/THIRD-PARTY-NOTICES.md && head -n 12 dist/THIRD-PARTY-NOTICES.md
 
@@ -144,9 +182,23 @@ jobs:
       - name: Tier P 物理化路线甲(patchelf 重写,NAMING §6.3)
         run: |
           command -v patchelf >/dev/null || sudo apt-get update -qq && sudo apt-get install -y -qq patchelf
+          # Keep the canonical Linux artifact unmodified. Fail closed on a new
+          # glibc baseline rather than silently distribute unpatched Android ELF.
+          mkdir -p work/android-bundle
+          cp -a work/audit/andcode work/android-bundle/andcode
+          bash scripts/patch-seccomp.sh work/android-bundle/andcode
+          sha256sum work/android-bundle/andcode/lib/ld-linux-aarch64.so.1 \
+            work/android-bundle/andcode/lib/libc.so.6 > work/seccomp-after.sha256
+          bash scripts/patch-seccomp.sh work/android-bundle/andcode
+          sha256sum -c work/seccomp-after.sha256
+          bash scripts/naming-lint.sh --bundle-dir work/android-bundle/andcode
+          bash baseline/check-compat.sh --page-align work/android-bundle/andcode/lib
+          tar -czf dist/andcode-bundle-android-arm64-v0.1.1.tar.gz -C work/android-bundle andcode
+          sha256sum dist/andcode-bundle-android-arm64-v0.1.1.tar.gz \
+            > dist/andcode-bundle-android-arm64-v0.1.1.tar.gz.sha256
           mkdir -p work/jni
           bash bundle/pack-apk-libs.sh \
-            --bundle dist/andcode-bundle-arm64-v0.1.1.tar.gz \
+            --bundle dist/andcode-bundle-android-arm64-v0.1.1.tar.gz \
             --out work/jni
           bash baseline/check-compat.sh --page-align work/jni/arm64-v8a
 
@@ -156,4 +208,6 @@ jobs:
           path: |
             dist/andcode-bundle-arm64-v0.1.1.tar.gz
             dist/andcode-bundle-arm64-v0.1.1.tar.gz.sha256
+            dist/andcode-bundle-android-arm64-v0.1.1.tar.gz
+            dist/andcode-bundle-android-arm64-v0.1.1.tar.gz.sha256
             dist/THIRD-PARTY-NOTICES.md

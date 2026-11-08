@@ -1,0 +1,44 @@
+#!/system/bin/sh
+# Install only trusted CI output, never user-supplied rootfs archives.
+# Usage: sh andcode-ubuntu-install <out-of-band-sha256>
+# Inputs: /data/local/tmp/andcode-ubuntu-arm64.img.gz and
+#         /data/local/tmp/andcode-ubuntu (the reviewed manager script).
+set -eu
+BASE=/data/adb/andcode-ubuntu
+SOURCE=/data/local/tmp/andcode-ubuntu-arm64.img.gz
+MANAGER=/data/local/tmp/andcode-ubuntu
+fail() { echo "andcode-ubuntu-install: $*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || fail 'root required'
+[ "$#" = 1 ] || fail 'one trusted SHA-256 argument required'
+[ "${#1}" = 64 ] || fail 'invalid SHA-256'
+case "$1" in *[!0-9a-f]*) fail 'invalid SHA-256' ;; esac
+[ ! -e "$BASE" ] && [ ! -L "$BASE" ] || fail 'refusing to replace an existing instance'
+[ "$(uname -m)" = aarch64 ] || fail 'arm64 required'
+# The compressed input is already on /data; require full 4 GiB image + 1 GiB headroom.
+free=$(df -k /data/adb | awk 'END {print $4}')
+case "$free" in ''|*[!0-9]*) fail 'cannot determine free storage' ;; esac
+[ "$free" -ge 5242880 ] || fail 'need at least 5 GiB free on /data after staging compressed image'
+[ -f "$SOURCE" ] && [ ! -L "$SOURCE" ] || fail 'missing regular compressed image'
+[ -f "$MANAGER" ] && [ ! -L "$MANAGER" ] || fail 'missing regular reviewed manager'
+[ "$(stat -c '%u:%g:%a' "$SOURCE")" = 0:0:600 ] || fail 'staged image must be root:root 0600'
+[ "$(stat -c '%u:%g:%a' "$MANAGER")" = 0:0:700 ] || fail 'staged manager must be root:root 0700'
+[ -f /data/local/tmp/andcode/bin/busybox ] || fail 'existing bundle busybox required for prototype'
+actual=$(sha256sum "$SOURCE")
+[ "${actual%% *}" = "$1" ] || fail 'compressed image SHA-256 mismatch'
+umask 077
+mkdir "$BASE"
+chown 0:0 "$BASE"
+chmod 0700 "$BASE"
+# On failure keep the private partial directory for inspection, do not overwrite/retry.
+cp "$MANAGER" "$BASE/andcode-ubuntu"
+cp /data/local/tmp/andcode/bin/busybox "$BASE/busybox"
+chown 0:0 "$BASE/busybox"
+chmod 0700 "$BASE/busybox"
+chown 0:0 "$BASE/andcode-ubuntu"
+chmod 0700 "$BASE/andcode-ubuntu"
+gzip -dc "$SOURCE" > "$BASE/ubuntu.img"
+[ "$(stat -c %s "$BASE/ubuntu.img")" = 4294967296 ] || fail 'unexpected image size; partial instance retained'
+chown 0:0 "$BASE/ubuntu.img"
+chmod 0600 "$BASE/ubuntu.img"
+sync
+echo 'Installed trusted chroot prototype. Android apt/compile/SELinux behavior still requires validation.'

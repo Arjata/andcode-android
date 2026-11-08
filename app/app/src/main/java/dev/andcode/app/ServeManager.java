@@ -105,7 +105,6 @@ public final class ServeManager {
         }
         final Context app = ctx.getApplicationContext();
         new Thread(() -> {
-            fixPtyBin(app); // 已有 serve(含上轮遗留)也要指路:插件可能刚重新下载
             // 初始探测也在后台做(ping 是网络调用,禁止主线程)
             if (ping()) {
                 synchronized (ServeManager.class) { sStarting = false; }
@@ -145,8 +144,6 @@ public final class ServeManager {
             if (srcCfg.exists()) copy(srcCfg, dstCfg);
         }
 
-        fixPtyBin(app); // 插件二进制指路必须在 serve 启动前完成(启动内即初始化插件)
-
         Paths p = resolvePaths(app);
         if (p == null) return "opencode V2 二进制或补丁 loader 未部署";
 
@@ -166,6 +163,15 @@ public final class ServeManager {
         env.put("ANDCODE_IN_PROOT", "1");
         env.put("GLIBC_TUNABLES", "glibc.pthread.rseq=0"); // zygote seccomp 对 rseq 直接 SIGSYS
         env.put("LD_LIBRARY_PATH", p.lib); // glibc 子进程(opencode-pty、git 等)的库解析
+        // opencode-pty 插件二进制"预置副本 + 指路"(DESIGN §1.2):官方支持
+        // OPENCODE_PTY_BIN 覆盖(packages/core/src/persistent-pty/binary.bun.ts
+        // resolveBinary 首行),设置后跳过缓存目录下载/校验,直接 exec 指定路径——
+        // 避开应用域禁 exec 应用数据文件的 targetSdk 37.2 约束(EACCES posix_spawn)
+        String ptyBin = ptyBinPath(app);
+        if (ptyBin != null) env.put("OPENCODE_PTY_BIN", ptyBin);
+        // v0.4.0 默认把 socket 放在 /tmp(忽略 TMPDIR),Android 下不可写。
+        env.put("OPENCODE_PTY_SOCKET_DIR", ptySocketDir(app));
+
         env.put("HTTPS_PROXY", "http://127.0.0.1:7890");   // 模型 API 走设备代理
         env.put("HTTP_PROXY", "http://127.0.0.1:7890");
         env.put("NODE_TLS_REJECT_UNAUTHORIZED", "0");
@@ -275,42 +281,31 @@ public final class ServeManager {
     }
 
     /**
-     * opencode-pty 插件二进制"预置副本 + 指路"(DESIGN §1.2):
-     * opencode 把插件原生二进制下载到应用数据目录
-     * files/home/.cache/opencode/bin/opencode-pty/<版本>/opencode-pty,
-     * 而应用域禁止 exec 应用数据文件 → posix_spawn EACCES。
-     * 把它替换为指向可 exec 位置的符号链接:nativeLibraryDir 预置副本
-     * (Tier P,待打包链集成)或 /data/local/tmp 开发部署(与 oc2 同域,
-     * interp 已改写为 /data/local/tmp/ld、库走 LD_LIBRARY_PATH)。
-     * serve 每次启动前执行;首次插件下载发生在 serve 启动内,重启一次生效。
+     * opencode-pty 预置副本路径(指路用,见 spawn 内 OPENCODE_PTY_BIN 注释):
+     * 优先 jniLibs(Tier P,打包链须已完成 interp 改写),回退
+     * /data/local/tmp 开发部署(interp 已指向 /data/local/tmp/ld、
+     * 库解析走 LD_LIBRARY_PATH)。null = 无预置副本(首次会 EACCES)。
      */
-    static void fixPtyBin(Context app) {
-        File target = null;
+    static String ptyBinPath(Context app) {
         String nat = app.getApplicationInfo().nativeLibraryDir;
         if (nat != null) {
             File f = new File(nat, "libandcode-opencode-pty.so");
-            if (f.exists()) target = f;
+            if (f.exists()) return f.getAbsolutePath();
         }
-        if (target == null) {
-            File f = new File("/data/local/tmp/andcode/lib/opencode-pty");
-            if (f.exists()) target = f;
+        File f = new File("/data/local/tmp/andcode/lib/opencode-pty");
+        return f.exists() ? f.getAbsolutePath() : null;
+    }
+
+    /** 短且应用私有的 socket 基目录;与上游追加的 uid/hash 后缀一起检查 sun_path。 */
+    static String ptySocketDir(Context app) {
+        // 不放 cacheDir:缓存清理可能 unlink 活跃 socket,导致新连接 ENOENT。
+        String base = app.getFilesDir().getAbsolutePath();
+        String socket = base + "/opencode-pty-" + android.os.Process.myUid()
+            + "/00000000000000000000000000000000.sock";
+        if (socket.getBytes(java.nio.charset.StandardCharsets.UTF_8).length >= 104) {
+            throw new IllegalStateException("PTY socket 路径过长: " + socket);
         }
-        if (target == null) return; // 无预置副本:维持原样(首次会 EACCES)
-        File base = new File(app.getFilesDir(), "home/.cache/opencode/bin/opencode-pty");
-        File[] vers = base.listFiles();
-        if (vers == null) return;
-        for (File ver : vers) {
-            if (!ver.isDirectory()) continue;
-            File bin = new File(ver, "opencode-pty");
-            boolean link = java.nio.file.Files.isSymbolicLink(bin.toPath());
-            if (link && bin.exists()) continue;   // 已指向有效目标
-            if (!link && !bin.exists()) continue; // 目录里没有(尚未下载)
-            try {
-                bin.delete();
-                android.system.Os.symlink(target.getAbsolutePath(), bin.getAbsolutePath());
-            } catch (Exception ignored) {
-            }
-        }
+        return base;
     }
 
     /** 二进制/loader 路径解析:优先 jniLibs,回退 /data/local/tmp 开发部署(终端页复用) */

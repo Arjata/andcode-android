@@ -7,6 +7,7 @@
 *.prop       text eol=lf
 Makefile     text eol=lf
 *.mk         text eol=lf
+runtime/ubuntu/andcode-* text eol=lf
 
 # 源码与数据格式
 *.c          text eol=lf

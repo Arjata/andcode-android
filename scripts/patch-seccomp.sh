@@ -8,12 +8,15 @@
 #   NR 99  set_robust_list — ld.so/libc 线程初始化(主线程 + 每线程)
 #   NR 293 rseq            — glibc 2.35+ 每线程注册(裸 syscall,非 libc 符号)
 #   NR 435 clone3          — glibc 2.34+ pthread_create(TRAP 使 ENOSYS 回退失效)
+#   NR 439 faccessat2      — Bash 交互启动的权限探测(同样阻断 ENOSYS 回退)
 #
 # 补丁(全部等价/无害替换):
 #   set_robust_list → sched_yield(124,恒返 0,即"注册成功"语义)
 #   rseq            → sched_yield,叠加 GLIBC_TUNABLES=glibc.pthread.rseq=0 双保险
 #   clone3          → close_range(436;4.9 内核无此调用 → -ENOSYS → glibc 走
 #                     传统 clone(220) 回退,行为完全正确)
+#   faccessat2 的 svc → mov x0,#-38(-ENOSYS),进入 glibc 自带 faccessat 回退。
+#     仅修改该调用点,不向其他 syscall 填入 faccessat2 的参数。
 #
 # 指令编码(aarch64): mov x8,#imm = 0xd2800000 | (imm<<5) | 8
 #   #99=680c80d2  #124=880f80d2  #293=a82480d2  #435=683680d2  #436=883680d2
@@ -69,6 +72,13 @@ patch_one "$LC" 546884 "a82480d2" "880f80d2" '\x88\x0f\x80\xd2' '\xa8\x24\x80\xd
 # pthread_create 的 clone3 直接调用点(0xebb04 wrapper): 4.9 内核无 close_range,
 # 恒返 -ENOSYS,上层按"glibc 标准回退"走传统 clone(220)(应用域已验证放行)
 patch_one "$LC" 965408 "683680d2" "883680d2" '\x88\x36\x80\xd2' '\x68\x36\x80\xd2' "clone3->close_range(ENOSYS)" && n=$((n+1))
+# Ubuntu libc6_2.39-0ubuntu8.9_arm64: faccessat+0x4c,0xdc94c。
+# 前面的 x8=439 保持不变;跳过 svc 并合成 -ENOSYS,后续标准错误处理保持不变。
+# 除 svc 字节外同时确认所属 syscall,避免其它构建在同偏移恰好也是 svc。
+callnr=$($BB dd if="$LC" bs=1 skip=903480 count=4 2>/dev/null | $BB od -A n -t x1 | $BB tr -d ' \n')
+[ "$callnr" = "e83680d2" ] || { echo 'ERROR: faccessat2 调用点基线不匹配'; exit 1; }
+patch_one "$LC" 903500 "010000d4" "a0048092" '\xa0\x04\x80\x92' '\x01\x00\x00\xd4' "faccessat2->ENOSYS(faccessat fallback)" && n=$((n+1))
 
 echo "patched: $n 处"
+[ "$n" -eq 7 ] || { echo 'ERROR: 补丁未全部通过校验'; exit 1; }
 echo "提醒: 会话环境建议含 GLIBC_TUNABLES=glibc.pthread.rseq=0(双保险)"

@@ -1,6 +1,67 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.3 (设计稿) · 日期: 2026-11-08
+> 版本: v0.4.16 (设计稿) · 日期: 2026-11-09
+> v0.4.16 变更(§4.8/交付链):CI 增加 Android 专用 bundle 副本,seccomp 七处校验
+> 与重复执行摘要不变门禁后才 Tier P 物理化;标准 Linux bundle 不打补丁。
+> 该链仍待 CI 首跑,偏移不匹配必须失败,不动态猜偏移或给 apt 更新后的系统套补丁。
+> v0.4.15 变更(§4.8):PRoot 新终端快照单个私有项目并映射 /workspace/项目名,
+> 拒绝链接/越界/丢失项目;修复 Android /data/user/0 与 /data/data 别名误拒绝。
+> 默认直连 UDP DNS 超时,改 TCP DNS 后应用域 HTTPS/严格 apt update/Git 成功;
+> 此处直连仅指不使用显式 HTTP 代理,未停用设备现有 VPN。chroot 网络身份仍未解决。
+> v0.4.14 变更(§4.8):设置页提供仅新终端生效的轻量 Bash/Ubuntu PRoot 开发选择,
+> 默认 Bash;Ubuntu 缺实例拒绝设置,启动时失效明确失败,不静默切后端。
+> Ubuntu 代理默认关闭且单独显式选择,不改已有终端/OpenCode/Web PTY,不映射项目。
+> v0.4.13 变更(§4.8):真实 untrusted_app/Seccomp=2/Enforcing 下独立 PRoot
+> Ubuntu 已通过显式代理 HTTPS/apt、hello、新编译 ELF、PTY/子进程和 libc 更新;
+> 全程不修改 guest ELF。新增终端 andcode-ubuntu-proot 开发入口,退出返回轻量 Bash,
+> 不接入 OpenCode/root 服务、不映射项目。默认直连、正式自包含与其它设备仍待验证。
+> v0.4.12 变更(§4.8):chroot 实测代理 HTTPS/apt 安装 hello 与 libc 更新通过;
+> 普通用户编译/16K LOAD/capabilities 清零/no-new-privs/PTY/退出码/stdin/前台清理通过,
+> 但 UID 60000 代理网络超时,不得声称完整通过。devpts 改独立 newinstance,
+> 避免 Android 宿主 ptmxmode=000。PRoot 应用域 Seccomp=2 下未修改 ELF 的 Base
+> Bash/id 通过;开发归档将硬链接展开副本并规范绝对链接,完整 apt/编译仍在验证。
+> v0.4.11 变更(§4.8):用户清理后设备可用空间约 54 GiB,解除空间阻塞。
+> 增加固定摘要 Ubuntu Base 设备开发引导路径,不冒充 Docker/CI 镜像验证;
+> 旧系统 Toybox bind mount 不适用,改用已有 bundle BusyBox 的 root 私有副本。
+> loop 显式分配,卸载后检查内核是否已自动 detach,避免将 ENXIO 误判为泄漏。
+> chroot 网络/apt/编译正在实机验证,PRoot 与 APK 后端接入仍待验证。
+> v0.4.10 变更(§4.8):启动 Ubuntu 双后端工作,新增同源 Ubuntu 24.04 arm64
+> 开发镜像配方与 root-only chroot 原型。会话使用私有 mount namespace/串行锁,
+> 默认 setpriv 普通用户且清除 capabilities;admin 仅显式人工入口。不把特权入口
+> 暴露给 APK 或模型。PRoot 仍为待应用域准入,轻量 Bash 不变。设备仅余 0.9 GiB,
+> 完整镜像/apt/编译尚待 P0/P3 实机验证;Linux CI 不替代 Android 验证。
+> v0.4.9 变更(§4.4):终端默认经补丁 loader 拉起预置 Bash --noprofile --rcfile
+> term-bashrc -i;无载荷时明确提示回退系统 sh -i。首帧绑定 client/同步尺寸与绘制,
+> 显式配置提示符;增加两行附加键,CTRL/ALT 点击锁定,方向键使用终端协议。
+> 旧设备应用域发现 Bash 权限探测调用 faccessat2(439) 被 seccomp TRAP;
+> patch-seccomp.sh 增加校验后的 -ENOSYS 回退,七处校验失败即非零退出。
+> 实测新会话无需按回车即显示提示符,Bash 5.2.21/交互标志/PTY、附加键与跨页
+> 同 PID 保留通过。CI 新增 Bash/依赖/许可收录,全打包与其它设备仍待 P3 验证。
+> v0.4.8 变更(§4.4):共享抽屉补齐项目/设置图标;独立终端接通既有双指缩放
+> 回调,按阈值逐级调整并保存 10–28 sp 字号,设置页恢复前台时同步滑块与预览。
+> 旧设备已通过双指触控注入验证放大/缩小、上下界及反向调整、返回既有设置页
+> 同步字号;导航图标已截图确认。其它设备的手势手感仍待 P3 实机验证。
+> v0.4.7 变更(§4.4):新增原生项目导入/导出与设置页。SAF ZIP/目录复制到
+> filesDir/projects,暂存完成后发布且不覆盖;ZIP 防路径穿越,限制 512 MiB /
+> 20000 项/64 层;导出跳过链接/特殊文件,默认排除 .git,明确提示隐藏文件风险。
+> 设置保存终端字号、亮屏、导出 .git 偏好;新终端使用选中项目,旧会话不自动 cd。
+> 旧设备已验证 SAF ZIP 导入/导出内容往返、目录导入、偏好保存及项目终端起始目录;
+> 其它文档提供器/Android 版本及大项目边界待 P3 实机验证。
+> v0.4.6 变更(§4.4):Web/终端抽屉“主页”显式跳转 HomeActivity 并清理其上返回栈,
+> 不再以 finish() 假定主页存在。Web 页销毁前取消自动配对重试,迟到的服务回调/
+> 页面回调检查 Activity 存活状态;WebView 从父视图移除后再 destroy。
+> 旧设备验证无主页返回栈及正常往返场景,应用/serve PID 保持,无新致命异常或
+> destroyed WebView 警告;其它 Android/WebView 版本仍待 P3 实机验证。
+> v0.4.5 变更(§4.4):Web 终端增加 Android IME hints 与本地退格哨兵;
+> 解决 LatinIME 英文整词组合不可见及隐藏 textarea 为空导致退格失效。
+> 旧设备已用屏幕软键盘验证逐字输入、空格、退格、回车和 echo 回显;
+> 中文候选词及其它第三方输入法待 P3 实机验证,不以粘贴成功代替输入法测试。
+> v0.4.4 变更(§4.4):终端页改为手动启动 opencode 的交互 shell,同进程内跨页面
+> 保留 TerminalSession;终端/Web 页均有悬浮球导航。Web PTY 改用上游
+> `OPENCODE_PTY_BIN` 指向可执行预置副本,`OPENCODE_PTY_SOCKET_DIR` 指向
+> filesDir(完整 socket 路径 <104 字节,不使用易清理的 cacheDir)。旧设备应用域
+> 实测创建终端并回显 `ANDCODE_PTY_OK`;当前依赖 root 辅助的开发部署,不代表
+> locked 设备完整自包含 APK 已交付。正式 jniLibs/CI 闭包集成仍待完成。
 > v0.4.3 变更(Tier P 桌面级 Web UI 落地,§4.4 扩充): OpenCode 2.0 桌面界面以
 > **"on-device serve + WebView"** 形态交付——`opencode serve --port 4096
 > --hostname 127.0.0.1` 由 ServeManager 在应用域托管(补丁 loader 直拉,环境同
@@ -136,7 +197,7 @@
           │ Tier M (root)    │ │ Tier A (locked)│ │ Tier P (locked)  │
           │ Magisk 模块      │ │ adb 直推包      │ │ 自研最小 APK      │
           │ /data/adb/andcode│ │ /data/local/tmp│ │ 内嵌交付包+终端   │
-          │ 真 chroot        │ │ loader 包装器   │ │ targetSdk 28     │
+          │ 真 chroot        │ │ loader 包装器   │ │ targetSdk 37.2   │
           │ 开机自启 sshd    │ │ sshd (dropbear)│ │ 侧载 GitHub/F-Droid│
           │ 零 App 依赖      │ │ 零 App 依赖     │ │ 唯一交付物=1 个 APK│
           └──────────────────┘ └────────────────┘ └──────────────────┘
@@ -276,19 +337,40 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     `nativeLibraryDir` 内的执行体;
   - **可写数据**(`HOME`、`TMPDIR`、git 仓库、配置、生成的 `resolv.conf`)
     → `filesDir`,绝无 ELF 落盘后 exec。
-- 终端 UI 复用 `jackpal/Android-Terminal-Emulator` 的 emulator/view 库
-  (Apache-2.0,可并入 AGPL 项目,保留声明);jackpal 上游 2022 年后停更,
-  以"最小 fork"方式维护,只保留 TUI 会话所需路径。
+- 终端 UI 已改用内嵌的 Termux terminal-emulator/terminal-view 模块
+  (GPLv3,保留版权与 NOTICE,合并作品 AGPL-3.0-only,见 REUSE §2.1),
+  不依赖用户安装 Termux App。
 - **targetSdk 37.2 平台行为适配清单**:
   - 前台服务必须声明类型:用 `specialUse`(属性说明:承载开发工具长会话),
     并申请 `POST_NOTIFICATIONS` 运行时权限(通知才可见);
   - edge-to-edge 强制(targetSdk 35+):终端页按 WindowInsets 适配;
   - 预测性返回手势(Android 16+):终端页禁用 predictive back 以防误退;
-  - scoped storage:工作区默认 `filesDir`,可选 SAF 授权 `/sdcard` 项目目录
-    (noexec 限制只影响 ELF,不影响源码)。
+  - scoped storage:项目通过 SAF 选择 ZIP 或文件夹,**复制**到 `filesDir/projects`,
+    不把 content URI 当 POSIX 路径、不做源目录双向同步、不申请全盘存储权限。
 - 常驻:前台服务(specialUse)+ wake-lock 承载 `opencode serve`/长会话(§4.6)。
-- **双 UI(v0.4.3)**:
-  - **终端页(TUI)**:`jackpal` 终端视图承载 opencode TUI(见上);
+- **双 UI(v0.4.4)**:
+  - **终端页(v0.4.9)**:Termux 终端视图默认承载随包 Bash 交互 shell,不自动启动 TUI;
+    显式补丁 loader + `bash --noprofile --rcfile <files/term-bashrc> -i`,预置副本
+    优先来自 nativeLibraryDir/libandcode-bash.so,开发期使用 bundle/bin/bash.bin;
+    不借用第三方宿主。配置设短提示符 `\W \$ `、HISTFILE,读取用户 ~/.bashrc,
+    提供 `opencode` 函数(前台运行后返回 shell,不再 exec 替换 shell)。无 Bash
+    时回退 `/system/bin/sh -i`,ENV 读取系统 mkshrc 并明确显示降级提示。
+    SHELL 仍为可直接 exec 的系统 sh,避免下游 spawn 裸 glibc Bash 因 PT_INTERP 失败;
+    正式 Bash 子 shell 启动器与完整 jniLibs 闭包仍待接线。
+    首帧前绑定 TerminalViewClient,布局后同步尺寸与绘制,不注入回车模拟提示符。
+    底部两行附加键含 ESC/TAB/CTRL/ALT/四方向、HOME/END/PGUP/PGDN、`/`/`-`/
+    回车/IME;CTRL/ALT 为高亮锁定键(再点解除),其它非文本键由 TerminalView
+    按应用模式编码,触摸按键不抢终端焦点;键盘展开时随 adjustResize 保持在其上方。
+    Bash 依赖 libtinfo;基线 CI 收录二者版权与 GPLv3 文本并以 dpkg 实际版本登记。
+    老内核的 faccessat2(439) TRAP 通过 libc 调用点合成 -ENOSYS 进入原生回退;
+    补丁锁定 Ubuntu libc6 2.39-0ubuntu8.9 的字节/偏移,不匹配必须失败。
+    静态 TerminalSession + 委托 ClientBridge
+    让 Activity 离开/重建后复用进程与缓冲区,SessionService 保持宿主常驻;
+    这仅是同一应用进程内的会话保留,不承诺 force-stop/系统杀进程后恢复。
+    终端页和 Web 页的悬浮球均可打开抽屉导航;
+    抽屉“主页”通过共享 `NavDrawer.goHome` 显式启动 HomeActivity
+    (`CLEAR_TOP | SINGLE_TOP`,Home 为 singleTask),关闭来源页;即使来源页经
+    开发入口直接启动、返回栈没有主页,也不会因裸 finish() 掉回系统桌面。
   - **桌面 Web 页(v0.4.3,已实机验证)**:`opencode serve --port 4096
     --hostname 127.0.0.1` 作为 OpenCode 2.0 桌面界面后端,前端 SPA 由 WebView
     加载 `http://127.0.0.1:4096/` 渲染。要点:
@@ -310,9 +392,63 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
       Bun 自 respawn(如 `pair`)会把子命令参数当 ELF 路径加载而失败——
       serve 单进程直跑不触发;需 pair/后台自拉起时,须给 oc2 加 launcher
       ELF 包装(复用 bundle/launcher/launcher.c 模式,同 bin/git)。
-- UI 极简:一个终端页 + 一个桌面 Web 页 + 一个"状态/设置"页(启动 sshd、
-  注入 API key、phantom-killer adb 引导、工作区选择),本质上是一个
-  "自带 opencode 的终端 + 桌面 GUI"。
+    - **Web PTY(v0.4.4)**:预置 process-daemon v0.4.0(协议 7,REUSE §2.1),
+      serve 与终端均设置 `OPENCODE_PTY_BIN` 指向可执行副本,不再用缓存 symlink
+      (上游拒绝 symlink,还校验 uid/sha256)。上游另支持
+      `OPENCODE_PTY_SOCKET_DIR`,设置为 `Context.getFilesDir()`;daemon 追加
+      `opencode-pty-<uid>/<32 hex>.sock`,保留非 symlink/uid/0700 校验;
+      Java 注入前检查完整路径 UTF-8 长度 <104 字节。不设置时默认 `/tmp`,
+      Android 上 mkdir 返回 EROFS,daemon 退出后前端报 service.json ENOENT;
+      单设 TMPDIR 不生效。cacheDir 曾观察到活跃 socket 被 unlink,故不用于端点。
+    - **Web 页面退出(v0.4.6)**:配对重试使用 Activity 自有主线程 Handler,
+      onDestroy 先清空队列;服务启动成功/失败、onPageFinished 与配对入口均检查
+      isFinishing/isDestroyed 及 WebView 引用。销毁时先置空引用,停止加载、
+      替换持有 Activity 的 WebViewClient,从父 ViewGroup 移除后再 destroy;
+      不停止 SessionService/serve。旧设备修复前可复现退出到系统桌面,日志另有
+      “Application attempted to call on a destroyed WebView”与 attached destroy
+      警告,但未观察到本轮应用进程致命异常,不把这些警告等同已证实的崩溃栈。
+    - **Web 输入法(v0.4.5)**:`WebActivity` 在本机页面加载后注入 APK asset
+      `andcode-terminal-ime.js`,以 MutationObserver 适配 SPA 新挂载的终端页签。
+      仅匹配 ghostty 的 `textarea[aria-label="Terminal input"]`,设置
+      `inputmode=url`(LatinIME 英文逐字输入)与 `enterkeyhint=enter`;
+      不修改聊天框、不使用密码类型或原生 JS bridge、不自行向 PTY 转发字符。
+      隐藏 textarea 保留一个本地空格哨兵,使 IME 能生成退格 beforeinput;
+      在上游事件处理完成后微任务恢复,组合输入期间不改值。上游继续负责
+      beforeinput/composition/paste 去重与传输。当前 LatinIME 真机验证
+      `echo okx` → 退格 → 回车得到 `ok`;中文候选与其它 IME **待 P3 实机验证**。
+    - **开发部署与交付边界**:当前旧设备以 root 给预置 ELF/依赖设置
+      apk_data_file 标签;PTY PT_INTERP 指向 `/data/local/tmp/ld` 的补丁 loader
+      **普通文件**(原 symlink 在应用域不可达,仅改 PTY 标签不足以修复 EACCES)。
+      库通过 LD_LIBRARY_PATH 寻址,须补齐 glibc 2.39 的 librt.so.1/libutil.so.1。
+      真机已验证真实 untrusted_app 域 daemon → shell → Web 粘贴命令 → 回显;
+      adb input text 经设备 IME 有乱码,不作为正常触屏输入的验证结论。
+      正式 Tier P 必须使用 nativeLibraryDir 的预置副本与 launcher/loader 指路,
+      禁止把 root/chcon 或固定 `/data/local/tmp/ld` 当成 locked 设备发布方案;
+      完整 jniLibs 及 CI 打包后仍**待 P0/P3 实机验证**。
+- **项目页/设置页(v0.4.7)**:共享抽屉增加“项目 · 导入 / 导出”和“设置”。
+  - 共享导航为项目/设置提供与其它条目等尺寸、同主题 tint 的图标。
+    独立终端双指展开/捏合调整字号,累计比例 >1.1 / <0.9 时增减 1 sp 并重置;
+    达到 10–28 sp 边界也重置比例,反向缩放可立即响应。字号保存到相同偏好,
+    设置页恢复前台时同步滑块与预览,不重建终端会话;不改变 Web 缩放行为。
+  - 原生 Material 3 顶栏 + 分组卡片,跟随 DayNight 主题;导入入口并排,项目卡
+    保留“打开终端”主操作、默认项目标识与折叠长路径,复制/导出归入更多菜单。
+    设置按终端显示/导出隐私/工作区分组,字号提供即时预览,开关行可整行点击。
+  - 项目使用唯一名称,先写 filesDir 下随机 `import-` 暂存目录,成功后 move 到
+    projects;失败清理本任务暂存目录,不覆盖已有项目。后台任务用 ViewModel
+    跨 Activity 旋转保留,不保证进程死亡后续传;异常进程退出可能遗留暂存目录。
+  - ZIP 拒绝绝对路径、反斜杠、`.`/`..`、重复路径与目录数据;导入/导出限
+    512 MiB 原始数据、20000 项、64 层。目录导入通过 DocumentsContract 读取。
+    ZIP 不恢复 Unix 权限/符号链接元数据,仅复制数据文件;并不放宽数据目录 exec 禁令。
+  - 导出通过 SAF 新建 ZIP,包含项目根目录;默认排除 .git,不跟随符号链接,
+    跳过 socket 等特殊文件,失败尽力删除残缺输出。导出不是运行中项目的原子快照,
+    不过滤 .env 等其它隐藏文件,UI 明确提示检查密钥。导入保留 ZIP 内原目录结构。
+  - 可复制项目绝对路径到 Web“打开项目”;可设为新终端的 cwd,已有终端会话
+    不注入 cd、不杀进程。ENV profile 不再强制 cd HOME。
+  - 设置保存到 `andcode-settings`:终端字号(10–28 sp)、终端/Web 亮屏开关、
+    导出是否包含 .git。onResume 应用显示设置,不重启会话,Web 内终端字号不受影响;
+    API key 与提供商仍由上游 Web UI 管理,本页不新增凭据存储。
+- UI:主页仪表盘 + 终端 + 桌面 Web + 项目 + 设置;sshd 管理/phantom-killer
+  引导等扩展设置仍待实现,不把规划当作已经交付。
 
 ### 4.5 /etc 重定向:proot bind(主)+ LD_PRELOAD shim(辅)
 
@@ -358,6 +494,58 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
 
 ---
 
+### 4.8 Ubuntu 开发环境双后端(实施中,非已交付能力)
+
+- 保留现有轻量 Bash;Ubuntu 24.04 arm64 来自同一官方镜像与软件源。chroot 使用
+  独立 ext4 镜像,PRoot 使用独立可写实例,不共享 `/etc`、`/usr`、dpkg 数据库。
+- `scripts/build-ubuntu-rootfs.sh` 在原生 arm64 CI 生成 4 GiB ext4 压缩镜像、
+  SHA-256、dpkg 源包/二进制包版本清单、Docker digest 与配方 commit;保留许可证。
+  rootfs tar 仅为可信 CI 中间产物,在提取前检查路径、重复项、链接祖先、特殊文件与
+  setuid/setgid 位。APK 项目 ZIP 导入器绝不用于安装 rootfs。
+- root-only `runtime/ubuntu/andcode-ubuntu-install` 固定安装至
+  `/data/adb/andcode-ubuntu`,校验带外摘要、arm64、≥5 GiB 可用空间与精确镜像大小,
+  拒绝覆盖旧实例;失败保留私有残留供检查,不自动删除用户数据。
+- 管理入口 `andcode-ubuntu` 每个前台会话使用独立且递归 private 的 mount namespace,
+  绑定最小 `/dev` 节点、PTY、proc,为 `/run` 与 `/dev/shm` 提供临时挂载;不绑定
+  整个 Android `/data`、`/system` 或 `/sys`,不修改 SELinux。镜像与入口 root 私有,
+  串行锁防止并发挂载同一文件系统。正常退出反向卸载,忙挂载不强制/懒卸载;
+  清理失败保留锁待人工恢复,不宣称后台进程自动回收已解决。
+- `shell`/`exec` 以 UID/GID 60000、Android inet 补充组 3003 运行,清空继承环境,
+  清除 capability bounding/inheritable/ambient set 并设置 no-new-privs;目录 `/workspace`
+  为该用户所有。`admin` 仅显式人工维护入口,允许 apt,不向模型提供 sudo/root。
+  **chroot 不是安全沙箱**:同宿主 UID、proc 可见性、共享内核与 root 管理仍有风险。
+- 尚不接入 APK/root IPC 或 OpenCode:需要先通过签名身份/peer-credential 认证通道、
+  项目范围映射和真实设备准入,不能把 `su -c` 字符串拼接当作生产服务。
+- PRoot 准入必须在真实 zygote 应用域验证 apt、新装 ELF、编译 ELF、PTY/子进程、
+  DNS/HTTPS、libc 更新;不能以 adb root/run-as 成功替代,不能降低 targetSdk 或关闭
+  SELinux 掩盖问题。旧设备真实应用域已通过显式代理模式的 apt/HTTPS、hello、
+  gcc 新编译 ELF、PTY/子进程及 libc 2.39-0ubuntu8.7 → 8.9 更新后执行,guest ELF
+  不打补丁。此结果是开发准入,不是默认直连或 locked 自包含交付认证。
+- APK 终端提供 `andcode-ubuntu-proot [loopback-proxy] [命令...]` 显式开发入口;
+  无参数启动交互 Bash,退出返回轻量 Bash,缺实例明确报错。不自动安装、不 su,
+  不改变 OpenCode/Web PTY 后端;仍使用 `/data/local/tmp` PRoot。
+  设置页可为新终端选择轻量 Bash(默认)或 Ubuntu PRoot,独立代理开关默认关闭。
+  不重启已有会话;新会话快照选中项目名,入口仅绑定 `files/projects/<项目名>` 至
+  `/workspace/<项目名>` 并从该目录起步,未选项目则 `/root`。拒绝项目根/父目录链接、
+  越界名/PRoot bind 分隔符与丢失路径。不会递归检查项目内链接,且应用 UID 的宿主
+  权限不变,不声称安全隔离。缺实例拒绝选择,启动后实例/项目丢失则明确失败,
+  不静默降级到宿主执行。OpenCode/Web PTY 不使用此映射。
+  旧设备应用域已验证项目写回/参数保真/stdin/退出码与拒绝错误项目。
+  UDP 公共 DNS 超时,TCP DNS 返回正常答案;`use-vc` 后无显式代理的 HTTPS、严格
+  apt update 与 Git HTTPS 成功,仍依赖设备现有 VPN/网络,不是 VPN 关闭后的测试。
+- CI 为 Tier P 单独复制标准 bundle,执行 seccomp 七处字节校验/修改,再执行一次并
+  验证 loader/libc SHA-256 不变,之后才重打包和物理化。标准 Linux bundle 保持原样;
+  新基线字节不匹配时构建失败,不把补丁用于 PRoot guest 或 apt 更新后的 libc。
+  Android 专用工件链、完整 jniLibs/Gradle 集成仍待 CI 首跑与 P0/P3 实机验证。
+- Linux CI 独立 workflow 仅测试 rootfs apt 与普通用户编译运行、权限降级与兼容性,
+  不证明 Android 支持。2026-11-09 用户清理后旧设备约有 54 GiB 可用空间。
+  本机无 Docker,新增固定官方 SHA-256 Ubuntu Base 的原生设备开发引导路径,
+  不等同 CI 构建验证。入口复制现有独立 BusyBox 至 root 私有目录处理 bind mount,
+  不依赖第三方 App;旧 Toybox 对字符设备 bind 错误尝试 loop。loop 显式分配,
+  内核自动 detach 后不再重复 detach。chroot UID 60000 网络仍失败,认证服务、
+  项目映射、OpenCode/Web PTY 与自包含集成**待 P0/P3 实机验证**。
+  操作与验收见 `docs/UBUNTU.md`。
+
 ## 5. 仓库结构(本仓库交付物)
 
 ```
@@ -373,6 +561,7 @@ andcode/
 │   ├── wrapper.sh.tpl        # loader 包装器模板
 │   └── shim/                 # LD_PRELOAD 重定向 shim(C, AGPL)
 ├── magisk-module/            # Tier M(§4.2)
+├── runtime/ubuntu/           # root chroot 原型管理/安装入口(§4.8)
 ├── scripts/
 │   ├── deploy-adb.sh         # Tier A(§4.3)
 │   ├── naming-lint.sh        # 命名规范 CI 门禁(NAMING §8)

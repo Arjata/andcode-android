@@ -61,6 +61,22 @@
         android:drawableTint="?attr/colorOnSurfaceVariant"
         android:text="@string/nav_web" />
 
+    <TextView
+        android:id="@+id/navProjects"
+        style="@style/NavDrawerItem"
+        android:drawableStart="@drawable/ic_nav_projects"
+        android:drawablePadding="14dp"
+        android:drawableTint="?attr/colorOnSurfaceVariant"
+        android:text="项目 · 导入 / 导出" />
+
+    <TextView
+        android:id="@+id/navSettings"
+        style="@style/NavDrawerItem"
+        android:drawableStart="@drawable/ic_nav_settings"
+        android:drawablePadding="14dp"
+        android:drawableTint="?attr/colorOnSurfaceVariant"
+        android:text="设置" />
+
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"

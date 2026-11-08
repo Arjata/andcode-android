@@ -8,7 +8,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
+import androidx.appcompat.widget.AppCompatImageButton;
 
 import com.google.android.material.color.MaterialColors;
 
@@ -22,7 +22,7 @@ import com.google.android.material.color.MaterialColors;
  * API 29+ 将自身矩形从系统返回手势区排除:贴边停靠时球位于手势 inset
  * 内,若不排除,起手拖动会被系统返回手势吞掉。
  */
-public class FloatingMenuBall extends ImageButton {
+public class FloatingMenuBall extends AppCompatImageButton {
 
     private static final String UI_PREFS = "andcode_ui";
     private static final float BALL_HIDE_SLIDE = 0.55f;

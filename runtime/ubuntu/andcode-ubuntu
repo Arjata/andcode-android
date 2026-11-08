@@ -1,0 +1,114 @@
+#!/system/bin/sh
+# Root-only prototype. No APK/model IPC and no caller-selected host paths.
+# Install only as root: /data/adb/andcode-ubuntu/andcode-ubuntu (root:root 0700).
+set -eu
+BASE=/data/adb/andcode-ubuntu
+IMAGE=$BASE/ubuntu.img
+ROOT=$BASE/rootfs
+LOCK=$BASE/session-lock
+fail() { echo "andcode-ubuntu: $*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || fail 'root required; PRoot application-domain backend is not certified'
+[ ! -L "$BASE" ] && [ -d "$BASE" ] || fail 'missing private instance directory'
+[ "$(stat -c '%u:%g:%a' "$BASE")" = 0:0:700 ] || fail 'instance directory must be root:root 0700'
+[ ! -L "$BASE/andcode-ubuntu" ] && [ -f "$BASE/andcode-ubuntu" ] || fail 'missing regular manager script'
+[ "$(stat -c '%u:%g:%a' "$BASE/andcode-ubuntu")" = 0:0:700 ] || fail 'manager must be root:root 0700'
+[ ! -L "$IMAGE" ] && [ -f "$IMAGE" ] || fail 'missing regular ubuntu.img'
+[ "$(stat -c '%u:%g:%a' "$IMAGE")" = 0:0:600 ] || fail 'ubuntu.img must be root:root 0600'
+[ ! -L "$BASE/busybox" ] && [ -f "$BASE/busybox" ] || fail 'missing bundled busybox'
+[ "$(stat -c '%u:%g:%a' "$BASE/busybox")" = 0:0:700 ] || fail 'busybox must be root:root 0700'
+cmd=${1:-status}
+shift || true
+if [ "$cmd" != private-session ]; then
+case "$cmd" in
+  status)
+    echo 'backend=chroot prototype=true proot=not-assessed-by-root-manager'
+    if [ -d "$LOCK" ]; then echo 'session=busy'; else echo 'session=idle'; fi
+    df -k "$BASE"
+    exit 0 ;;
+  shell|exec|admin) ;;
+  *) fail 'usage: andcode-ubuntu status|shell|exec <command...>|admin <command...>' ;;
+esac
+case "$cmd" in exec|admin) [ "$#" -gt 0 ] || fail 'command required' ;; esac
+[ ! -L "$ROOT" ] || fail 'symlink mountpoint rejected'
+mkdir -p "$ROOT"
+chmod 0700 "$ROOT"
+# A crash may leave this lock. Never guess that a session is dead or force-unmount.
+mkdir "$LOCK" 2>/dev/null || fail 'session active or stale lock: inspect mounts/processes before manual recovery'
+trap 'echo "andcode-ubuntu: interrupted; retaining lock for inspection" >&2; exit 75' HUP INT TERM
+echo 'chroot is NOT a security sandbox. admin has host root authority.' >&2
+# Use a new, recursively private namespace; all mounts disappear with its last process.
+# The lock is released only after the namespace child has returned.
+result=0
+/system/bin/toybox unshare -m /system/bin/sh "$BASE/andcode-ubuntu" private-session "$cmd" "$@" || result=$?
+if [ "$result" = 75 ] || [ "$result" -ge 128 ]; then
+  echo 'andcode-ubuntu: cleanup incomplete; retaining lock for manual inspection' >&2
+else
+  rmdir "$LOCK"
+fi
+exit "$result"
+fi
+# Internal root-only entry: use a file, not sh -s/heredoc, so PTY stdin is preserved.
+[ "$#" -gt 0 ] || fail 'missing private-session mode'
+case "$1" in shell|exec|admin) ;; *) fail 'invalid private-session mode' ;; esac
+# Reject accidental direct invocation in Magisk's own namespace.
+[ "$(readlink /proc/self/ns/mnt)" != "$(readlink /proc/$PPID/ns/mnt)" ] || fail 'private mount namespace required'
+mount -o rprivate none /
+loop=$(losetup -f -s "$BASE/ubuntu.img")
+if ! mount -t ext4 -o rw,nosuid,nodev "$loop" "$ROOT"; then
+  losetup -d "$loop"
+  exit 1
+fi
+mounted=""
+cleanup() {
+  result=$?
+  trap - EXIT
+  # No lazy/forced unmount: a busy tree is reported, not hidden.
+  busy=0
+  for p in $mounted; do
+    umount "$ROOT/$p" || busy=1
+  done
+  umount "$ROOT" || busy=1
+  [ "$busy" = 0 ] || exit 75
+  backing=$(cat "/sys/class/block/${loop##*/}/loop/backing_file" 2>/dev/null || true)
+  [ -z "$backing" ] || losetup -d "$loop" || exit 75
+  exit "$result"
+}
+trap cleanup EXIT
+grep -qx 'format=1' "$ROOT/etc/andcode-image"
+grep -qx 'suite=noble' "$ROOT/etc/andcode-image"
+grep -qx 'arch=arm64' "$ROOT/etc/andcode-image"
+mkdir -p "$ROOT/dev/pts" "$ROOT/proc"
+if [ ! -e "$ROOT/dev/ptmx" ] && [ ! -L "$ROOT/dev/ptmx" ]; then
+  ln -s pts/ptmx "$ROOT/dev/ptmx"
+fi
+[ -L "$ROOT/dev/ptmx" ] && [ "$(readlink "$ROOT/dev/ptmx")" = pts/ptmx ] || fail 'unexpected dev/ptmx'
+for n in null zero random urandom tty; do
+  [ ! -L "$ROOT/dev/$n" ] || exit 1
+  touch "$ROOT/dev/$n"
+  "$BASE/busybox" mount -o bind "/dev/$n" "$ROOT/dev/$n"
+  mounted="dev/$n $mounted"
+done
+# Android's host devpts has ptmxmode=000; use a private PTY instance instead.
+mount -t devpts -o newinstance,nosuid,noexec,ptmxmode=0666,mode=0620,gid=60000 devpts "$ROOT/dev/pts"
+mounted="dev/pts $mounted"
+mount -t tmpfs -o nosuid,nodev,noexec,mode=1777,size=64m tmpfs "$ROOT/dev/shm"
+mounted="dev/shm $mounted"
+mount -t tmpfs -o nosuid,nodev,noexec,mode=755,size=16m tmpfs "$ROOT/run"
+mounted="run $mounted"
+mount -t proc -o nosuid,nodev,noexec proc "$ROOT/proc"
+mounted="proc $mounted"
+mode=$1
+shift
+case "$mode" in
+  shell) set -- /bin/bash --noprofile --norc -i ;;
+  admin)
+    chroot "$ROOT" /usr/bin/env -i HOME=/root USER=root LOGNAME=root \
+      PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+      TERM=xterm-256color LANG=C.UTF-8 "$@"
+    exit $? ;;
+esac
+chroot "$ROOT" /usr/bin/setpriv --reuid=60000 --regid=60000 --groups=3003 \
+  --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
+  /usr/bin/env -i HOME=/home/andcode USER=andcode LOGNAME=andcode \
+  PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color LANG=C.UTF-8 \
+  /bin/bash --noprofile --norc -c 'cd /workspace && exec "$@"' bash "$@"

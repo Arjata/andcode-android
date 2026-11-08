@@ -192,6 +192,14 @@ fi
 # ── 4. manifest(NAMING §7.2;kind/物理名判定见 NAMING §6.2)───────────────
 MF="$B/manifest"
 printf '# logical-path\tphysical-tier-p\tkind\tlicense\tversion\tupstream\n' > "$MF"
+# 从真实基线包数据库取版本,不把交付包版本误记为 Bash/ncurses 版本。
+package_version() {
+  awk -v package="$1" 'BEGIN { RS=""; FS="\n" }
+    { matched=0; version=""; for (i=1; i<=NF; i++) {
+      if ($i == "Package: " package) matched=1;
+      if ($i ~ /^Version: /) version=substr($i,10);
+    } if (matched) { print version; exit } }' "$ROOTFS/var/lib/dpkg/status"
+}
 
 slug() { # $1 = bundle 内逻辑路径(root/ 相对) → 物理名(NAMING §6.2)
   local p="${1#root/}" base s
@@ -270,6 +278,16 @@ while IFS= read -r -d '' f; do
   else
     kind=script; phys="$(slug "$lp")"
   fi
+  case "$lp" in
+    bin/bash.bin|bin/bash|etc/third-party/bash-copyright|etc/third-party/gpl-3)
+      lic=GPL-3.0-or-later; ver="$(package_version bash)"
+      up=https://ports.ubuntu.com/pool/main/b/bash/
+      [ -n "$ver" ] || { echo '缺少 Bash 基线包版本' >&2; exit 1; } ;;
+    lib/libtinfo.so.*|etc/third-party/ncurses-copyright)
+      lic='MIT AND BSD-3-Clause'; ver="$(package_version libtinfo6)"
+      up=https://ports.ubuntu.com/pool/main/n/ncurses/
+      [ -n "$ver" ] || { echo '缺少 libtinfo6 基线包版本' >&2; exit 1; } ;;
+  esac
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$lp" "$phys" "$kind" "$lic" "$ver" "$up" >> "$MF"
 done < <(find "$B" -type f -print0 | sort -z)
 

@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
@@ -26,6 +27,7 @@ import com.termux.view.TerminalViewClient;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -52,6 +54,7 @@ public class TerminalActivity extends AppCompatActivity {
 
     private TerminalView mTerminalView;
     private DrawerLayout mDrawer;
+    private TerminalExtraKeys mExtraKeys;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,15 +62,36 @@ public class TerminalActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_terminal);
         mTerminalView = findViewById(R.id.terminal_view);
-        mTerminalView.setTextSize(30);
+        // attachSession 可能在已布局的 View 上立即初始化模拟器,先绑定 client。
+        mTerminalView.setTerminalViewClient(new ViewClient());
+        applyTerminalSize();
         mDrawer = findViewById(R.id.rootDrawer);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() {
+                if (mDrawer.isDrawerOpen(GravityCompat.START)) {
+                    mDrawer.closeDrawer(GravityCompat.START);
+                } else {
+                    setEnabled(false);
+                    try { getOnBackPressedDispatcher().onBackPressed(); }
+                    finally { setEnabled(true); }
+                }
+            }
+        });
 
         // 悬浮抽屉球(与 WebActivity 共用停靠位置)
         FrameLayout content = findViewById(R.id.termContent);
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
+            androidx.core.graphics.Insets bars = insets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.systemBars()
+                    | androidx.core.view.WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
+        mExtraKeys = new TerminalExtraKeys(findViewById(R.id.terminalExtraKeys), mTerminalView);
         content.addView(new FloatingMenuBall(this, content, "menu_ball",
             () -> mDrawer.openDrawer(GravityCompat.START)));
         NavDrawer.bind(this, mDrawer, new NavDrawer.Callbacks() {
-            @Override public void onHomeSelected() { finish(); }
+            @Override public void onHomeSelected() { NavDrawer.goHome(TerminalActivity.this); }
             @Override public void onTerminalSelected() { /* 当前页 */ }
             @Override public void onWebSelected() {
                 startActivity(new Intent(TerminalActivity.this, WebActivity.class));
@@ -83,8 +107,35 @@ public class TerminalActivity extends AppCompatActivity {
             sSession = createSession();
         }
         mTerminalView.attachSession(sSession);
-        mTerminalView.setTerminalViewClient(new ViewClient());
+        // 首帧布局完成后确保尺寸与绘制已就绪,不通过注入回车伪造提示符。
+        mTerminalView.post(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            mTerminalView.updateSize();
+            mTerminalView.onScreenUpdated();
+        });
         mTerminalView.requestFocus();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (sBridge != null) sBridge.activity = this;
+        if (AppSettings.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        applyTerminalSize();
+        // A reused Activity may still display an exited session. Returning to the
+        // page must apply the new backend preference rather than attach dead PTY.
+        if (sSession == null) {
+            sSession = createSession();
+            mTerminalView.attachSession(sSession);
+            mTerminalView.updateSize();
+            mTerminalView.onScreenUpdated();
+        }
+    }
+
+    private void applyTerminalSize() {
+        mTerminalView.setTextSize(Math.round(AppSettings.terminalSize(this)
+            * getResources().getDisplayMetrics().scaledDensity));
     }
 
     @Override
@@ -94,16 +145,7 @@ public class TerminalActivity extends AppCompatActivity {
         if (sBridge != null && sBridge.activity == this) sBridge.activity = null;
     }
 
-    @Override
-    public void onBackPressed() {
-        if (mDrawer != null && mDrawer.isDrawerOpen(GravityCompat.START)) {
-            mDrawer.closeDrawer(GravityCompat.START);
-        } else {
-            super.onBackPressed();
-        }
-    }
-
-    /** 建 home/tmp 目录并生成 ENV profile(交互 shell 启动时被 mksh source) */
+    /** 分别生成系统 sh 和 Bash 的只读启动配置,不覆盖用户 ~/.bashrc。 */
     private void prepareEnv() {
         File files = getFilesDir();
         File home = new File(files, "home");
@@ -112,21 +154,44 @@ public class TerminalActivity extends AppCompatActivity {
         if (!tmp.isDirectory()) tmp.mkdirs();
 
         ServeManager.Paths p = ServeManager.resolvePaths(this);
-        if (p == null) return; // 无 glibc 部署:纯系统 shell 仍可用
-
         StringBuilder sb = new StringBuilder();
-        sb.append("# andcode 终端 profile(mksh 交互 shell 启动时 source)\n");
-        sb.append("[ -r /system/etc/mkshrc ] && . /system/etc/mkshrc\n");
-        sb.append("cd \"$HOME\" 2>/dev/null\n");
-        sb.append("echo 'andcode 终端 · 输入 opencode 启动 AI 编码代理'\n");
+        sb.append("# andcode terminal profile\n");
+        sb.append("if [ -n \"${BASH_VERSION:-}\" ]; then\n");
+        sb.append("  PS1='\\W \\$ '; HISTFILE=\"$HOME/.bash_history\"\n");
+        sb.append("  shopt -s checkwinsize\n");
+        sb.append("  [ ! -r \"$HOME/.bashrc\" ] || . \"$HOME/.bashrc\"\n");
+        sb.append("else\n");
+        sb.append("  [ ! -r /system/etc/mkshrc ] || . /system/etc/mkshrc\n");
+        sb.append("  PS1='$PWD $ '\n");
+        sb.append("  printf '%s\\n' 'Bash 未部署，当前使用系统 sh。'\n");
+        sb.append("fi\n");
+        sb.append("printf '%s\\n' 'andcode 终端 · 输入 opencode 启动 AI 编码代理'\n");
         // shell 函数而非可执行文件:应用数据目录禁 exec(targetSdk 37.2),
         // loader/oc2 在 nativeLibraryDir 或 /data/local/tmp,exec 放行
-        sb.append("opencode() {\n");
-        sb.append("  GLIBC_TUNABLES=glibc.pthread.rseq=0 exec \"").append(p.ld)
-          .append("\" --library-path \"").append(p.lib)
-          .append("\" --inhibit-cache \"").append(p.oc2).append("\" \"$@\"\n");
-        sb.append("}\n");
+        if (p != null) {
+            sb.append("opencode() {\n");
+            sb.append("  GLIBC_TUNABLES=glibc.pthread.rseq=0 \"").append(p.ld)
+              .append("\" --library-path \"").append(p.lib)
+              .append("\" --inhibit-cache \"").append(p.oc2).append("\" \"$@\"\n");
+            sb.append("}\n");
+        }
+        sb.append("andcode-ubuntu-proot() { /system/bin/sh \"$ANDCODE_APP_DATA/term-ubuntu-proot\" \"$@\"; }\n");
+        sb.append("printf '%s\\n' 'Ubuntu 开发实例：andcode-ubuntu-proot [loopback-proxy]；未安装时明确报错。'\n");
+        prepareUbuntuProot(files);
         writeFile(new File(files, "term-env.sh"), sb.toString());
+        writeFile(new File(files, "term-bashrc"), sb.toString());
+    }
+
+    /** 只解释脚本;不 su、不 relabel、不自动下载/解包、不把模型接入特权维护入口。 */
+    private void prepareUbuntuProot(File files) {
+        try (InputStream in = getAssets().open("term-ubuntu-proot.sh");
+             OutputStream out = new FileOutputStream(new File(files, "term-ubuntu-proot"))) {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+        } catch (java.io.IOException error) {
+            throw new IllegalStateException("无法准备 Ubuntu 启动入口", error);
+        }
     }
 
     private TerminalSession createSession() {
@@ -145,6 +210,7 @@ public class TerminalActivity extends AppCompatActivity {
             "HOME=" + home.getAbsolutePath(),
             "PATH=" + path,
             "TERM=xterm-256color",
+            "GLIBC_TUNABLES=glibc.pthread.rseq=0",
             "LANG=en_US.UTF-8",
             "TMPDIR=" + new File(files, "tmp").getAbsolutePath(),
             "BUN_TMPDIR=" + new File(files, "tmp").getAbsolutePath(), // Bun 原生库提取目录
@@ -157,16 +223,58 @@ public class TerminalActivity extends AppCompatActivity {
         if (p != null) {
             // glibc 子进程(opencode-pty、git 等)的库解析;文件名与 bionic 不冲突
             env.add("LD_LIBRARY_PATH=" + p.lib);
+            // 插件二进制指路(见 ServeManager.spawn 内注释):
+            // 终端里跑的 opencode TUI 自身也会 spawn opencode-pty
+            String ptyBin = ServeManager.ptyBinPath(this);
+            if (ptyBin != null) env.add("OPENCODE_PTY_BIN=" + ptyBin);
+            env.add("OPENCODE_PTY_SOCKET_DIR=" + ServeManager.ptySocketDir(this));
         }
 
+        String[] command = bashCommand(files);
+        // 子进程直接 exec 的 SHELL 仍需可用的 PT_INTERP;Bash 本体依赖显式 loader。
+        // 默认交互会话用 command 拉起 Bash,不把裸 glibc ELF 暴露给子进程。
+        env.add("SHELL=/system/bin/sh");
+        if (command == null) command = new String[]{"/system/bin/sh", "-i"};
+        File selected = AppSettings.selectedProject(this);
+        // Preserve a stale/invalid selection for launcher validation rather than
+        // silently losing the requested project and executing from guest /root.
+        String projectName = AppSettings.prefs(this).getString("selected-project", "");
+        if (projectName != null && !projectName.isEmpty())
+            env.add("ANDCODE_UBUNTU_PROJECT_NAME=" + projectName);
+        if (AppSettings.ubuntuTerminal(this)) {
+            // Let the launcher explicitly fail on a missing instance; never silently
+            // run a command in a different environment than the user selected.
+            List<String> ubuntu = new ArrayList<>(List.of("/system/bin/sh",
+                new File(files, "term-ubuntu-proot").getAbsolutePath()));
+            if (AppSettings.ubuntuProxy(this)) ubuntu.add("loopback-proxy");
+            command = ubuntu.toArray(new String[0]);
+            selected = null; // Host cwd is not the guest cwd; launcher owns the binding.
+        }
         return new TerminalSession(
-            "/system/bin/sh",
-            home.getAbsolutePath(),
-            new String[]{"/system/bin/sh"},
+            command[0],
+            selected != null ? selected.getAbsolutePath() : home.getAbsolutePath(),
+            command,
             env.toArray(new String[0]),
             null,
             sBridge
         );
+    }
+
+    /** 不执行 filesDir ELF、不查找第三方宿主;补丁 loader 显式拉起预置 Bash。 */
+    private String[] bashCommand(File files) {
+        String nat = getApplicationInfo().nativeLibraryDir;
+        String[][] candidates = {
+            {nat + "/libandcode-ld-linux.so", nat, nat + "/libandcode-bash.so"},
+            {nat + "/libandcode-loader.so", nat, nat + "/libandcode-bash.so"},
+            {"/data/local/tmp/andcode/lib/ld-linux-aarch64.so.1",
+                "/data/local/tmp/andcode/lib", "/data/local/tmp/andcode/bin/bash.bin"}
+        };
+        for (String[] candidate : candidates) {
+            if (new File(candidate[0]).isFile() && new File(candidate[2]).isFile())
+                return new String[]{candidate[0], "--library-path", candidate[1], "--inhibit-cache",
+                    candidate[2], "--noprofile", "--rcfile", new File(files, "term-bashrc").getAbsolutePath(), "-i"};
+        }
+        return null;
     }
 
     private static void writeFile(File dst, String text) {
@@ -237,20 +345,50 @@ public class TerminalActivity extends AppCompatActivity {
 
     /** TerminalViewClient 最小实现(每 Activity 一份,轻量) */
     private class ViewClient implements TerminalViewClient {
-        @Override public float onScale(float scale) { return scale; }
+        @Override public float onScale(float scale) {
+            // TerminalView 累积缩放比例;越过阈值调整 1 sp 后重置,避免抖动。
+            if (scale > 1.1f || scale < 0.9f) {
+                int current = AppSettings.terminalSize(TerminalActivity.this);
+                int next = Math.max(10, Math.min(28, current + (scale > 1f ? 1 : -1)));
+                if (next != current) {
+                    AppSettings.prefs(TerminalActivity.this).edit().putInt("terminal-size", next).apply();
+                    applyTerminalSize();
+                }
+                // 到达边界也重置,反向手势无需抵消先前累计的比例。
+                return 1f;
+            }
+            return scale;
+        }
         @Override public void onSingleTapUp(MotionEvent e) {
-            mTerminalView.requestFocus();
+            if (mTerminalView.requestFocus()) {
+                // 自绘 TerminalView 不是 EditText:获得焦点不会自动显示输入法。
+                // 先让焦点/InputConnection 生效,再按用户点击明确请求显示。
+                mTerminalView.post(() -> {
+                    if (isFinishing() || isDestroyed() || !mTerminalView.hasWindowFocus()) return;
+                    InputMethodManager imm = getSystemService(InputMethodManager.class);
+                    if (imm != null) imm.showSoftInput(mTerminalView, InputMethodManager.SHOW_IMPLICIT);
+                });
+            }
         }
         @Override public boolean shouldBackButtonBeMappedToEscape() { return false; }
         @Override public boolean shouldEnforceCharBasedInput() { return true; }
         @Override public boolean shouldUseCtrlSpaceWorkaround() { return true; }
         @Override public boolean isTerminalViewSelected() { return true; }
         @Override public void copyModeChanged(boolean copyMode) { }
-        @Override public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession session) { return false; }
+        @Override public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession session) {
+            if (keyCode == KeyEvent.KEYCODE_ENTER && !session.isRunning()) {
+                sSession = createSession();
+                mTerminalView.attachSession(sSession);
+                mTerminalView.updateSize();
+                mTerminalView.onScreenUpdated();
+                return true;
+            }
+            return false;
+        }
         @Override public boolean onKeyUp(int keyCode, KeyEvent e) { return false; }
         @Override public boolean onLongPress(MotionEvent event) { return false; }
-        @Override public boolean readControlKey() { return false; }
-        @Override public boolean readAltKey() { return false; }
+        @Override public boolean readControlKey() { return mExtraKeys != null && mExtraKeys.controlDown(); }
+        @Override public boolean readAltKey() { return mExtraKeys != null && mExtraKeys.altDown(); }
         @Override public boolean readShiftKey() { return false; }
         @Override public boolean readFnKey() { return false; }
         @Override public boolean onCodePoint(int codePoint, boolean ctrlDown, TerminalSession session) { return false; }

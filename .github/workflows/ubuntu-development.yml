@@ -1,0 +1,65 @@
+name: ubuntu-development-prototype
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/build-ubuntu-rootfs.sh
+      - scripts/validate-ubuntu-rootfs.py
+      - scripts/ubuntu-rootfs-validator.test.py
+      - scripts/ubuntu-rootfs-test.sh
+      - runtime/ubuntu/**
+      - scripts/bootstrap-ubuntu-device.sh
+      - scripts/ubuntu-device-test.sh
+      - scripts/proot-app-gate.sh
+      - scripts/proot-rootfs-gate.sh
+      - scripts/proot-development-gate.sh
+      - scripts/proot-terminal-test.sh
+      - app/app/src/main/assets/term-ubuntu-proot.sh
+      - scripts/prepare-proot-gate.py
+      - scripts/prepare-proot-gate.test.py
+      - .github/workflows/ubuntu-development.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rootfs:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recipe syntax
+        run: |
+          bash -n scripts/build-ubuntu-rootfs.sh
+          bash -n scripts/ubuntu-rootfs-test.sh
+          sh -n runtime/ubuntu/andcode-ubuntu
+          sh -n runtime/ubuntu/andcode-ubuntu-install
+          for script in scripts/bootstrap-ubuntu-device.sh scripts/ubuntu-device-test.sh \
+            scripts/proot-app-gate.sh scripts/proot-rootfs-gate.sh scripts/proot-development-gate.sh \
+            scripts/proot-terminal-test.sh app/app/src/main/assets/term-ubuntu-proot.sh; do
+            sh -n "$script"
+          done
+          python3 -m py_compile scripts/validate-ubuntu-rootfs.py scripts/prepare-proot-gate.py
+          python3 scripts/ubuntu-rootfs-validator.test.py
+          python3 scripts/prepare-proot-gate.test.py
+      - name: Build trusted development image
+        run: bash scripts/build-ubuntu-rootfs.sh dist/ubuntu
+      - name: Verify image and test in private mount namespace
+        run: |
+          cd dist/ubuntu
+          sha256sum -c andcode-ubuntu-arm64.img.gz.sha256
+          gzip -dc andcode-ubuntu-arm64.img.gz > "$RUNNER_TEMP/ubuntu.img"
+          sudo unshare --mount --propagation private bash "$GITHUB_WORKSPACE/scripts/ubuntu-rootfs-test.sh" "$RUNNER_TEMP/ubuntu.img"
+      - name: Audit baseline executables (glibc and 16K load alignment)
+        run: |
+          mkdir "$RUNNER_TEMP/ubuntu-audit"
+          sudo mount -o loop,ro,nosuid,nodev "$RUNNER_TEMP/ubuntu.img" "$RUNNER_TEMP/ubuntu-audit"
+          trap 'sudo umount "$RUNNER_TEMP/ubuntu-audit"' EXIT
+          bash baseline/check-compat.sh --page-align "$RUNNER_TEMP/ubuntu-audit/usr/bin" "$RUNNER_TEMP/ubuntu-audit/usr/lib/aarch64-linux-gnu"
+      - name: Upload original image (not modified smoke-test instance)
+        uses: actions/upload-artifact@v4
+        with:
+          name: andcode-ubuntu-development-prototype
+          path: dist/ubuntu/
+          retention-days: 7

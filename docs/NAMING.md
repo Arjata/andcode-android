@@ -42,6 +42,47 @@
 | `andcode` | Magisk 模块 id / 组件标识 | `module.prop` 的 `id=andcode` |
 | `dev.andcode.app`(占位,可随发布组织调整) | APK applicationId | `app/build.gradle` |
 | `.sh` 后缀 | **仅限仓库内开发脚本**(`scripts/`);bundle 与 PATH 内命令一律无扩展名 | `scripts/deploy-adb.sh` |
+| `andcode-terminal-ime.js` | APK assets 内自有 Web 终端输入法适配脚本(非 PATH 命令) | `app/app/src/main/assets/andcode-terminal-ime.js` |
+| `andcode-terminal-ime.test.mjs` | 上述脚本的 Node 内置测试(开发期,不进 APK) | `app/tests/andcode-terminal-ime.test.mjs` |
+| `projects`、`import-<随机值>` | APK filesDir 项目目录与导入暂存目录;仅数据,不作为可执行入口 | `files/projects/<项目名>`、`files/import-<随机值>` |
+| `andcode-settings` | APK 私有 SharedPreferences 名,保存终端/导出偏好与选中项目 | 不保存 API key |
+| `terminal-backend`、`ubuntu-loopback-proxy` | 上述偏好键;新终端选择 `bash`/`ubuntu-proot`,代理默认关闭且显式选择,不影响已有会话或 Web | APK SharedPreferences |
+| `ProjectsActivity.java`、`SettingsActivity.java`、`AppSettings.java`、`ProjectArchive.java`、`ProjectArchiveTest.java`、`UtilityActivity.java` | APK 项目/设置组件、共享页面及 ZIP 安全测试(Java 类文件遵循类名) | `dev.andcode.app` |
+| `ic_more.xml` | APK 项目卡的更多操作矢量图标(Android resource 采用现有 snake_case 风格) | `res/drawable/ic_more.xml` |
+| `ic_nav_projects.xml`、`ic_nav_settings.xml` | APK 共享抽屉的项目/设置矢量图标(沿用 Android resource snake_case) | `res/drawable/` |
+| `TerminalExtraKeys.java` | APK 自有终端附加键控件,复用 TerminalView 输入协议 | `dev.andcode.app` |
+| `term-env.sh`、`term-bashrc` | APK filesDir 生成的系统 sh / Bash 启动配置,仅由 shell 读取,不是可执行文件 | `files/term-env.sh`、`files/term-bashrc` |
+| `etc/third-party/bash-copyright`、`etc/third-party/ncurses-copyright` | 随包 Bash / libtinfo 的 Ubuntu 版权及许可文本,数据文件不进入 jniLibs | bundle `etc/third-party/` |
+| `etc/third-party/gpl-3` | Bash 版权文本引用的完整 GPLv3 许可证 | bundle 数据文件 |
+| `build-ubuntu-rootfs.sh` | CI 原生 arm64 Ubuntu 开发镜像构建配方 | `scripts/` |
+| `andcode-ubuntu` | root 专用 chroot 原型管理入口,不放入模型 PATH | `runtime/ubuntu/andcode-ubuntu` |
+| `ubuntu-rootfs-test.sh` | Linux CI 镜像/普通用户编译与 apt 冒烟 | `scripts/` |
+| `validate-ubuntu-rootfs.py` | 构建期 rootfs 结构/链接校验,不是设备安装器 | `scripts/` |
+| `andcode-ubuntu-arm64.img.gz`、`andcode-ubuntu-arm64.img.gz.sha256` | 4 GiB ext4 开发镜像及压缩文件摘要,仅 CI 工件 | `dist/` |
+| `andcode-ubuntu-packages.tsv`、`andcode-ubuntu-build.txt` | dpkg 包版本/来源与 Docker 镜像身份,仅 CI 工件 | `dist/` |
+| `andcode-ubuntu`(目录) | root 专用实例,与轻量 bundle 和未来 PRoot 实例隔离 | `/data/adb/andcode-ubuntu/` |
+| `ubuntu.img`、`rootfs`、`session-lock` | root 实例镜像/挂载点/并发锁,不接受应用传入替代路径 | `/data/adb/andcode-ubuntu/` |
+| `andcode-image` | 镜像内部格式/发行版/架构标记 | guest `/etc/andcode-image` |
+| `ubuntu-development.yml` | 手动触发的镜像构建与 Linux 冒烟 workflow | `.github/workflows/` |
+| `andcode-ubuntu-install` | root 专用可信 CI 镜像安装器,摘要/空间/权限检查,不接收 ZIP | `runtime/ubuntu/andcode-ubuntu-install` |
+| `ubuntu-rootfs-validator.test.py` | rootfs 构建校验器的合成归档回归测试 | `scripts/` |
+| `UBUNTU.md` | 双后端状态、可信镜像安装流程与实机准入清单 | `docs/` |
+| `bootstrap-ubuntu-device.sh` | root 设备开发验证配方,固定 Ubuntu Base 摘要,不替代 CI 正式安装 | `scripts/` |
+| `loopback-proxy`(参数值) | 设备开发验证显式选择现有 `http://127.0.0.1:7890` 代理,仅该调用透传 http_proxy/https_proxy;不关闭 TLS 校验 | Ubuntu 引导/设备测试参数 |
+| `ubuntu-device-test.sh` | root chroot 真机联网/apt/权限/编译/退出清理验证,不代表 PRoot 通过 | `scripts/` |
+| `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |
+| `proot-rootfs-gate.sh` | 应用域原版 Ubuntu Base Bash 独立实例准入,不修改 SELinux 或 glibc | `scripts/` |
+| `proot-development-gate.sh`、`proot-development-gate.txt` | 应用域独立 Ubuntu 的 apt/工具链/新 ELF/PTY 验证脚本与 APK files 诊断输出 | `scripts/`、APK `files/` |
+| `proot-terminal-test.sh`、`proot-terminal-test.txt` | 应用域启动器参数/单项目映射/失败拒绝/stdin/退出码回归;只创建和清理自有临时夹具 | `scripts/`、APK `files/` |
+| `term-ubuntu-proot`、`term-ubuntu-proot.sh` | APK assets 启动模板及 filesDir 副本,系统 sh 解释;仅映射会话创建时选中的单个私有项目,不提权 | APK `assets/`、`files/` |
+| `proot-gate.txt` | APK 私有临时开发诊断输出 | `files/` |
+| `proot-rootfs`、`proot-rootfs-gate.txt` | 免 root 后端准入的独立 Ubuntu Base 实例与诊断,不共享 chroot 可写层 | APK `files/` |
+| `ubuntu-base-app-gate.tar.gz` | 固定摘要官方 Base 的独立只读开发输入副本,供真实应用域读取 | `/data/local/tmp/` |
+| `prepare-proot-gate.py` | 固定摘要 Base 的开发准入预处理:绝对链接改等价 guest 相对链接,去特权位,ELF 不变 | `scripts/` |
+| `prepare-proot-gate.test.py` | Base 准入预处理的摘要/链接/内容/拒绝覆盖回归测试,不下载依赖 | `scripts/` |
+| `busybox`(root 实例副本) | 复用现有独立 BusyBox 载荷处理 Android Toybox 不兼容的 bind mount/归档提取,root:root 0700 | `/data/adb/andcode-ubuntu/busybox` |
+| `ubuntu-base-24.04.4-base-arm64.tar.gz` | 官方 Ubuntu Base 24.04.4 arm64 开发引导输入,固定 SHA-256 | 开发暂存 `/data/local/tmp/`,不入库 |
+| `andcode-bundle-android-arm64-v<semver>.tar.gz` | Android 应用域专用 seccomp 补丁副本与同名 `.sha256`;不改标准 Linux 原始 bundle | CI 工件,非已验证 locked 交付 |
 
 **豁免**:Magisk 平台固定文件名(`customize.sh`、`service.sh`、`uninstall.sh`、
 `module.prop`)遵循 Magisk 官方约定,不受第 2.1 条"无 .sh"约束。
@@ -55,9 +96,11 @@
 | 逻辑名 | 类型 | 说明 |
 |---|---|---|
 | `opencode` | 包装器脚本 | 设 env → exec `opencode.bin`(规范布局)/ `libandcode-opencode.so`(Tier P) |
-| `opencode-pty` | 上游直通(opencode 运行时下载的终端插件帮助进程) | 缓存于 `~/.cache/opencode/bin/opencode-pty/<版本>/`;应用域禁 exec → **预置副本 + 指路**(ServeManager `fixPtyBin` 换 symlink;Tier P 物理名 `libandcode-opencode-pty.so`,interp 改写短路径 + `LD_LIBRARY_PATH` 解库) |
+| `opencode-pty` | 上游直通(opencode 运行时下载的终端插件帮助进程) | 上游会写入 `~/.cache/opencode/bin/opencode-pty/<版本>/` 且校验"普通文件+uid+sha256"(拒 symlink);应用域禁 exec → **预置副本 + 指路**:serve/终端 env 设 `OPENCODE_PTY_BIN` 指向预置副本;`OPENCODE_PTY_SOCKET_DIR` 指向应用 filesDir(§5);Tier P 物理名 `libandcode-opencode-pty.so`,开发部署 interp 短路径必须是可执行 loader 普通文件,不可假定 symlink 可达 |
 | `git`、`ssh` | 上游直通(经链接农场指向物理名) | 供 opencode 内部 spawn 与用户使用 |
+| `bash` | 上游交互 shell,Ubuntu 24.04 基线独立程序聚合;终端优先加载预置副本 | `root/bin/bash.bin` → `libandcode-bash.so`;包装器 `libandcode-cmd-bash.so` |
 | `andcode-doctor` | 自研 | 环境自检:loader、shim、DNS、JIT、phantom-killer 状态,输出诊断报告 |
+| `andcode-ubuntu-proot` | 开发终端 shell 函数;显式进入已安装 PRoot 独立实例,退出返回原 Bash | `term-ubuntu-proot` 解释执行;不是已完成自包含安装的产品入口 |
 | `andcode-sshd` | 自研 | 内置 dropbear 生命周期:`start|stop|status` 子命令式 |
 | `opencode-tui` | 上游直通 | 若核实 opencode 需按名调用 TUI 二进制,预置为该逻辑名(DESIGN §4.1) |
 
@@ -67,6 +110,8 @@
 |---|---|
 | `andcode-entry` | 统一入口(原 entry.sh 更名):初始化 env、生成 `etc/resolv.conf`、按参数派发 |
 | `andcode-mkresolv` | 从 Android `net.dns*` 生成 resolv.conf(供 service.sh 单独复用) |
+| `andcode-ubuntu` | root 管理原型:`status|shell|exec|admin`;每次会话独立 mount namespace,退出清理;默认普通用户,admin 必须显式请求,暂不向 APK/模型开放 |
+| `andcode-ubuntu-install` | root 安装原型,只接受固定暂存路径的可信 gzip 镜像及带外 SHA-256,拒绝覆盖既有实例;至少 5 GiB 可用空间 |
 
 ## 5. 环境变量规范
 
@@ -78,8 +123,11 @@
 | `ANDCODE_LIBPATH` | `--library-path` 值(launcher 用) | `$ROOT/lib`(规范)/`$ANDCODE_EXE_DIR`(Tier P) |
 | `ANDCODE_SHIM` | shim 绝对路径(launcher 用) | `$ROOT/shim/libandcode-shim.so` |
 | `ANDCODE_TIER` | 形态标识,单字符小写,与 DESIGN 章节一致 | `m` / `a` / `p` |
+| `ANDCODE_UBUNTU_PROJECT_NAME` | 新终端创建时快照的私有项目名;空值不映射;入口验证目录与规范路径,拒绝符号链接/越界,不接受宿主任意路径 | `andcode-demo` → guest `/workspace/andcode-demo` |
 | `ANDCODE_BUNDLE_VERSION` | bundle 语义化版本 | `1.2.0` |
 | `ANDCODE_LOG` | 日志级别 | `debug\|info\|error` |
+| `OPENCODE_PTY_BIN` | 上游 v2 预置 PTY 可执行路径覆盖;跳过缓存安装/校验 | Tier P = `nativeLibraryDir/libandcode-opencode-pty.so`;开发期 `/data/local/tmp/andcode/lib/opencode-pty` |
+| `OPENCODE_PTY_SOCKET_DIR` | 上游 process-daemon v0.4.0 socket 基目录覆盖;实际追加 `opencode-pty-<uid>/<32 hex>.sock`,保留普通目录/uid/0700 校验 | APK `Context.getFilesDir()`(不用可被清理的 cacheDir);完整 socket 路径 UTF-8 长度须 <104 字节 |
 
 - 透传规则:`OPENCODE_*` 等上游变量允许用户透传,但包装器只设置自己登记的
   `ANDCODE_*` 与必需的运行时变量(`HOME`、`TMPDIR`、`PATH`、`LD_PRELOAD`、
@@ -166,6 +214,7 @@ $ANDCODE_ROOT/usr/libexec/git-core/git-remote-https
 | Magisk 模块 | `andcode-magisk-v<semver>.zip` |
 | 校验文件 | 同名 + `.sha256` |
 | 标准 Linux 产物 | `andcode-linux-arm64-v<semver>.tar.gz`(与 DESIGN §3 兼容性目标对应) |
+| Ubuntu 开发镜像(原型) | `andcode-ubuntu-arm64.img.gz` + `.sha256`,4 GiB ext4;仅可信 CI 工件,尚非正式发行物 |
 
 ### 7.2 manifest 语法(`bundle/manifest`,TSV,`#` 注释)
 
