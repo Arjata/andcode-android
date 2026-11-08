@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.32 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.33 (设计稿) · 日期: 2026-11-09
+> v0.4.33 变更(Tier P shell 入口):持久 PTY 系统 sh 的 WebSocket/resize/reconnect
+> 已实测,但 daemon 直接 exec Bash shebang 包装器立即退出;bin/bash 改用同物理名
+> 静态 ELF 入口,从 /proc/self/exe 定位 loader/Bash/shim 并单进程 --preload,
+> 不释放 ELF、不接入 Ubuntu 后端;新增 Linux 实际执行/参数测试,待新版 APK 验收。
 > v0.4.32 变更(包装器):真实 Bash 子进程仍能继承 wrapper 设置的 LD_PRELOAD,
 > 不再依赖 shim 构造器清环境;direct 分支改用 loader --preload 单进程注入,
 > 环境中移除 LD_PRELOAD,PRoot bind 分支不变。新增 Linux 与应用域 Bionic 子进程

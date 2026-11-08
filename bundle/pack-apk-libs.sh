@@ -77,6 +77,13 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
       cp -f "$src" "$LIBS/$phys"
       ;;
     wrapper-sh)
+      # portable-pty directly executes SHELL. Use an ELF entry instead of relying
+      # on execvp's shell-script fallback on Android. Keep the registered name.
+      if [ "$lp" = bin/bash ]; then
+        musl-gcc -static -O2 -Wall -Wextra -Werror -Wl,-z,max-page-size=16384 \
+          -o "$LIBS/$phys" "$(dirname "$0")/launcher/bash-launcher.c"
+        continue
+      fi
       # Tier P 重渲染(NAMING §6.3):ROOT/EXEDIR 来自 APK 注入的环境变量,
       # loader/target 用 jniLibs 物理名
       target="${ELF_PHYS["$lp.bin"]:-}"

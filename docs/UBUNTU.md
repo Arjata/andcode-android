@@ -220,6 +220,28 @@ wrapper 已改 direct loader `--preload` 单进程注入而不导出 LD_PRELOAD�
 修复待新 CI/APK 实测。模型默认配置正确，但本次实际请求因 EAI_AGAIN
 无法解析 provider 域名而重试，已中止；不能算模型端到端成功。
 
+新版官方载荷 run `42519762828`（`2716a49`）全部 CI 成功；native 工件 ZIP/API
+SHA-256 `60dbbaed741181f37c1c8194643fc79bcaf7227709689504de7899862a32ecaf`。
+本机 assembleDebug/lintDebug、APK 403 个 native 与 253 个 data 逐字节核对及
+原签名覆盖安装通过；ZIP 文件名按原 UTF-8 字节解释（Android 构建工具未置 UTF-8
+flag，Python 默认 CP437 显示并非真实文件名）。真实应用域新增
+`ANDCODE_NATIVE_BIONIC_CHILD_OK` 和原有 native/PRoot 子进程门禁全部通过，
+SELinux 由 adb 独立确认为 Enforcing。
+
+官方 V2 的持久 PTY 使用预置 daemon 已通过系统 sh 的 tty、WebSocket 输入、
+91×31 resize、重连重放和快照 `ANDCODE_NATIVE_PERSISTENT_WS_OK`。默认 Bash
+wrapper 直接由 daemon exec 时立即退出，无输出；通过系统 sh 显式执行 wrapper
+可成功。为修正该边界，Tier P 的 `bin/bash` 保留原物理名，改为静态 ELF 入口
+直接调用同 nativeLibraryDir 的 loader/Bash/shim，CI/新版 APK 尚待验收。
+这不代表 Web UI 操作/默认 Bash 或 Ubuntu Web 后端已经通过。
+
+固定 npm tarball 完整性核查纠正 OpenTUI 原生包许可为 MIT AND LGPL-2.1-or-later，
+附 FFmpeg/Ghostty/LCMS2/WebP/STB/Wuffs/Zlib 声明；fff 平台包未附 LICENSE。
+详见 REUSE §2.1，仍不得把源码实验直接接入正式 APK。隔离设备 root 诊断可运行
+源码版 serve/普通 PTY，但不是应用域或自包含证据；测试进程已停止。
+默认 provider 域名在设备系统 ping 与宿主 DNS 均解析失败；PRoot 映射与 TCP DNS
+对照也未恢复模型请求，已中断自有重试并清理自有诊断进程，未改网络策略或凭据。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/
