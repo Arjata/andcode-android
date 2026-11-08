@@ -1,6 +1,9 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.26 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.27 (设计稿) · 日期: 2026-11-09
+> v0.4.27 变更(交付链):对 patchelf 搬迁版本定义节却遗留 DT_VERDEF 旧地址的
+> Bun ET_EXEC 增加节表/LOAD 映射校验后修复,仅改动态表地址;修复后设备诊断目录
+> V2.2.6 与静态入口 PTY 0.4.0/protocol 7 实际执行成功,仍待 CI/真实应用域验收。
 > v0.4.26 变更(§4.8):root 安装器/manager 新增显式 ci-validation 固定实例,
 > 仅使用 /data/adb/andcode-ubuntu-ci,不接受任意路径、不覆盖现有开发实例;
 > 用于可信 CI 镜像的独立实机验收,不改变普通用户联网阻塞或开放 APK 特权接口。

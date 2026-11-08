@@ -122,6 +122,9 @@ if [ "$REWRITE" = 1 ]; then
 fi
 
 # ── 4. 结果校验(check-compat 兼容审计同样适用,由 CI 串联)──────────────
+# Ubuntu patchelf may move .gnu.version_d without updating DT_VERDEF (notably
+# Bun ET_EXEC). Validate against the ELF's own tables; never hardcode offsets.
+python3 "$(dirname "$0")/../scripts/repair-elf-verdef.py" "$LIBS"/*.so
 bad=0
 for f in "$LIBS"/*.so; do
   n="$(basename "$f")"
