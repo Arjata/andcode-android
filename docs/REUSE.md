@@ -38,6 +38,13 @@
 | proot(Termux bionic 构建) | packages.termux.dev pool/main/p/proot | **GPL-2.0** | **Tier A/M 的 /etc 重定向正解**(真机 P0:LD_PRELOAD 无法拦截 glibc 内部 fopen("/etc/resolv.conf"),proot bind 实测打通 git https 全链路) | 独立程序聚合;proot + loader + libtalloc(LGPL-3.0)+ libandroid-shmem(**BSD-2-Clause**,termux/libandroid-shmem LICENSE 已核)随 bundle 分发,manifest 记录 |
 | ConnectBot | `connectbot/connectbot` (★3.6k, 活跃) | Apache-2.0 | Tier A/M 的推荐 SSH 客户端(**可选工具,非依赖**) | 仅文档推荐 |
 
+源码实验 CI 的 `collect-opencode-native-licenses.py` 对四个固定原生导入逐一核对
+安装源字节/包名/版本/声明许可，将包内顶层 LICENSE*/COPYING*/NOTICE* 与 package.json
+保存在诊断工件 `native-license-evidence/`，并生成 `native-license-review.json`。
+缺声明记为 `blocked-missing-package-notice`，有声明仍为 `blocked-transitive-review`；
+`redistributionApproved` 始终 false。它不是传递源码审查，也不覆盖 Bun/JS/Web 整体依赖，
+不能把 CI 成功或收集到 LICENSE 理解为合规交付完成。
+
 ### 2.2 独立程序聚合(GPL-2.0,只随包放二进制 + 源码指引)
 
 | 项目 | 仓库 | 许可证 | 角色 | 义务与边界 |

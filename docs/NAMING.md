@@ -101,6 +101,8 @@
 | `opencode-native-imports.ts`、`opencode-native-imports.test.ts` | Bun 源码构建实验插件与回归,将原生扩展导入改为显式预置路径;不修改官方二进制 | `scripts/` |
 | `prepare-opencode-native-build.py` | 固定上游提交的源码构建实验接线,拒绝不匹配锚点 | `scripts/` |
 | `audit-opencode-native.py`、`audit-opencode-native.test.py` | 实验工件 ELF/依赖/对齐/摘要审计与回归,拒绝残留 Bun 内嵌 ELF 或 musl 闭包 | `scripts/` |
+| `collect-opencode-native-licenses.py`、`collect-opencode-native-licenses.test.py` | 固定安装树原生扩展的包版本/许可/包内声明快照,缺声明明确记录为 blocked,不构成发布许可批准 | `scripts/` |
+| `native-license-review.json`、`native-license-evidence/` | 实验工件中四个原生扩展的人工审查待办与包内声明副本,不进入正式 APK | 源码实验工件 |
 | `probe-opencode-native.py` | Linux CI 实验 API 准入:普通/持久 PTY、shell,口令只在内存使用不输出 | `scripts/` |
 | `opencode-native-prototype.yml` | 手动执行的原生扩展预置源码构建实验;失败/未审计工件不得接入 APK | `.github/workflows/` |
 | `libandcode-oc2-native-<sha256前16位>.so` | 实验 Bun 插件按内容命名的原生扩展预置副本,完整摘要校验去重/冲突 | 实验输出 native/ |
