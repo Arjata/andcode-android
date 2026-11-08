@@ -315,6 +315,7 @@ jobs:
           path: work/jni/
 
       - name: Execute physical Tier P Bash (failure blocks downstream APK)
+        id: native-execution
         run: |
           readelf -d work/jni/arm64-v8a/libandcode-ld-linux.so | grep SONAME
           readelf -d work/jni/arm64-v8a/libandcode-libc.so | grep NEEDED
@@ -325,6 +326,25 @@ jobs:
             work/jni/arm64-v8a/libandcode-ld-linux.so --library-path work/jni/arm64-v8a --inhibit-cache \
             work/jni/arm64-v8a/libandcode-oc2.so --version
           work/jni/arm64-v8a/libandcode-opencode-pty.so --version
+
+      - name: Diagnose native execution failure without weakening gate
+        if: failure() && steps.native-execution.outcome == 'failure'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdb
+          export HOME="$RUNNER_TEMP" BUN_TMPDIR="$RUNNER_TEMP" GLIBC_TUNABLES=glibc.pthread.rseq=0
+          echo 'Unmodified official V2'
+          work/oc2/opencode --version || true
+          echo 'Canonical explicit-loader V2 before Tier P rewriting'
+          work/android-bundle/andcode/lib/ld-linux-aarch64.so.1 \
+            --library-path work/android-bundle/andcode/lib --inhibit-cache \
+            work/android-bundle/andcode/bin/oc2.bin --version || true
+          echo 'Physical PTY entry'
+          work/jni/arm64-v8a/libandcode-opencode-pty.so --version || true
+          gdb --batch -ex run -ex 'thread apply all bt 12' -ex 'info sharedlibrary' \
+            -ex 'info registers pc sp' --args \
+            work/jni/arm64-v8a/libandcode-ld-linux.so --library-path work/jni/arm64-v8a \
+            --inhibit-cache work/jni/arm64-v8a/libandcode-oc2.so --version
 
       - uses: actions/upload-artifact@v4
         with:

@@ -53,6 +53,9 @@
 `gradle/actions/setup-gradle@v4`，2026-11-09 通过各仓库 LICENSE 核实为 MIT
 （Gradle 特别核对 v4/LICENSE，不以 main 的混合许可替代所用版本）。仅用于
 下载当前 run 工件及安装 JDK/Android SDK/Gradle，不并入第三方源码或工具到交付物。
+故障诊断可在 CI 安装 Ubuntu 官方 `gdb`（GPL-3.0-or-later，2026-11-09 核对
+GNU GDB `gdb/top.c` 版权头及 GPLv3+ 版本输出，sourceware 的 RTEMS 只读镜像）；
+仅收集自有 CI 进程栈，不进入 APK 或 bundle。
 
 | 项目 | 仓库 | 许可证 | 价值 | 备注 |
 |---|---|---|---|---|

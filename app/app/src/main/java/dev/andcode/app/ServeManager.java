@@ -47,7 +47,10 @@ public final class ServeManager {
     /** Null means a payload-free developer APK. Partial native installs fail closed. */
     static File prepareRuntime(Context app) throws IOException {
         String nat = app.getApplicationInfo().nativeLibraryDir;
-        if (nat == null || !new File(nat, "libandcode-ld-linux.so").isFile()) return null;
+        if (!RuntimePayload.present(nat == null ? null : new File(nat).toPath())) return null;
+        for (String required : new String[]{"libandcode-ld-linux.so", "libandcode-bash.so"}) {
+            if (!new File(nat, required).isFile()) throw new IOException("Missing native payload: " + required);
+        }
         return RuntimePayload.prepare(app.getFilesDir().toPath(), new File(nat).toPath(),
             name -> app.getAssets().open("andcode-runtime/" + name)).toFile();
     }

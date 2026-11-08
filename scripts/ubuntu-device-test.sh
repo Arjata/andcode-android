@@ -3,7 +3,17 @@
 set -eu
 MANAGER=/data/adb/andcode-ubuntu/andcode-ubuntu
 BASE=/data/adb/andcode-ubuntu
-call() { /system/bin/sh "$MANAGER" "$@"; }
+INSTANCE=''
+if [ "${1:-}" = ci-validation ]; then
+  BASE=/data/adb/andcode-ubuntu-ci
+  MANAGER=$BASE/andcode-ubuntu
+  INSTANCE=ci-validation
+  shift
+fi
+call() {
+  if [ -n "$INSTANCE" ]; then /system/bin/sh "$MANAGER" "$INSTANCE" "$@";
+  else /system/bin/sh "$MANAGER" "$@"; fi
+}
 proxy=""
 case "${1:-}" in '' ) ;; loopback-proxy) proxy=http://127.0.0.1:7890 ;; *) echo 'unknown network mode' >&2; exit 1 ;; esac
 [ "$(id -u)" = 0 ] || exit 1

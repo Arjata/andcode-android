@@ -61,6 +61,7 @@
 | `andcode-ubuntu-arm64.img.gz`、`andcode-ubuntu-arm64.img.gz.sha256` | 4 GiB ext4 开发镜像及压缩文件摘要,仅 CI 工件 | `dist/` |
 | `andcode-ubuntu-packages.tsv`、`andcode-ubuntu-build.txt` | dpkg 包版本/来源与 Docker 镜像身份,仅 CI 工件 | `dist/` |
 | `andcode-ubuntu`(目录) | root 专用实例,与轻量 bundle 和未来 PRoot 实例隔离 | `/data/adb/andcode-ubuntu/` |
+| `andcode-ubuntu-ci`、`ci-validation`(首参数) | 可信 CI 镜像的独立验收实例;安装器/manager 只允许此固定替代目录,拒绝覆盖,不接受任意路径 | `/data/adb/andcode-ubuntu-ci/` |
 | `ubuntu.img`、`rootfs`、`session-lock` | root 实例镜像/挂载点/并发锁,不接受应用传入替代路径 | `/data/adb/andcode-ubuntu/` |
 | `andcode-image` | 镜像内部格式/发行版/架构标记 | guest `/etc/andcode-image` |
 | `ubuntu-development.yml` | 手动触发的镜像构建与 Linux 冒烟 workflow | `.github/workflows/` |

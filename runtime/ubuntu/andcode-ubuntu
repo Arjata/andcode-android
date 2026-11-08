@@ -3,6 +3,12 @@
 # Install only as root: /data/adb/andcode-ubuntu/andcode-ubuntu (root:root 0700).
 set -eu
 BASE=/data/adb/andcode-ubuntu
+INSTANCE=''
+if [ "${1:-}" = ci-validation ]; then
+  BASE=/data/adb/andcode-ubuntu-ci
+  INSTANCE=ci-validation
+  shift
+fi
 IMAGE=$BASE/ubuntu.img
 ROOT=$BASE/rootfs
 LOCK=$BASE/session-lock
@@ -39,7 +45,11 @@ echo 'chroot is NOT a security sandbox. admin has host root authority.' >&2
 # Use a new, recursively private namespace; all mounts disappear with its last process.
 # The lock is released only after the namespace child has returned.
 result=0
-/system/bin/toybox unshare -m /system/bin/sh "$BASE/andcode-ubuntu" private-session "$cmd" "$@" || result=$?
+if [ -n "$INSTANCE" ]; then
+  /system/bin/toybox unshare -m /system/bin/sh "$BASE/andcode-ubuntu" "$INSTANCE" private-session "$cmd" "$@" || result=$?
+else
+  /system/bin/toybox unshare -m /system/bin/sh "$BASE/andcode-ubuntu" private-session "$cmd" "$@" || result=$?
+fi
 if [ "$result" = 75 ] || [ "$result" -ge 128 ]; then
   echo 'andcode-ubuntu: cleanup incomplete; retaining lock for manual inspection' >&2
 else

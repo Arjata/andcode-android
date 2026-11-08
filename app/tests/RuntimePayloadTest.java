@@ -49,6 +49,9 @@ public final class RuntimePayloadTest {
             return;
         }
         Fixture f = new Fixture();
+        check(!RuntimePayload.present(null));
+        check(RuntimePayload.present(f.nat));
+        check(!RuntimePayload.present(f.files));
         Path root = f.prepare();
         check(Files.isSymbolicLink(root.resolve("bin/bash.bin")));
         check(Files.readSymbolicLink(root.resolve("bin/bash.bin")).equals(f.nat.resolve("libandcode-bash.so")));

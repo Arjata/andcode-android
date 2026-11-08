@@ -1,10 +1,11 @@
 #!/system/bin/sh
 # Install only trusted CI output, never user-supplied rootfs archives.
-# Usage: sh andcode-ubuntu-install <out-of-band-sha256>
+# Usage: sh andcode-ubuntu-install [ci-validation] <out-of-band-sha256>
 # Inputs: /data/local/tmp/andcode-ubuntu-arm64.img.gz and
 #         /data/local/tmp/andcode-ubuntu (the reviewed manager script).
 set -eu
 BASE=/data/adb/andcode-ubuntu
+if [ "${1:-}" = ci-validation ]; then BASE=/data/adb/andcode-ubuntu-ci; shift; fi
 SOURCE=/data/local/tmp/andcode-ubuntu-arm64.img.gz
 MANAGER=/data/local/tmp/andcode-ubuntu
 fail() { echo "andcode-ubuntu-install: $*" >&2; exit 1; }

@@ -9,7 +9,10 @@
 不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。
 
 - 原生 arm64 CI 首跑 [42508958877](https://github.com/Arjata/andcode-android/actions/runs/42508958877)
-  已通过镜像构建、私有 mount namespace 测试、glibc/16K 审计；尚未用该工件在设备安装。
+  已通过镜像构建、私有 mount namespace 测试、glibc/16K 审计；该工件已按摘要
+  安装到独立 `/data/adb/andcode-ubuntu-ci`，拒绝重复安装已实测。可信镜像已通过
+  root 代理 HTTPS/严格 apt/hello，以及普通用户编译、权限清空、PTY 与生命周期；
+  最后普通用户连接回环代理超时，完整 smoke 退出 1，网络阻塞未解决。
 - 本轮已通过：构建归档校验器 14 项合成测试；设备系统 sh 的入口语法、预置 Bash
   的构建脚本语法；Toybox 私有 mount namespace 递归 private 设置。空间不足门禁
   曾实测拒绝且未创建实例。清理空间后已建立设备开发实例（不是 CI 工件安装）。
@@ -77,6 +80,18 @@ proc status 的 NoNewPrivs 字段，使用 `prctl(PR_GET_NO_NEW_PRIVS)` 验证�
    暂存文件要求 root 所有且不可被其他用户写入；本原型假设设备无恶意 root 进程。
    当前安装原型还需要 `/data/local/tmp/andcode/bin/busybox`，复制到 root 私有实例；
    这是开发 bundle 依赖，不应被误称为已完成的自包含 APK 安装。
+
+   设备已有开发实例时，可以显式选择**固定独立验收实例**，不要移动或覆盖旧实例：
+
+   ```sh
+   su -c 'sh /data/local/tmp/andcode-ubuntu-install ci-validation <可信的SHA256>'
+   su -c 'sh /data/adb/andcode-ubuntu-ci/andcode-ubuntu ci-validation status'
+   su -c 'sh /data/local/tmp/andcode-ubuntu-device-test.sh ci-validation loopback-proxy'
+   ```
+
+   `ci-validation` 必须同时传给安装器与该实例的 manager；它只选择
+   `/data/adb/andcode-ubuntu-ci`，不是任意路径参数。测试脚本来自
+   `scripts/ubuntu-device-test.sh`。两实例使用独立镜像/锁/命名空间，不共享可写系统。
 
 5. `shell`/`exec` 为普通用户（60000），在 `/workspace` 起步；显式维护命令示例：
 

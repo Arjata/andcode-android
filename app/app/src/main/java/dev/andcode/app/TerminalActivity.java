@@ -289,6 +289,7 @@ public class TerminalActivity extends AppCompatActivity {
                 "/data/local/tmp/andcode/lib", "/data/local/tmp/andcode/bin/bash.bin"}
         };
         for (String[] candidate : candidates) {
+            if (mRuntimeRoot != null && !candidate[0].equals(nat + "/libandcode-ld-linux.so")) continue;
             if (new File(candidate[0]).isFile() && new File(candidate[2]).isFile())
                 return new String[]{candidate[0], "--library-path", candidate[1], "--inhibit-cache",
                     candidate[2], "--noprofile", "--rcfile", new File(files, "term-bashrc").getAbsolutePath(), "-i"};

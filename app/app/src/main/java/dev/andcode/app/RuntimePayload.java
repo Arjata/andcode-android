@@ -17,6 +17,15 @@ final class RuntimePayload {
     interface Assets { InputStream open(String name) throws IOException; }
     private static final LinkOption[] NOFOLLOW = {LinkOption.NOFOLLOW_LINKS};
 
+    static boolean present(Path nativeDir) throws IOException {
+        if (nativeDir == null) return false;
+        if (!Files.isDirectory(nativeDir, NOFOLLOW) || Files.isSymbolicLink(nativeDir))
+            throw new IOException("Invalid native payload directory");
+        try (java.nio.file.DirectoryStream<Path> entries = Files.newDirectoryStream(nativeDir, "libandcode-*.so")) {
+            return entries.iterator().hasNext();
+        }
+    }
+
     static synchronized Path prepare(Path files, Path nativeDir, Assets assets) throws IOException {
         if (Files.isSymbolicLink(files) || Files.isSymbolicLink(nativeDir)
                 || !Files.isDirectory(nativeDir, NOFOLLOW)) throw new IOException("Invalid payload directories");
@@ -46,7 +55,8 @@ final class RuntimePayload {
                 if (bytes.length >= 4 && bytes[0] == 127 && bytes[1] == 'E' && bytes[2] == 'L' && bytes[3] == 'F')
                     throw new IOException("ELF forbidden in runtime data");
                 if (existing) {
-                    if (!Files.isRegularFile(dst, NOFOLLOW) || !java.util.Arrays.equals(Files.readAllBytes(dst), bytes))
+                    if (!Files.isRegularFile(dst, NOFOLLOW) || Files.size(dst) != bytes.length
+                            || !java.util.Arrays.equals(read(Files.newInputStream(dst), 8 * 1024 * 1024), bytes))
                         throw new IOException("Runtime data changed");
                 } else Files.write(dst, bytes, java.nio.file.StandardOpenOption.CREATE_NEW);
             } else {
