@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootDrawer"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.termux.view.TerminalView
-        android:id="@+id/terminal_view"
+    <!-- 终端内容层:悬浮球由代码挂到本层(需要 content 引用做拖拽边界) -->
+    <FrameLayout
+        android:id="@+id/termContent"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-</FrameLayout>
+        android:layout_height="match_parent">
+
+        <com.termux.view.TerminalView
+            android:id="@+id/terminal_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <include layout="@layout/nav_drawer" />
+</androidx.drawerlayout.widget.DrawerLayout>

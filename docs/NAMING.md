@@ -55,6 +55,7 @@
 | 逻辑名 | 类型 | 说明 |
 |---|---|---|
 | `opencode` | 包装器脚本 | 设 env → exec `opencode.bin`(规范布局)/ `libandcode-opencode.so`(Tier P) |
+| `opencode-pty` | 上游直通(opencode 运行时下载的终端插件帮助进程) | 缓存于 `~/.cache/opencode/bin/opencode-pty/<版本>/`;应用域禁 exec → **预置副本 + 指路**(ServeManager `fixPtyBin` 换 symlink;Tier P 物理名 `libandcode-opencode-pty.so`,interp 改写短路径 + `LD_LIBRARY_PATH` 解库) |
 | `git`、`ssh` | 上游直通(经链接农场指向物理名) | 供 opencode 内部 spawn 与用户使用 |
 | `andcode-doctor` | 自研 | 环境自检:loader、shim、DNS、JIT、phantom-killer 状态,输出诊断报告 |
 | `andcode-sshd` | 自研 | 内置 dropbear 生命周期:`start|stop|status` 子命令式 |
@@ -119,6 +120,7 @@ shim/libandcode-shim.so      # 本项目 LD_PRELOAD 库(见 §6.3)
 | `root/lib/libstdc++.so.6` | glibc-lib | `libandcode-libstdc---.so`(slug 字符净化见下) |
 | `shim/libandcode-shim.so`(本项目 LD_PRELOAD 库) | preload-lib | `libandcode-shim.so`(原名即合规) |
 | `root/etc/ssl/certs/ca-certificates.crt` 等数据文件 | data | **`-`**(data 不进 jniLibs:只读数据经 APK assets → filesDir 原样落位;亦避免长路径超 64 字符) |
+| `opencode-pty/<版本>/opencode-pty`(上游运行时下载插件,非 bundle 布局;预置副本进 jniLibs) | elf-exec(MIT,上游 sst/opencode process-daemon) | `libandcode-opencode-pty.so`(slug 同名净化;interp 由打包链改写,见 §4.1 指路口径) |
 
 **slug 字符净化**(在 `/`→`-` 之后):仅保留 `[a-z0-9-]`,其余逐字符替换为 `-`
 (`+`、`_`、`.` 等均逐字符替换,连续结果不合并)。物理名全长(含 `libandcode-`/`.so`)≤ 64。

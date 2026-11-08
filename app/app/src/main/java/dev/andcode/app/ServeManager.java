@@ -105,6 +105,7 @@ public final class ServeManager {
         }
         final Context app = ctx.getApplicationContext();
         new Thread(() -> {
+            fixPtyBin(app); // 已有 serve(含上轮遗留)也要指路:插件可能刚重新下载
             // 初始探测也在后台做(ping 是网络调用,禁止主线程)
             if (ping()) {
                 synchronized (ServeManager.class) { sStarting = false; }
@@ -144,6 +145,8 @@ public final class ServeManager {
             if (srcCfg.exists()) copy(srcCfg, dstCfg);
         }
 
+        fixPtyBin(app); // 插件二进制指路必须在 serve 启动前完成(启动内即初始化插件)
+
         Paths p = resolvePaths(app);
         if (p == null) return "opencode V2 二进制或补丁 loader 未部署";
 
@@ -162,6 +165,7 @@ public final class ServeManager {
         env.put("BUN_TMPDIR", tmp.getAbsolutePath()); // Bun 内嵌原生库提取目录,必须应用可写
         env.put("ANDCODE_IN_PROOT", "1");
         env.put("GLIBC_TUNABLES", "glibc.pthread.rseq=0"); // zygote seccomp 对 rseq 直接 SIGSYS
+        env.put("LD_LIBRARY_PATH", p.lib); // glibc 子进程(opencode-pty、git 等)的库解析
         env.put("HTTPS_PROXY", "http://127.0.0.1:7890");   // 模型 API 走设备代理
         env.put("HTTP_PROXY", "http://127.0.0.1:7890");
         env.put("NODE_TLS_REJECT_UNAUTHORIZED", "0");
@@ -270,8 +274,47 @@ public final class ServeManager {
         }
     }
 
-    /** 二进制/loader 路径解析:优先 jniLibs,回退 /data/local/tmp 开发部署 */
-    private static Paths resolvePaths(Context app) {
+    /**
+     * opencode-pty 插件二进制"预置副本 + 指路"(DESIGN §1.2):
+     * opencode 把插件原生二进制下载到应用数据目录
+     * files/home/.cache/opencode/bin/opencode-pty/<版本>/opencode-pty,
+     * 而应用域禁止 exec 应用数据文件 → posix_spawn EACCES。
+     * 把它替换为指向可 exec 位置的符号链接:nativeLibraryDir 预置副本
+     * (Tier P,待打包链集成)或 /data/local/tmp 开发部署(与 oc2 同域,
+     * interp 已改写为 /data/local/tmp/ld、库走 LD_LIBRARY_PATH)。
+     * serve 每次启动前执行;首次插件下载发生在 serve 启动内,重启一次生效。
+     */
+    static void fixPtyBin(Context app) {
+        File target = null;
+        String nat = app.getApplicationInfo().nativeLibraryDir;
+        if (nat != null) {
+            File f = new File(nat, "libandcode-opencode-pty.so");
+            if (f.exists()) target = f;
+        }
+        if (target == null) {
+            File f = new File("/data/local/tmp/andcode/lib/opencode-pty");
+            if (f.exists()) target = f;
+        }
+        if (target == null) return; // 无预置副本:维持原样(首次会 EACCES)
+        File base = new File(app.getFilesDir(), "home/.cache/opencode/bin/opencode-pty");
+        File[] vers = base.listFiles();
+        if (vers == null) return;
+        for (File ver : vers) {
+            if (!ver.isDirectory()) continue;
+            File bin = new File(ver, "opencode-pty");
+            boolean link = java.nio.file.Files.isSymbolicLink(bin.toPath());
+            if (link && bin.exists()) continue;   // 已指向有效目标
+            if (!link && !bin.exists()) continue; // 目录里没有(尚未下载)
+            try {
+                bin.delete();
+                android.system.Os.symlink(target.getAbsolutePath(), bin.getAbsolutePath());
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /** 二进制/loader 路径解析:优先 jniLibs,回退 /data/local/tmp 开发部署(终端页复用) */
+    static Paths resolvePaths(Context app) {
         List<Paths> candidates = new ArrayList<>();
         // 1) jniLibs(最终形态):libandcode-oc2.so + 补丁 loader 同目录
         String nat = app.getApplicationInfo().nativeLibraryDir;
@@ -292,7 +335,7 @@ public final class ServeManager {
         return null;
     }
 
-    private static final class Paths {
+    static final class Paths {
         final String ld;
         final String lib;
         final String oc2;

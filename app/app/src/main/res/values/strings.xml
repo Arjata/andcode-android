@@ -4,7 +4,7 @@
     <string name="app_subtitle">opencode · AI 编码代理</string>
 
     <string name="nav_home">主页</string>
-    <string name="nav_terminal">TUI 终端</string>
+    <string name="nav_terminal">终端</string>
     <string name="nav_web">Web 图形界面</string>
     <string name="nav_open_menu">打开菜单</string>
 
@@ -17,11 +17,11 @@
     <string name="action_start">启动服务</string>
     <string name="action_stop">停止服务</string>
     <string name="action_web">Web 图形界面</string>
-    <string name="action_terminal">TUI 终端</string>
+    <string name="action_terminal">终端</string>
     <string name="web_card_title">opencode Web 图形界面(OpenCode 2.0)</string>
     <string name="web_card_desc">本机 serve 承载,WebView 渲染,自动配对</string>
-    <string name="terminal_card_title">opencode TUI(内嵌终端)</string>
-    <string name="terminal_card_desc">jackpal 终端视图,终端会话直接可用</string>
+    <string name="terminal_card_title">终端(Termux 式)</string>
+    <string name="terminal_card_desc">交互式 shell,会话保持;输入 opencode 启动 AI 代理</string>
     <string name="serve_card_title">opencode 服务</string>
     <string name="copied">已复制</string>
 </resources>
