@@ -116,6 +116,7 @@ public class TerminalActivity extends AppCompatActivity {
 
         StringBuilder sb = new StringBuilder();
         sb.append("# andcode 终端 profile(mksh 交互 shell 启动时 source)\n");
+        sb.append("[ -r /system/etc/mkshrc ] && . /system/etc/mkshrc\n");
         sb.append("cd \"$HOME\" 2>/dev/null\n");
         sb.append("echo 'andcode 终端 · 输入 opencode 启动 AI 编码代理'\n");
         // shell 函数而非可执行文件:应用数据目录禁 exec(targetSdk 37.2),
