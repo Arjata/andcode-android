@@ -71,13 +71,15 @@ jobs:
           done
           test "$ready" = 1
           python3 scripts/probe-opencode-native.py
+          python3 scripts/probe-opencode-native-tui.py "$EXE"
           python3 - <<'PY'
           from pathlib import Path
-          for f in Path('work/probe-tmp').rglob('*'):
-              if f.is_file():
-                  with f.open('rb') as src:
-                      assert src.read(4) != b'\x7fELF', f'Runtime extracted ELF: {f}'
-          print('Serve ready; no runtime ELF in isolated BUN_TMPDIR (not full closure acceptance)')
+          for root in ['work/probe-home', 'work/probe-tmp']:
+              for f in Path(root).rglob('*'):
+                  if f.is_file():
+                      with f.open('rb') as src:
+                          assert src.read(4) != b'\x7fELF', f'Runtime extracted ELF: {f}'
+          print('Serve/shell/PTY/TUI ready; no runtime ELF in isolated HOME/BUN_TMPDIR (not Android acceptance)')
           PY
       - name: Save prototype provenance and upstream license
         run: |

@@ -242,6 +242,11 @@ wrapper 直接由 daemon exec 时立即退出，无输出；通过系统 sh 显�
 默认 provider 域名在设备系统 ping 与宿主 DNS 均解析失败；PRoot 映射与 TCP DNS
 对照也未恢复模型请求，已中断自有重试并清理自有诊断进程，未改网络策略或凭据。
 
+实验 CI 继续增加真实 TUI 准入：独立 controlling PTY 内启动 `--standalone`，
+同时要求 `/proc/<pid>/maps` 实际映射预置 OpenTUI 与终端渲染，结束仅终止该
+测试进程组；运行期 ELF 扫描扩大到隔离 HOME 与 BUN_TMPDIR。该新门禁尚待 CI，
+不提前声称 TUI 或完整运行期加载闭包通过。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/
