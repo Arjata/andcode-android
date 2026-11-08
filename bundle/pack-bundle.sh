@@ -108,6 +108,13 @@ done < <(find "$B" -type f ! -name '*.bin' -print0 | while IFS= read -r -d '' f;
   file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64' && printf '%s\0' "$f"
 done)
 
+# bin/git is the canonical ELF spawn entry when a launcher was supplied.
+# Omit only our freshly rendered redundant usr/bin/git wrapper: both logical
+# names otherwise map to libandcode-cmd-git.so and silently overwrite in Tier P.
+if [ -n "$LAUNCHER" ] && [ -f "$LAUNCHER" ] && [ -f "$B/usr/bin/git.bin" ]; then
+  rm -f "$B/usr/bin/git"
+fi
+
 # ── 2. glibc 闭包(root/lib,保持 soname)─────────────────────────────────
 mkdir -p "$B/lib"
 declare -A COPIED=()
@@ -237,8 +244,9 @@ wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|
 }
 
 declare -A KINDMAP=()
+declare -A PHYSICAL_PATHS=()
 if [ -f "$B/.kindmap" ]; then
-  while IFS=$'\t' read -r rel k; do KINDMAP["usr/libexec/git-core/$rel"]="$k"; done < "$B/.kindmap"
+  while IFS=$'\t' read -r rel k; do KINDMAP["$rel"]="$k"; done < "$B/.kindmap"
 fi
 while IFS= read -r -d '' f; do
   lp="${f#$B/}"
@@ -246,30 +254,29 @@ while IFS= read -r -d '' f; do
     root/home/*|root/tmp/*|manifest|.kindmap) continue ;;
   esac
   lic=AGPL-3.0-only; up=andcode; ver="$VER"
-  if [ "${lp#root/lib/}" != "$lp" ]; then
+  if [ "${lp#lib/}" != "$lp" ]; then
     kind=glibc-lib; phys="$(lib_slug "$lp")"; lic=LGPL-2.1; up=glibc-2.39
   elif [ "${lp#root/etc/}" != "$lp" ] || [ "${lp#etc/}" != "$lp" ]; then
     # data 类不进 jniLibs(只读数据经 APK assets → filesDir 原样落位),物理名占位 "-"
     kind=data; phys="-"
   elif [ "$lp" = "shim/libandcode-shim.so" ]; then
     kind=preload-lib; phys="libandcode-shim.so"
-  elif file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64'; then
-    kind=elf-exec; phys="$(slug "$lp")"
-    case "$(basename "$lp")" in
-      busybox*)            lic=GPL-2.0;            up=busybox.net/alpine ;;
-      dropbear*|dbclient*) lic=MIT;                up=mkj/dropbear ;;
-      *libexec/git-core/*) lic=GPL-2.0-or-later;  up=git/git ;;
-      *lib/proot/proot|*lib/proot/loader) lic=GPL-2.0; up=proot-me/proot\(termux-build\) ;;
-      *lib/proot/libtalloc*) lic=LGPL-3.0-or-later; up=samba.org/talloc ;;
-      *lib/proot/libandroid-shmem*) lic=BSD-2-Clause; up=termux/libandroid-shmem ;;
-      *)                   lic=MIT;                up=sst/opencode ;;
-    esac
-  elif [ -n "${KINDMAP[${lp#root/}]:-}" ]; then
-    # wrapper / launcher(NAMING §6.2:bin/usr/bin 下 cmd- 前缀;libexec 直名)
+  elif [ -n "${KINDMAP[$lp]:-}" ]; then
     phys="$(wrapper_slug "$lp")"
-    case "${KINDMAP[${lp#root/}]}" in
+    case "${KINDMAP[$lp]}" in
       launcher) kind=launcher; lic=AGPL-3.0-only; up=andcode ;;
       *)        kind=wrapper-sh ;;
+    esac
+  elif file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64'; then
+    kind=elf-exec; phys="$(slug "$lp")"
+    case "$lp" in
+      bin/busybox*)        lic=GPL-2.0;            up=busybox.net/alpine ;;
+      sbin/dropbear*|bin/dbclient*) lic=MIT;        up=mkj/dropbear ;;
+      usr/bin/git*|usr/libexec/git-core/*) lic=GPL-2.0-or-later; up=git/git ;;
+      usr/lib/proot/proot|usr/lib/proot/loader) lic=GPL-2.0; up=proot-me/proot\(termux-build\) ;;
+      usr/lib/proot/libtalloc*) lic=LGPL-3.0-or-later; up=samba.org/talloc ;;
+      usr/lib/proot/libandroid-shmem*) lic=BSD-2-Clause; up=termux/libandroid-shmem ;;
+      *)                   lic=MIT;                up=sst/opencode ;;
     esac
   elif [ -f "$f.bin" ]; then
     # 有同名 .bin ⇒ 上游命令包装器(shell 形态,未登记 kindmap 的兜底)
@@ -288,6 +295,13 @@ while IFS= read -r -d '' f; do
       up=https://ports.ubuntu.com/pool/main/n/ncurses/
       [ -n "$ver" ] || { echo '缺少 libtinfo6 基线包版本' >&2; exit 1; } ;;
   esac
+  if [ "$phys" != "-" ]; then
+    [ -z "${PHYSICAL_PATHS[$phys]:-}" ] || {
+      echo "[FAIL] Tier P physical collision: $phys ($lp / ${PHYSICAL_PATHS[$phys]})" >&2
+      exit 1
+    }
+    PHYSICAL_PATHS["$phys"]="$lp"
+  fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$lp" "$phys" "$kind" "$lic" "$ver" "$up" >> "$MF"
 done < <(find "$B" -type f -print0 | sort -z)
 

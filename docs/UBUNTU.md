@@ -8,7 +8,8 @@
 轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
 不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。
 
-- 新增原生 arm64 CI 配方与 Linux 测试；本机无 Linux，完整构建需 CI 首跑。
+- 原生 arm64 CI 首跑 [42508958877](https://github.com/Arjata/andcode-android/actions/runs/42508958877)
+  已通过镜像构建、私有 mount namespace 测试、glibc/16K 审计；尚未用该工件在设备安装。
 - 本轮已通过：构建归档校验器 14 项合成测试；设备系统 sh 的入口语法、预置 Bash
   的构建脚本语法；Toybox 私有 mount namespace 递归 private 设置。空间不足门禁
   曾实测拒绝且未创建实例。清理空间后已建立设备开发实例（不是 CI 工件安装）。
@@ -142,7 +143,8 @@ shell 后新终端直接显示 Ubuntu 提示符；已有会话不会切换。不
 PTY/子进程和现有 libc 执行，输出 `development-exit=0 network-mode=direct`。
 本次 apt 安装包均为已装最新版，不将重跑描述成再次安装或再次升级 libc。
 CI 增加 Android 专用 bundle 的 seccomp 七处校验、幂等摘要检查及后续 Tier P
-物理化，标准 Linux bundle 不变；该链尚未运行，不代表 jniLibs 自包含已经完成。
+物理化，标准 Linux bundle 不变；首跑已执行该链，后续 manifest 分类修复及
+Tier P 原生中间工件仍需重跑，不代表 jniLibs 自包含已经完成。
 
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。

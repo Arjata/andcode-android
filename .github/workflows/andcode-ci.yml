@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+      - name: Launcher argv memory safety and argument preservation
+        run: python3 scripts/launcher.test.py
       - name: 项目 ZIP 安全与导出往返测试(平台 JDK,无第三方测试依赖)
         run: |
           mkdir -p "$RUNNER_TEMP/archive-tests"
@@ -34,6 +36,7 @@ jobs:
       - name: 打包与 seccomp 脚本语法
         run: |
           bash -n bundle/pack-bundle.sh
+          bash -n bundle/pack-apk-libs.sh
           bash -n scripts/patch-seccomp.sh
 
       - name: 生成基线 rootfs(docker export ubuntu:24.04,arm64 原生)
@@ -126,7 +129,7 @@ jobs:
       - name: 组装 bundle
         run: |
           sudo apt-get install -y -qq musl-tools >/dev/null 2>&1 || true
-          musl-gcc -static -O2 -o work/andcode-launcher bundle/launcher/launcher.c
+          musl-gcc -static -O2 -Wl,-z,max-page-size=16384 -o work/andcode-launcher bundle/launcher/launcher.c
           file -b work/andcode-launcher | grep -q 'statically linked\|static-pie' || { echo "launcher 非静态"; exit 1; }
           mkdir -p dist
           bash bundle/pack-bundle.sh \
@@ -153,6 +156,29 @@ jobs:
 
       - name: 命名规范门禁(NAMING §8)
         run: bash scripts/naming-lint.sh --bundle-dir work/audit/andcode
+
+      - name: Manifest kind, license and Tier P identity regression
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          rows = [r for r in csv.reader(Path('work/audit/andcode/manifest').open(), delimiter='\t') if r and not r[0].startswith('#')]
+          names = [r[1] for r in rows if r[1] != '-']
+          assert len(names) == len(set(names)), 'duplicate physical filename would overwrite payload'
+          manifest = {r[0]: r for r in rows}
+          expected = {
+              'lib/ld-linux-aarch64.so.1': ('libandcode-ld-linux.so', 'glibc-lib', 'LGPL-2.1'),
+              'lib/libc.so.6': ('libandcode-libc.so', 'glibc-lib', 'LGPL-2.1'),
+              'bin/git': ('libandcode-cmd-git.so', 'launcher', 'AGPL-3.0-only'),
+              'usr/libexec/git-core/git-remote-https': ('libandcode-git-remote-https.so', 'launcher', 'AGPL-3.0-only'),
+          }
+          for path, fields in expected.items():
+              assert tuple(manifest[path][1:4]) == fields, (path, manifest[path])
+          assert manifest['usr/bin/git.bin'][3] == 'GPL-2.0-or-later'
+          assert manifest['usr/lib/proot/proot'][3] == 'GPL-2.0'
+          assert manifest['usr/lib/proot/libtalloc.so.2'][3] == 'LGPL-3.0-or-later'
+          print('Manifest kind/license/physical identity OK')
+          PY
 
       - name: Bash 载荷与闭包检查
         run: |
@@ -201,6 +227,16 @@ jobs:
             --bundle dist/andcode-bundle-android-arm64-v0.1.1.tar.gz \
             --out work/jni
           bash baseline/check-compat.sh --page-align work/jni/arm64-v8a
+          test -s work/jni/arm64-v8a/libandcode-ld-linux.so
+          test -s work/jni/arm64-v8a/libandcode-libc.so
+          work/jni/arm64-v8a/libandcode-ld-linux.so \
+            --library-path work/jni/arm64-v8a --inhibit-cache \
+            work/jni/arm64-v8a/libandcode-bash.so --noprofile --norc -c 'printf "Tier P Bash %s\n" "$BASH_VERSION"'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: andcode-tier-p-native
+          path: work/jni/
 
       - uses: actions/upload-artifact@v4
         with:

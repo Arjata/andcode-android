@@ -23,7 +23,7 @@ Tier P 当前提供交互 Bash 终端(手动输入 `opencode`,同进程内保留
 终端首次进入即显示提示符,下方提供两行附加键(ESC/TAB/CTRL/ALT/方向与翻页等);
 CTRL/ALT 点击锁定、再次点击解除,IME 键切换软键盘。未部署 Bash 时明确提示回退系统 sh。
 Web PTY 创建及命令回显已在旧设备应用域验证;预置可执行副本和 socket 指路见
-[DESIGN v0.4.17 §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态)。
+[DESIGN v0.4.18 §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态)。
 Web 终端已适配 Android LatinIME 的逐字输入、退格与回车;其它输入法仍待验证。
 Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页面延迟任务并释放视图。
 抽屉新增 **项目 · 导入 / 导出** 与 **设置**:

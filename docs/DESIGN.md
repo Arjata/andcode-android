@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.17 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.18 (设计稿) · 日期: 2026-11-09
+> v0.4.18 变更(交付链):修复 manifest 对扁平 lib/ 的 kind/SONAME 映射、launcher
+> 与第三方许可证误分类及 git 重复物理名;物理冲突必须失败。修复 launcher PRoot
+> argv 数组越界,新增 Linux ASan/UBSan 参数保真测试,导出 Tier P native 中间工件。
+> Ubuntu 原生 arm64 CI 首跑已通过;仍未验证可信 CI 镜像设备安装或 locked APK。
 > v0.4.17 变更(§4.8):只读诊断确认旧设备受限网络模式/BPF RESTRICTED_MATCH
 > 阻断 UID 60000;APK UID 有放行位。不改网络策略或借 UID 绕过,chroot 联网仍失败。
 > v0.4.16 变更(§4.8/交付链):CI 增加 Android 专用 bundle 副本,seccomp 七处校验

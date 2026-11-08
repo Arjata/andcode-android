@@ -80,7 +80,10 @@ int main(int argc, char **argv) {
     /* argv: [proot -b ... -w DIR] loader --library-path LIBPATH --inhibit-cache SELF argv[1..]
      * argv[0] 槽位必须是 proot/loader 本身;先前把 loader 选项前置导致 execv(proot)
      * 时 argv 全错位(git.bin 收到 argv[0]=loader、"git: '...proot' is not a git command") */
-    char **nargv = malloc(sizeof(char *) * (size_t)(argc + 16));
+    /* Largest prefix: proot + seven option/value pairs + loader/four
+     * arguments = 20 entries. Then argc-1 user arguments and the NULL.
+     * The former argc+16 allocation overran by four pointers with proot. */
+    char **nargv = malloc(sizeof(char *) * ((size_t)argc + 20));
     if (!nargv) { fprintf(stderr, "andcode-launcher: OOM\n"); return 127; }
     int i = 0;
 
