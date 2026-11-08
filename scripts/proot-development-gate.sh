@@ -4,6 +4,11 @@ set -eu
 FILES=/data/data/dev.andcode.app/files
 ROOT=$FILES/proot-rootfs
 P=/data/local/tmp/andcode/usr/lib/proot
+PLIB=$P
+if [ "${ANDCODE_TIER:-}" = p ] && [ -n "${ANDCODE_ROOT:-}" ]; then
+  P=$ANDCODE_ROOT/usr/lib/proot
+  PLIB=${ANDCODE_EXE_DIR:?missing native payload directory}
+fi
 umask 077
 exec > "$FILES/proot-development-gate.txt" 2>&1
 id
@@ -15,7 +20,7 @@ case "$(cat /proc/self/attr/current)" in
 esac
 proxy=""
 case "${1:-}" in '' ) ;; loopback-proxy) proxy=http://127.0.0.1:7890 ;; *) exit 1 ;; esac
-export PROOT_LOADER="$P/loader" LD_LIBRARY_PATH="$P" PROOT_TMP_DIR="$FILES/tmp"
+export PROOT_LOADER="$P/loader" LD_LIBRARY_PATH="$PLIB" PROOT_TMP_DIR="$FILES/tmp"
 export GLIBC_TUNABLES=glibc.pthread.rseq=0
 set +e
 /system/bin/toybox timeout 900 "$P/proot" --kill-on-exit -l -0 -r "$ROOT" -b /dev -b /proc -w /root \

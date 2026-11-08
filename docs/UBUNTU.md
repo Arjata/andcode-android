@@ -171,6 +171,14 @@ data 并创建 nativeLibraryDir 链接，21 项回归及真实 manifest 往返�
 旧设备真实应用域已运行 APK 内 Bash，无 root relabel；git 首测因 launcher
 仍搜索旧 PRoot 库目录失败，修正待验证。不代表 V2/Web PTY 或 locked 整包通过。
 
+原生 arm64 run `42515404336` 已全部成功：修复 Bun ET_EXEC 的 DT_VERDEF
+遗留地址及 clone3 补丁的新内核回退后，Bash/V2.2.6/PTY 0.4.0 实际执行通过，
+下游 SDK、APK 编译/Lint、真实 manifest 初始化与 APK 载荷逐字节核验通过。
+`scripts/native-payload-device-test.sh` 只从 APK 轻量终端执行；原生目录路径、
+真实应用域/seccomp、Bash/V2/PTY/Git/PRoot 子进程均为独立实机门禁，尚待新版安装。
+PRoot 开发完整 gate 也可显式使用当前 APK 的 farm/native 库，不再混用旧开发库。
+以上仍不是正式签名、Bun 原生扩展预置闭包或 locked 整包交付结论。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/
