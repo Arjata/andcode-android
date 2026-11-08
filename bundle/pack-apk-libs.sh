@@ -54,13 +54,15 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$kind" in
     glibc-lib)
       base="$(basename "$lp")"
+      # libc itself may NEEDED the loader. Explicit invocation does not waive
+      # that dependency: rewrite it to the renamed physical loader as well.
+      if [ "$REWRITE" = 1 ]; then SONAME_MAP["$base"]="$phys"; fi
       case "$base" in
         ld-linux*) : ;;  # loader 无需 SONAME 重写(显式路径调用)
         *)
           newsoname="$phys"
           if [ "$REWRITE" = 1 ]; then
             patchelf --set-soname "$newsoname" "$src"
-            SONAME_MAP["$base"]="$newsoname"
           fi
           ;;
       esac

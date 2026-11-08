@@ -236,11 +236,10 @@ wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|
     bin/*|usr/bin/*|usr/libexec/git-core/*|sbin/*) p="${p#bin/}"; p="${p#usr/bin/}"; p="${p#usr/libexec/git-core/}"; p="${p#sbin/}" ;;
   esac
   p="$(printf '%s' "$p" | tr '/' '-' | tr -c 'a-z0-9A-Z-' '-')"
-  if [ "${1#root/bin/}" != "$1" ] || [ "${1#root/usr/bin/}" != "$1" ]; then
-    printf 'libandcode-cmd-%s.so' "$p"
-  else
-    printf 'libandcode-%s.so' "$p"
-  fi
+  case "${1#root/}" in
+    bin/*|usr/bin/*) printf 'libandcode-cmd-%s.so' "$p" ;;
+    *) printf 'libandcode-%s.so' "$p" ;;
+  esac
 }
 
 declare -A KINDMAP=()
