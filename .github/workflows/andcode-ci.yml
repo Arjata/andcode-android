@@ -7,6 +7,49 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-apk-intermediate:
+    needs: build-bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: andcode-tier-p-native
+          path: work/native
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install matching Android build tools
+        run: sdkmanager 'platforms;android-37' 'build-tools;36.1.0' 'ndk;27.0.12077973' 'cmake;3.22.1'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+      - name: Build and lint intermediate APK (not a complete self-contained product)
+        run: gradle -p app -PandcodeNativeDir="$GITHUB_WORKSPACE/work/native" assembleDebug lintDebug --no-daemon
+      - name: Verify APK native payload bytes and packaged data
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          native = Path('work/native')
+          with zipfile.ZipFile('app/app/build/outputs/apk/debug/app-debug.apk') as apk:
+              for f in (native / 'arm64-v8a').glob('libandcode-*.so'):
+                  assert apk.read('lib/arm64-v8a/' + f.name) == f.read_bytes(), f.name
+              for f in (native / 'assets').rglob('*'):
+                  if f.is_file():
+                      assert apk.read('assets/' + f.relative_to(native / 'assets').as_posix()) == f.read_bytes(), f
+          print('APK preserves native ELF/scripts and data bytes')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: andcode-apk-intermediate
+          path: |
+            app/app/build/outputs/apk/debug/*.apk
+            app/app/build/reports/lint-results-debug.*
+
   app-data-tests:
     runs-on: ubuntu-24.04-arm
     steps:

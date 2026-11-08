@@ -32,7 +32,7 @@ chk shim      test -f "$ROOT/shim/libandcode-shim.so"
 chk resolv    test -s "$ROOT/etc/resolv.conf"
 chk ssl-certs test -s "$ROOT/etc/ssl/certs/ca-certificates.crt"
 chk opencode  "$ROOT/bin/opencode" --version
-chk git       "$ROOT/usr/bin/git" --version
+chk git       "$ROOT/bin/git" --version
 chk busybox   "$ROOT/bin/busybox" true
 
 if [ $JSON -eq 1 ]; then

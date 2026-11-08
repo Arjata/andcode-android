@@ -86,6 +86,7 @@
 | `ubuntu-base-24.04.4-base-arm64.tar.gz` | 官方 Ubuntu Base 24.04.4 arm64 开发引导输入,固定 SHA-256 | 开发暂存 `/data/local/tmp/`,不入库 |
 | `andcode-bundle-android-arm64-v<semver>.tar.gz` | Android 应用域专用 seccomp 补丁副本与同名 `.sha256`;不改标准 Linux 原始 bundle | CI 工件,非已验证 locked 交付 |
 | `andcode-tier-p-native` | CI 中间工件:arm64-v8a 原生物理名、manifest.farm、assets/andcode-runtime 数据;非完整自包含 APK | Actions artifact |
+| `andcode-apk-intermediate` | CI debug APK 与 Lint 报告,仅验证中间原生载荷打包;非正式签名/自包含产品 | Actions artifact |
 | `andcodeNativeDir` | Gradle 显式原生工件目录属性,包含 arm64-v8a/manifest.farm/assets;不设置时保留开发空载荷构建 | `-PandcodeNativeDir=<绝对目录>` |
 | `andcode-runtime` | APK assets 内 CI 生成的只读 bundle 数据与 manifest.farm,不含运行期解包 ELF | `assets/andcode-runtime/` |
 | `libandcode-git-core-<命令>.so` | git-core 包装器/自有 launcher 统一前缀;避免 git/receive-pack/upload-pack 等与 usr/bin/*.bin 冲突 | Tier P nativeLibraryDir |

@@ -21,7 +21,7 @@ t "loader 可执行(--version)"   "$ROOT/lib/ld-linux-aarch64.so.1" --version
 t "shim 存在"                   test -f "$ROOT/shim/libandcode-shim.so"
 t "resolv.conf 已生成"          test -s "$ROOT/etc/resolv.conf"
 t "opencode --version"          "$ROOT/bin/opencode" --version
-t "git --version"               "$ROOT/usr/bin/git" --version
+t "git --version"               "$ROOT/bin/git" --version
 t "DNS 解析(bundle resolv.conf)" sh -c "PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH getent hosts github.com || getent hosts github.com"
 # KNOWN-ISSUE(P0 跟进): https 助手链路在容器冒烟中报 /bin/sh: 1: capabilities: not found,
 # 双诱饵证明 git 未 exec 任何 helper 文件;核心链路不受影响。降级为警告,证据存 CI 日志。

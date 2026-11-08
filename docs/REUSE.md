@@ -47,6 +47,12 @@
 
 ### 2.3 参考实现(谨慎取材)
 
+构建期 Actions（不进入 APK/bundle）：`actions/download-artifact@v4`、
+`actions/setup-java@v4`、`android-actions/setup-android@v3`、
+`gradle/actions/setup-gradle@v4`，2026-11-09 通过各仓库 LICENSE 核实为 MIT
+（Gradle 特别核对 v4/LICENSE，不以 main 的混合许可替代所用版本）。仅用于
+下载当前 run 工件及安装 JDK/Android SDK/Gradle，不并入第三方源码或工具到交付物。
+
 | 项目 | 仓库 | 许可证 | 价值 | 备注 |
 |---|---|---|---|---|
 | claude-code-termux | `naiyQAQ/claude-code-termux` (★22) | MIT | **最接近的先行者**:Bun 编译的 AI 编码 CLI 在 Termux 上宣称原生跑通(不经 proot)——P0 精读其环境处理与 shim 思路 | MIT,可复用代码但须保留声明 |

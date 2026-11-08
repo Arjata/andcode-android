@@ -311,11 +311,12 @@ public final class ServeManager {
     /** 二进制/loader 路径解析:优先 jniLibs,回退 /data/local/tmp 开发部署(终端页复用) */
     static Paths resolvePaths(Context app) {
         List<Paths> candidates = new ArrayList<>();
-        // 1) jniLibs(最终形态):libandcode-oc2.so + 补丁 loader 同目录
+         // 1) jniLibs V2 deployment. Loader name follows NAMING §6.2;
+         // do not treat the legacy V1 libandcode-opencode.so as a Web backend.
         String nat = app.getApplicationInfo().nativeLibraryDir;
         if (nat != null) {
             candidates.add(new Paths(
-                nat + "/libandcode-loader.so",
+                 nat + "/libandcode-ld-linux.so",
                 nat,
                 nat + "/libandcode-oc2.so"));
         }
