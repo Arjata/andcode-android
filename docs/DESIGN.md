@@ -1,6 +1,9 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.21 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.22 (设计稿) · 日期: 2026-11-09
+> v0.4.22 变更(交付链):实际执行门禁发现 Tier P Bash SIGSEGV,不允许只靠静态
+> 审计放行;保留 loader 原 SONAME 及 libc 对它的 NEEDED,显式加载仅改物理文件名,
+> 避免重复加载 ld.so。该修正仍需 CI 验证;PRoot IME 往返 resize/SIGWINCH 已实测。
 > v0.4.21 变更(§4.4/CI):新增依赖原生工件的 debug APK 构建/Lint/逐字节载荷核验,
 > 自有终端 JNI 显式 16K LOAD 对齐;修正 V2 loader 路径为注册物理名。仍是中间 APK,
 > 未宣称 V2/PTY/首启动初始化/签名/locked 实机交付已完成。

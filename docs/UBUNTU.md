@@ -133,7 +133,9 @@ APK 独立终端可执行 `andcode-ubuntu-proot [loopback-proxy] [命令...]`；
 开发入口已在真实应用域验证 hello、PTY、stdin 与退出码 42 传播；
 不改变 OpenCode 工具或 Web PTY 后端。归档预处理另有 14 项合成测试接入 CI。
 交互终端已实测 `stty size` 返回 44×54、Ctrl+C 中断前台 sleep 后返回 Ubuntu
-提示符、`exit` 返回原项目轻量 Bash；动态 resize/SIGWINCH 和更多设备仍待验证。
+提示符、`exit` 返回原项目轻量 Bash。真实应用域的 guest Python 前台信号测试已验证
+软键盘隐藏/显示时两次 SIGWINCH，尺寸 28×54 → 47×54 → 28×54，输出
+`ANDCODE_PROOT_RESIZE_OK`；仅代表旧设备本轮，更多设备仍待 P0/P3 实机验证。
 设置页的“终端环境”仅影响新会话，默认轻量 Bash，可选已安装的 Ubuntu PRoot；
 代理另有默认关闭的显式开关。旧设备已通过 UI 选择并持久化 Ubuntu 后端、退出旧
 shell 后新终端直接显示 Ubuntu 提示符；已有会话不会切换。不提供 chroot 选择，
@@ -174,7 +176,7 @@ stdin/退出码 42、空项目回 `/root`、错误路径/链接拒绝与自有�
 
 | 验证 | chroot | PRoot（真实应用域） |
 |---|---|---|
-| rootfs Bash、PTY 与终端尺寸/信号 | Bash/PTY 创建通过；交互尺寸/信号待 P0/P3 | Bash/PTY/子进程、stty 初始尺寸、Ctrl+C、exit 返回通过；动态 resize 待 P0/P3 |
+| rootfs Bash、PTY 与终端尺寸/信号 | Bash/PTY 创建通过；交互尺寸/信号待 P0/P3 | Bash/PTY/子进程、stty 初始尺寸、Ctrl+C、exit 返回、IME 往返两次 SIGWINCH/尺寸同步通过；其它设备待 P0/P3 |
 | DNS、HTTPS 证书校验、`apt update/install` | root 代理模式通过；UID 60000 网络超时、直连 DNS 未通过 | 显式代理完整通过；TCP DNS 无显式代理 HTTPS/apt update/Git 通过，VPN 未关闭 |
 | 新安装 `hello` ELF 能运行 | root/普通用户均通过 | 应用域通过 |
 | 普通用户 gcc 编译并运行，写 `/etc` 被拒 | UID 60000 通过，LOAD 0x4000 | 待 P0/P3 |
