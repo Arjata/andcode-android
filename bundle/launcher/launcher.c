@@ -108,6 +108,9 @@ int main(int argc, char **argv) {
             snprintf(plib, sizeof plib, "%s", exedir);
         setenv("PROOT_LOADER", ploader, 1);
         setenv("LD_LIBRARY_PATH", plib, 1);
+        /* PRoot is Bionic: a glibc preload must not reach its linker. The
+         * bind mappings provide /etc for the traced glibc child instead. */
+        unsetenv("LD_PRELOAD");
         setenv("ANDCODE_IN_PROOT", "1", 1);
         if (getenv("PROOT_TMP_DIR") == NULL) {
             const char *ad = getenv("ANDCODE_APP_DATA");

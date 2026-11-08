@@ -1,6 +1,9 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.28 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.29 (设计稿) · 日期: 2026-11-09
+> v0.4.29 变更(交付链):原生 APK 应用域 Bash/V2/PTY 版本执行通过;Git launcher
+> 进入 Bionic PRoot 前清除 glibc LD_PRELOAD,由 bind 提供 /etc,避免 Android
+> linker 加载 glibc shim。新增直接/PRoot 分支环境断言,Git 待新版工件实测。
 > v0.4.28 变更(§4.6):clone3 补丁不再借 close_range 系统调用号,直接将该调用点
 > svc 改为 mov x0,#-ENOSYS,避免现代内核实现 close_range 后回退失效;兼容已有
 > 补丁的调用号但仍校验指令,继续由 CI 和应用域执行门禁确认。

@@ -40,6 +40,10 @@ static int fake_execv(const char *path, char *const args[]) {
     if (!getenv("TEST_DIRECT")) {
         const char *lib = getenv("LD_LIBRARY_PATH");
         if (!lib || strcmp(lib, getenv("TEST_TIER_P") ? "/native" : "/fixture/usr/lib/proot")) exit(15);
+        if (getenv("LD_PRELOAD")) exit(16);
+    } else {
+        const char *preload = getenv("LD_PRELOAD");
+        if (!preload || strcmp(preload, "/fixture/shim/libandcode-shim.so")) exit(17);
     }
     exit(0);
 }
@@ -54,6 +58,7 @@ int main(void) {
         setenv("ANDCODE_TIER", "p", 1); setenv("ANDCODE_EXE_DIR", "/native", 1);
     } else { unsetenv("ANDCODE_TIER"); unsetenv("ANDCODE_EXE_DIR"); }
     unsetenv("ANDCODE_LOADER"); unsetenv("ANDCODE_LIBPATH");
+    unsetenv("ANDCODE_SHIM");
     if (getenv("TEST_DIRECT")) setenv("ANDCODE_IN_PROOT", "1", 1);
     else unsetenv("ANDCODE_IN_PROOT");
     char *args[] = {"/farm/git-remote-https", "origin", "https://example.test/a b", "", "semi;dollar$", NULL};
