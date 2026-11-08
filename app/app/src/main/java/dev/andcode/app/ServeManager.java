@@ -73,7 +73,8 @@ public final class ServeManager {
 
     /**
      * 停止 serve:优先销毁本进程拉起的子进程;遗留实例(如 run-as 起的)
-     * 退而 pkill 兜底。停止后旧 password 即失效,一并清空。
+     * 退而 pkill 兜底。停止后旧 password 即失效,一并清空;
+     * 同时复位 sStarting,保证随后可立即再次启动。
      */
     public static synchronized void stop(Context ctx) {
         Process p = sProcess;
@@ -86,6 +87,7 @@ public final class ServeManager {
         } catch (IOException ignored) {
         }
         sPassword = null;
+        sStarting = false;
     }
 
     /**
@@ -96,7 +98,7 @@ public final class ServeManager {
         synchronized (ServeManager.class) {
             if (sStarting) {
                 // 已有启动流程在跑,轮询等它完成
-                waitReady(cb);
+                waitReady(cb, null);
                 return;
             }
             sStarting = true;
@@ -121,7 +123,7 @@ public final class ServeManager {
                 runOnMain(() -> cb.onFailed(failure));
                 return;
             }
-            waitReady(cb);
+            waitReady(cb, new File(app.getFilesDir(), "oc2-serve.log"));
         }, "oc2-serve-starter").start();
     }
 
@@ -188,19 +190,71 @@ public final class ServeManager {
         return null;
     }
 
-    /** 轮询就绪(最长 40s),完成后主线程回调 */
-    private static void waitReady(ReadyCallback cb) {
+    /**
+     * 轮询就绪(最长 40s)。serve 进程退出则快速失败(附日志尾部定位原因)。
+     * 无论成功失败,结束时都复位 sStarting——否则停止后再启动会永远
+     * 走进"已有启动流程"分支,卡 40s 超时(修复:重启失败且无原因)。
+     */
+    private static void waitReady(ReadyCallback cb, File log) {
         new Thread(() -> {
             long deadline = System.currentTimeMillis() + 40_000;
             while (System.currentTimeMillis() < deadline) {
                 if (ping()) {
-                    runOnMain(() -> cb.onReady(getPassword()));
+                    finishStart(cb, null);
+                    return;
+                }
+                Process p = sProcess;
+                if (p != null && !p.isAlive()) {
+                    // 进程已退出:再观察 1.5s 确认没有残留监听,然后快速失败
+                    long grace = System.currentTimeMillis() + 1_500;
+                    boolean revived = false;
+                    while (System.currentTimeMillis() < grace) {
+                        if (ping()) { revived = true; break; }
+                        try { Thread.sleep(300); } catch (InterruptedException ignored) { return; }
+                    }
+                    finishStart(cb, revived ? null : "serve 进程已退出" + tailOfLog(log));
                     return;
                 }
                 try { Thread.sleep(500); } catch (InterruptedException ignored) { return; }
             }
-            runOnMain(() -> cb.onFailed("serve 启动超时(40s),见 files/oc2-serve.log"));
+            finishStart(cb, "serve 启动超时(40s)" + tailOfLog(log));
         }, "oc2-serve-wait").start();
+    }
+
+    /** 结束一次启动流程:复位 sStarting 并主线程回调 */
+    private static void finishStart(ReadyCallback cb, String failure) {
+        synchronized (ServeManager.class) { sStarting = false; }
+        if (failure == null) {
+            runOnMain(() -> cb.onReady(getPassword()));
+        } else {
+            runOnMain(() -> cb.onFailed(failure));
+        }
+    }
+
+    /** serve 日志尾部(末尾 4KB 内最后 3 行,截 200 字符),失败时给界面展示原因 */
+    private static String tailOfLog(File log) {
+        if (log == null || !log.exists()) return "";
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(log, "r")) {
+            long len = raf.length();
+            int want = (int) Math.min(len, 4096);
+            raf.seek(len - want);
+            byte[] buf = new byte[want];
+            raf.readFully(buf);
+            String[] lines = new String(buf, java.nio.charset.StandardCharsets.UTF_8).split("\n");
+            StringBuilder sb = new StringBuilder();
+            int taken = 0;
+            for (int i = lines.length - 1; i >= 0 && taken < 3; i--) {
+                String l = lines[i].trim();
+                if (l.isEmpty()) continue;
+                sb.insert(0, l + " ⏎ ");
+                taken++;
+            }
+            String s = sb.toString().trim();
+            if (s.length() > 200) s = "…" + s.substring(s.length() - 200);
+            return s.isEmpty() ? "" : " | 日志尾部: " + s;
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     static void runOnMain(Runnable r) {

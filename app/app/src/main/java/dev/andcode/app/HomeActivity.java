@@ -73,6 +73,8 @@ public class HomeActivity extends AppCompatActivity {
         mStopButton.setOnClickListener(v -> {
             mWaitingStart = false;
             ServeManager.stop(this);
+            // FGS 也一并停掉:START_STICKY 会重建服务并 ensureStarted,把 serve 又拉起来
+            stopService(new Intent(this, SessionService.class));
             render(false, null);
         });
 
@@ -107,28 +109,38 @@ public class HomeActivity extends AppCompatActivity {
             @Override public void onReady(String password) {
                 mWaitingStart = false;
                 render(true, null);
+                resumePoll();
             }
             @Override public void onFailed(String reason) {
                 mWaitingStart = false;
                 render(false, reason);
+                resumePoll();
             }
         });
     }
 
+    /** 启动流程结束后恢复 2s 状态轮询(此期间 onResume 被 mWaitingStart 跳过) */
+    private void resumePoll() {
+        mPolling = true;
+        mStatusDot.removeCallbacks(mPoll);
+        mStatusDot.post(mPoll);
+    }
+
     /**
      * 渲染状态。up 为 null 表示只更新文案(过渡态),不改变状态点。
-     * 传入非 null 时:绿=运行,灰=停止;detail 非空时以错误色显示。
+     * 传入非 null 时:绿=运行,灰=停止;detail 非空时以错误色显示
+     * (失败原因必须透出,不能被状态行覆盖)。
      */
     private void render(Boolean up, String detail) {
+        mDetailText.setText(detail != null
+            ? getString(R.string.detail_prefix) + detail : "");
         if (up == null) {
             mStatusText.setText(detail != null ? detail : getString(R.string.state_stopped));
-            mDetailText.setText(detail == null ? "" : getString(R.string.detail_prefix) + detail);
             return;
         }
         mStatusText.setText(up ? R.string.state_running : R.string.state_stopped);
         mStatusDot.setBackgroundResource(up ? R.drawable.dot_green : R.drawable.dot_gray);
         mAddressText.setText(up ? ServeManager.BASE_URL : getString(R.string.address_hint));
-        mDetailText.setText("");
         mStartButton.setEnabled(!up);
         mStopButton.setEnabled(up);
     }
