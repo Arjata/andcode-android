@@ -64,7 +64,12 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
         *)
           newsoname="$phys"
           if [ "$REWRITE" = 1 ]; then
-            patchelf --set-soname "$newsoname" "$src"
+            # glibc dl-load.c recognizes libc by the literal LIBC_SO SONAME
+            # to run __libc_early_init. Physical naming/NEEDED may change,
+            # but changing libc SONAME skips that initialization and crashes.
+            if [ "$base" != libc.so.6 ]; then
+              patchelf --set-soname "$newsoname" "$src"
+            fi
             SONAME_MAP["$base"]="$newsoname"
           fi
           ;;

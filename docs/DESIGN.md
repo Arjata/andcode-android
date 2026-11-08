@@ -1,6 +1,9 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.22 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.23 (设计稿) · 日期: 2026-11-09
+> v0.4.23 变更(交付链):源码核实 glibc loader 用 libc.so.6 SONAME 识别 libc 并
+> 调用 __libc_early_init,因此 libc 自身 SONAME 也必须保留,仅调用者 NEEDED 改物理名。
+> 上条的重复 loader 是待证假设,不是已证实根因;实际 Bash 执行仍是强制门禁。
 > v0.4.22 变更(交付链):实际执行门禁发现 Tier P Bash SIGSEGV,不允许只靠静态
 > 审计放行;保留 loader 原 SONAME 及 libc 对它的 NEEDED,显式加载仅改物理文件名,
 > 避免重复加载 ld.so。该修正仍需 CI 验证;PRoot IME 往返 resize/SIGWINCH 已实测。

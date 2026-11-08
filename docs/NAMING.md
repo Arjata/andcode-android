@@ -186,8 +186,11 @@ shim/libandcode-shim.so      # 本项目 LD_PRELOAD 库(见 §6.3)
 1. **DT_NEEDED 依赖库(glibc/libstdc++ 等)**:soname 必须与 `NEEDED` 逐字一致,
    无法简单改名。两条路线,P0 定夺:
    - **路线甲(默认)**:打包时用 `patchelf` 对 sysroot 闭包做全量重写
-     (`libc.so.6 → libandcode-libc.so`,同步改 SONAME 与全部 NEEDED),
-     连同可执行体一起放入 `nativeLibraryDir`——单一可执行目录,最简;
+      (`libc.so.6 → libandcode-libc.so`,同步改 SONAME 与全部 NEEDED),
+      连同可执行体一起放入 `nativeLibraryDir`——单一可执行目录,最简;
+      **glibc 特例**:libc 自身保留 `libc.so.6` SONAME(loader 依赖该标记执行
+      `__libc_early_init`),仅调用者 NEEDED 改物理名;loader 物理名改为
+      `libandcode-ld-linux.so`,其自身 SONAME 及 libc 对 loader 的 NEEDED 保持原名。
    - **路线乙(若 P0 证实数据目录可 mmap-exec)**:依赖库保持原名,经 assets
      解压到 `filesDir/lib`,`--library-path` 指向之。
    无论哪条路线,**物理命名空间永远是 `libandcode-*`**,逻辑名记录在 manifest。
