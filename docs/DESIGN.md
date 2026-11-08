@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.33 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.34 (设计稿) · 日期: 2026-11-09
+> v0.4.34 变更(Tier P shim):真实应用域 trace 确认 libtinfo safe-open 无条件调用
+> setfsuid/setfsgid 触发 SIGSYS;仅拦截 ncurses 两个打开入口,逐次确认线程全部
+> real/effective/saved/fs 身份一致且非 root、capabilities 全空后直接内核 open。
+> 身份不符拒绝,非 Tier P 透传;不拦截或伪造 setfsuid,不改设备策略。待 CI/设备验证。
 > v0.4.33 变更(Tier P shell 入口):持久 PTY 系统 sh 的 WebSocket/resize/reconnect
 > 已实测,但 daemon 直接 exec Bash shebang 包装器立即退出;bin/bash 改用同物理名
 > 静态 ELF 入口,从 /proc/self/exe 定位 loader/Bash/shim 并单进程 --preload,

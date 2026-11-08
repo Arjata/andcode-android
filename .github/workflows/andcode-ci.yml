@@ -73,6 +73,8 @@ jobs:
         run: python3 scripts/wrapper.test.py
       - name: Bash direct ELF entry argv and child environment
         run: python3 scripts/bash-launcher.test.py
+      - name: Ncurses safe-open identity and kernel permission checks
+        run: python3 scripts/shim-ncurses.test.py
       - name: PTY entry compiler checks
         run: cc -Wall -Wextra -Werror -fsyntax-only bundle/launcher/pty-launcher.c
       - name: ELF version definition repair rejects ambiguous layouts

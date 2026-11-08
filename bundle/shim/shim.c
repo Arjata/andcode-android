@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 static const char *const REDIRECT_BASENAMES[] = {
@@ -145,4 +146,63 @@ int access(const char *path, int mode) {
     char buf[PATH_MAX];
     const char *r = redirect_path(path, buf, sizeof buf);
     return real_access(r ? r : path, mode);
+}
+
+/* ncurses safe-open normally lowers fsuid/fsgid even when already unprivileged.
+ * Zygote seccomp traps those calls. Do NOT intercept/fake setfsuid itself.
+ * Only Tier P's ncurses entry points may skip that redundant transition, after
+ * checking this THREAD's real/effective/saved/fs IDs and capabilities. Opening
+ * the file still uses normal kernel DAC/SELinux checks. No elevated fallback. */
+static int ncurses_app_identity(void) {
+    char text[8192];
+    int fd = (int)syscall(SYS_openat, AT_FDCWD, "/proc/thread-self/status", O_RDONLY | O_CLOEXEC, 0);
+    if (fd < 0) return 0;
+    ssize_t n = read(fd, text, sizeof(text) - 1);
+    close(fd);
+    if (n <= 0 || n == (ssize_t)sizeof(text) - 1) return 0;
+    text[n] = 0;
+    unsigned long u[4], g[4];
+    unsigned long long inh, prm, eff, amb;
+    char *uid = strstr(text, "\nUid:"), *gid = strstr(text, "\nGid:");
+    char *ci = strstr(text, "\nCapInh:"), *cp = strstr(text, "\nCapPrm:");
+    char *ce = strstr(text, "\nCapEff:"), *ca = strstr(text, "\nCapAmb:");
+    if (!uid || !gid || !ci || !cp || !ce || !ca
+        || sscanf(uid, "\nUid: %lu %lu %lu %lu", &u[0], &u[1], &u[2], &u[3]) != 4
+        || sscanf(gid, "\nGid: %lu %lu %lu %lu", &g[0], &g[1], &g[2], &g[3]) != 4
+        || sscanf(ci, "\nCapInh: %llx", &inh) != 1
+        || sscanf(cp, "\nCapPrm: %llx", &prm) != 1
+        || sscanf(ce, "\nCapEff: %llx", &eff) != 1
+        || sscanf(ca, "\nCapAmb: %llx", &amb) != 1) return 0;
+    if (u[0] == 0 || g[0] == 0 || inh || prm || eff || amb) return 0;
+    for (int i = 1; i < 4; i++)
+        if (u[i] != u[0] || g[i] != g[0]) return 0;
+    return 1;
+}
+
+static int ncurses_tier_p(void) {
+    const char *tier = getenv("ANDCODE_TIER");
+    return tier && strcmp(tier, "p") == 0;
+}
+
+int _nc_safe_open3(const char *path, int flags, mode_t mode) {
+    if (!ncurses_tier_p()) {
+        int (*next)(const char *, int, mode_t) = dlsym(RTLD_NEXT, "_nc_safe_open3");
+        if (next) return next(path, flags, mode);
+        errno = ENOSYS; return -1;
+    }
+    if (!ncurses_app_identity()) { errno = EPERM; return -1; }
+    return open(path, flags, mode);
+}
+
+FILE *_nc_safe_fopen(const char *path, const char *mode) {
+    if (!ncurses_tier_p()) {
+        FILE *(*next)(const char *, const char *) = dlsym(RTLD_NEXT, "_nc_safe_fopen");
+        if (next) return next(path, mode);
+        errno = ENOSYS; return NULL;
+    }
+    if (!ncurses_app_identity()) { errno = EPERM; return NULL; }
+    /* fopen is not one of the general /etc redirect entry points. */
+    char buf[PATH_MAX];
+    const char *r = redirect_path(path, buf, sizeof buf);
+    return fopen(r ? r : path, mode);
 }
