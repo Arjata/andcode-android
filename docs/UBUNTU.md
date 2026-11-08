@@ -247,6 +247,18 @@ wrapper 直接由 daemon exec 时立即退出，无输出；通过系统 sh 显�
 测试进程组；运行期 ELF 扫描扩大到隔离 HOME 与 BUN_TMPDIR。该新门禁尚待 CI，
 不提前声称 TUI 或完整运行期加载闭包通过。
 
+源码实验 run `42522076401`（`c24813c`）现已通过上述 TUI 门禁，日志包含
+`ANDCODE_SOURCE_TUI_NATIVE_OK`，shell/普通和持久 PTY、隔离 HOME/BUN_TMPDIR
+无 ELF 扫描亦通过。前一轮 `42521939719` 的许可证据工件已核对 API SHA-256
+`60a9b72e71e2ebcc6dd66dce280fc698532e545b007d2d80502ca7831444c7c8`；
+四个固定包的 review 全部 blocked，与预期一致，不能作为发布合规通过证据。
+
+显式 `loopback-proxy` 的应用域独立 serve 诊断可越过 provider DNS 阻塞，但
+请求在 TLS 阶段因 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` 失败。未设置
+NODE_TLS_REJECT_UNAUTHORIZED=0、未添加未知 CA、未修改用户配置或默认代理；
+已中断自有重试并停止隔离服务。恢复端到端验收需要可验证的 provider 证书链或
+正常可解析的直连网络，不把代理可连接误称为模型可用。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/
