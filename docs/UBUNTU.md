@@ -208,6 +208,18 @@ ESM namespace。新增门禁待新 CI 通过，许可证/Android 闭包仍待验
 （bun-pty library 未加载，后续访问 symbols 失败）。这是待修边界，不是完整 Web
 或工具闭包验收成功；没有降低 targetSdk/SELinux 或引入 TLS bypass。
 
+源码实验 run `42519500865`（`c2277e8`）全部成功：Bun graph 无内嵌 ELF、
+四个 glibc 扩展的摘要/依赖/16K/版本审计、shell、普通 PTY 的 tty/resize/子进程、
+持久 PTY 快照回显及独立 BUN_TMPDIR 无 ELF 通过。仅为 Linux CI 证据，
+不是 Android 原生扩展加载/传递依赖许可证/正式交付批准。
+
+应用域诊断确认 Bash wrapper 的子环境中仍存在 LD_PRELOAD，临时仅对
+`/system/bin/id` 清空该变量后即成功（同 UID/domain，未修改网络策略）。
+wrapper 已改 direct loader `--preload` 单进程注入而不导出 LD_PRELOAD；
+新增真实 glibc Bash/子 sh 的 Linux 门禁和 native device gate 中 Bionic id 断言，
+修复待新 CI/APK 实测。模型默认配置正确，但本次实际请求因 EAI_AGAIN
+无法解析 provider 域名而重试，已中止；不能算模型端到端成功。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/

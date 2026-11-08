@@ -69,6 +69,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Launcher argv memory safety and argument preservation
         run: python3 scripts/launcher.test.py
+      - name: Wrapper loader-only preload and child environment isolation
+        run: python3 scripts/wrapper.test.py
       - name: PTY entry compiler checks
         run: cc -Wall -Wextra -Werror -fsyntax-only bundle/launcher/pty-launcher.c
       - name: ELF version definition repair rejects ambiguous layouts
@@ -106,6 +108,7 @@ jobs:
           bash -n bundle/pack-bundle.sh
           bash -n bundle/pack-apk-libs.sh
           bash -n scripts/patch-seccomp.sh
+          sh -n bundle/wrapper.sh.tpl
 
       - name: 生成基线 rootfs(docker export ubuntu:24.04,arm64 原生)
         run: |

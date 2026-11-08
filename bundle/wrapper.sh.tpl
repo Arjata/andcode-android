@@ -28,8 +28,6 @@ TMPDIR="$ROOT/tmp"; mkdir -p "$TMPDIR" 2>/dev/null || true; export TMPDIR
 PATH="$ROOT/bin:$ROOT/usr/bin:$ROOT/usr/libexec/git-core:$PATH"; export PATH
 LD_LIBRARY_PATH="$EXEDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"; export LD_LIBRARY_PATH
 if [ -f "$SHIM" ]; then
-  LD_PRELOAD="$SHIM${LD_PRELOAD:+:$LD_PRELOAD}"
-  export LD_PRELOAD
   ANDCODE_ETC_DIR="$ROOT/etc"; export ANDCODE_ETC_DIR
 fi
 GIT_EXEC_PATH="$ROOT/usr/libexec/git-core"; export GIT_EXEC_PATH
@@ -46,8 +44,8 @@ if [ -x "$PROOT" ] && [ -e /system/bin/sh ] && [ -z "${ANDCODE_IN_PROOT:-}" ]; t
   export PROOT_LOADER="$ROOT/usr/lib/proot/loader"
   export ANDCODE_IN_PROOT=1
   export LD_LIBRARY_PATH="$ROOT/usr/lib/proot${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  unset LD_PRELOAD 2>/dev/null
-export PROOT_TMP_DIR="${ANDCODE_APP_DATA:-$ROOT/tmp}"
+  unset LD_PRELOAD
+  export PROOT_TMP_DIR="${ANDCODE_APP_DATA:-$ROOT/tmp}"
   exec "$PROOT" \
        -b "$ROOT/etc/resolv.conf:/etc/resolv.conf" \
        -b "$ROOT/etc/ssl:/etc/ssl" \
@@ -59,6 +57,16 @@ export PROOT_TMP_DIR="${ANDCODE_APP_DATA:-$ROOT/tmp}"
        "$LOADER_PATH" --library-path "$LIBPATH_VALUE" --inhibit-cache "$TARGET_PATH" "$@"
 fi
 
+# Loader-only preload never enters Bash's exported startup environment. Relying
+# on a constructor unsetenv left LD_PRELOAD visible in Bash on the real device,
+# breaking Bionic children such as /system/bin/id before their main() ran.
+unset LD_PRELOAD
+if [ -f "$SHIM" ]; then
+  exec "$LOADER_PATH" \
+       --library-path "$LIBPATH_VALUE" \
+       --inhibit-cache --preload "$SHIM" \
+       "$TARGET_PATH" "$@"
+fi
 exec "$LOADER_PATH" \
      --library-path "$LIBPATH_VALUE" \
      --inhibit-cache \

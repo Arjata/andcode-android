@@ -73,6 +73,7 @@
 | `ubuntu-device-test.sh` | root chroot 真机联网/apt/权限/编译/退出清理验证,不代表 PRoot 通过 | `scripts/` |
 | `ubuntu-network-diagnose.sh` | root 人工只读检查 Android 13 BPF 网络规则/当前 APK 与固定 guest UID;不修改设置/权限表,不借用 UID 执行 | `scripts/` |
 | `launcher.test.py` | Linux CI 编译自有 launcher,ASan/UBSan 检查直拉及 PRoot argv 组装/参数保真 | `scripts/` |
+| `wrapper.test.py` | Linux CI 检查包装器 direct loader 的 --preload 单进程注入与 Bionic 子进程环境隔离 | `scripts/` |
 | `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |
 | `proot-rootfs-gate.sh` | 应用域原版 Ubuntu Base Bash 独立实例准入,不修改 SELinux 或 glibc | `scripts/` |
 | `proot-development-gate.sh`、`proot-development-gate.txt` | 应用域独立 Ubuntu 的 apt/工具链/新 ELF/PTY 验证脚本与 APK files 诊断输出 | `scripts/`、APK `files/` |

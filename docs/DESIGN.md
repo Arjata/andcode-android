@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.31 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.32 (设计稿) · 日期: 2026-11-09
+> v0.4.32 变更(包装器):真实 Bash 子进程仍能继承 wrapper 设置的 LD_PRELOAD,
+> 不再依赖 shim 构造器清环境;direct 分支改用 loader --preload 单进程注入,
+> 环境中移除 LD_PRELOAD,PRoot bind 分支不变。新增 Linux 与应用域 Bionic 子进程
+> 门禁;新版 APK 尚待成功 CI/实机复测。
 > v0.4.31 变更(实验门禁):源码预置实验排除固定 bun-pty musl 分支并保留显式拒绝,
 > .so require 保留 CommonJS 字符串导出;持久 PTY 绑定必须指定预置入口,不再嵌入
 > extensionless ELF。新增 Bun graph 无 ELF/摘要/依赖/16K/glibc 静态门禁与 Linux

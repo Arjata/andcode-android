@@ -28,6 +28,13 @@ test -z "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}${ALL_PRO
   "$ANDCODE_EXE_DIR/libandcode-oc2.so" --version
 "$ANDCODE_EXE_DIR/libandcode-opencode-pty.so" --version
 git --version
+# Exercise the real Bash wrapper, not only a direct loader version probe.
+# A glibc LD_PRELOAD inherited by the Bionic system child must fail this gate.
+"$ANDCODE_ROOT/bin/bash" --noprofile --norc -c '
+  test -z "${LD_PRELOAD:-}" || exit 1
+  /system/bin/id
+  echo ANDCODE_NATIVE_BIONIC_CHILD_OK
+'
 PROOT="$ANDCODE_EXE_DIR/libandcode-usr-lib-proot-proot.so"
 PROOT_LOADER="$ANDCODE_EXE_DIR/libandcode-usr-lib-proot-loader.so" \
 LD_LIBRARY_PATH="$ANDCODE_EXE_DIR" PROOT_TMP_DIR="$ANDCODE_APP_DATA/tmp" \
