@@ -30,7 +30,7 @@ try:
         if state['status'] != 'running':
             break
         time.sleep(.1)
-    assert state.get('exitCode') == 0, state
+    assert state.get('exit') == 0, state
     assert 'ANDCODE_SOURCE_SHELL_OK' in request('GET', '/api/shell/' + shell['id'] + '/output')['data']['output']
     # Ordinary Web PTY must really allocate a tty, resize, and execute a child.
     marker = Path(os.environ['HOME']) / 'ordinary-pty-ok'
