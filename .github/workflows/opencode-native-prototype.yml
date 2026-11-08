@@ -26,7 +26,9 @@ jobs:
           unzip -q work/bun.zip -d work/bun
           echo "$GITHUB_WORKSPACE/work/bun/bun-linux-aarch64" >> "$GITHUB_PATH"
       - name: Native import plugin regression
-        run: bun test scripts/opencode-native-imports.test.ts
+        run: |
+          bun test scripts/opencode-native-imports.test.ts
+          python3 scripts/audit-opencode-native.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
@@ -42,12 +44,19 @@ jobs:
         run: |
           cd work/upstream
           bun run packages/cli/script/build.ts --single --skip-install
-      - name: Execution and empty extraction directory gate
+      - name: Static native closure gate
+        run: |
+          cp work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode work/native-prototype/
+          python3 scripts/audit-opencode-native.py work/native-prototype
+          bash baseline/check-compat.sh --page-align work/native-prototype
+      - name: Execution, shell, PTYs and empty extraction directory gate
         run: |
           set -euo pipefail
           mkdir -p work/probe-home work/probe-tmp
           export ANDCODE_EXE_DIR="$GITHUB_WORKSPACE/work/native-prototype/native"
           export HOME="$GITHUB_WORKSPACE/work/probe-home" BUN_TMPDIR="$GITHUB_WORKSPACE/work/probe-tmp"
+          export OPENCODE_PTY_BIN="$(find "$GITHUB_WORKSPACE/work/upstream/node_modules/.bun" -path '*/@opencode/pty-linux-arm64-gnu/bin/opencode-pty' -type f -print -quit)"
+          test -n "$OPENCODE_PTY_BIN"
           EXE="$GITHUB_WORKSPACE/work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode"
           "$EXE" --version
           "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
@@ -60,6 +69,7 @@ jobs:
             sleep 1
           done
           test "$ready" = 1
+          python3 scripts/probe-opencode-native.py
           python3 - <<'PY'
           from pathlib import Path
           for f in Path('work/probe-tmp').rglob('*'):

@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.30 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.31 (设计稿) · 日期: 2026-11-09
+> v0.4.31 变更(实验门禁):源码预置实验排除固定 bun-pty musl 分支并保留显式拒绝,
+> .so require 保留 CommonJS 字符串导出;持久 PTY 绑定必须指定预置入口,不再嵌入
+> extensionless ELF。新增 Bun graph 无 ELF/摘要/依赖/16K/glibc 静态门禁与 Linux
+> shell/普通及持久 PTY 实际执行,仍不批准实验产物集成 APK。
 > v0.4.30 变更(交付链):Git preload 隔离修复已通过 APK 真实应用域门禁,原生
 > PRoot 完整 apt/编译/Git HTTPS/PTY 无显式代理验收通过。新增手动固定源码
 > 构建实验,在 Bun 编译期将 .so/.node 导入换成显式预置路径,不伪装 Bun 临时文件;

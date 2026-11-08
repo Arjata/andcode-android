@@ -196,6 +196,18 @@ apt、C/C++、Make、Git HTTPS、PTY 均成功；仅未设置显式代理，设�
 扫描仅覆盖启动路径，不替代工具、Web PTY、TUI 或全部传递原生库审计。
 实验不接 APK，不修改已验证官方载荷；许可证 notices/源码义务和兼容性待审查。
 
+首个源码实验 run `42518155724` 成功且工件 API 摘要核对通过，但后续更严格静态
+审计发现 Bun graph 仍嵌入 extensionless PTY ELF，且导入表包含不会选用的 musl
+PTY 库，因此不能集成。新版实验插件显式要求 `OPENCODE_PTY_BIN`、不嵌入 daemon，
+排除固定摘要的 musl 输入并在误选时失败；`.so` 的 require 返回路径字符串而不是
+ESM namespace。新增门禁待新 CI 通过，许可证/Android 闭包仍待验证。
+
+当前正式原生载荷 Web 首页能在 APK WebView 渲染，默认模型查询为
+`arjata/gpt-oss-120b`；shell API 的 Bash/printf/Git 实际执行可达，但 Android
+系统 `id` 受到 glibc shim preload 泄漏而失败，普通 Web PTY 创建返回 500
+（bun-pty library 未加载，后续访问 symbols 失败）。这是待修边界，不是完整 Web
+或工具闭包验收成功；没有降低 targetSdk/SELinux 或引入 TLS bypass。
+
 新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
 绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
 不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/

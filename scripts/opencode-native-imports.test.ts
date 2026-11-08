@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -13,7 +13,7 @@ test("native imports become explicit runtime paths with byte-identical staged EL
     elf.writeUInt16LE(183, 18)
     writeFileSync(path.join(root, "lib.so"), elf)
     writeFileSync(path.join(root, "binding.node"), elf)
-    writeFileSync(path.join(root, "entry.ts"), 'import lib from "./lib.so" with {type:"file"}; import addon from "./binding.node"; const other=require("./binding.node"); if(addon.marker!==lib || other.marker!==lib) throw Error("native export mismatch"); console.log("NATIVE_IMPORT_OK")')
+    writeFileSync(path.join(root, "entry.ts"), 'import lib from "./lib.so" with {type:"file"}; import addon from "./binding.node"; const other=require("./binding.node"); const ffi=require("./lib.so"); if(addon.marker!==lib || other.marker!==lib || ffi!==lib) throw Error("native export mismatch"); console.log("NATIVE_IMPORT_OK")')
     const result = await Bun.build({ entrypoints: [path.join(root, "entry.ts")], target: "bun", plugins: [nativeImports(root)] })
     expect(result.success).toBe(true)
     const code = await result.outputs[0].text()
@@ -29,6 +29,27 @@ test("native imports become explicit runtime paths with byte-identical staged EL
     expect(await proc.exited).toBe(0)
     expect(await new Response(proc.stdout).text()).toContain("NATIVE_IMPORT_OK")
   } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test("persistent PTY binding requires an absolute preinstalled executable without embedding it", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "andcode-native-imports-"))
+  try {
+    mkdirSync(path.join(root, "persistent-pty"))
+    writeFileSync(path.join(root, "persistent-pty/pty-binding.ts"), 'throw Error("upstream embedded binary must not run")')
+    writeFileSync(path.join(root, "entry.ts"), 'import p from "./persistent-pty/pty-binding"; console.log(p)')
+    const result = await Bun.build({entrypoints:[path.join(root,"entry.ts")],target:"bun",plugins:[nativeImports(root)]})
+    expect(result.success).toBe(true)
+    const output = path.join(root, "output.mjs")
+    const code = await result.outputs[0].text()
+    expect(code).not.toContain("upstream embedded binary")
+    expect(code).not.toContain("$bunfs")
+    writeFileSync(output, code)
+    for (const value of ["", "relative", "/native/libandcode-opencode-pty.so"]) {
+      const proc=Bun.spawn([process.execPath,output],{env:{...process.env,OPENCODE_PTY_BIN:value},stdout:"pipe",stderr:"pipe"})
+      expect(await proc.exited).toBe(value.startsWith("/")?0:1)
+      if (value.startsWith("/")) expect(await new Response(proc.stdout).text()).toContain(value)
+    }
+  } finally { rmSync(root,{recursive:true,force:true}) }
 })
 
 test("wrong architecture and non-ELF imports fail closed", async () => {
