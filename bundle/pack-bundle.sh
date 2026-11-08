@@ -114,6 +114,10 @@ done)
 if [ -n "$LAUNCHER" ] && [ -f "$LAUNCHER" ] && [ -f "$B/usr/bin/git.bin" ]; then
   rm -f "$B/usr/bin/git"
 fi
+if [ -f "$B/bin/opencode-pty" ] && [ -f "$B/usr/lib/opencode-pty/opencode-pty.bin" ]; then
+  # Tier P static entry invokes the daemon through the explicit loader.
+  rm -f "$B/usr/lib/opencode-pty/opencode-pty"
+fi
 
 # ── 2. glibc 闭包(root/lib,保持 soname)─────────────────────────────────
 mkdir -p "$B/lib"
@@ -275,6 +279,9 @@ while IFS= read -r -d '' f; do
   elif file -b "$f" | grep -q 'ELF 64-bit.*ARM aarch64'; then
     kind=elf-exec; phys="$(slug "$lp")"
     case "$lp" in
+      bin/opencode-pty) lic=AGPL-3.0-only; up=andcode ;;
+      bin/oc2.bin) lic=MIT; up=anomalyco/opencode; ver=2.2.6 ;;
+      usr/lib/opencode-pty/opencode-pty.bin) lic=MIT; up=anomalyco/opencode-process-daemon; ver=0.4.0 ;;
       bin/busybox*)        lic=GPL-2.0;            up=busybox.net/alpine ;;
       sbin/dropbear*|bin/dbclient*) lic=MIT;        up=mkj/dropbear ;;
       usr/bin/git*|usr/libexec/git-core/*) lic=GPL-2.0-or-later; up=git/git ;;

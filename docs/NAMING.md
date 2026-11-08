@@ -90,6 +90,10 @@
 | `andcodeNativeDir` | Gradle 显式原生工件目录属性,包含 arm64-v8a/manifest.farm/assets;不设置时保留开发空载荷构建 | `-PandcodeNativeDir=<绝对目录>` |
 | `andcode-runtime` | APK assets 内 CI 生成的只读 bundle 数据与 manifest.farm,不含运行期解包 ELF | `assets/andcode-runtime/` |
 | `RuntimePayload.java`、`RuntimePayloadTest.java` | APK 只读原生载荷链接农场初始化与平台 JDK 安全回归 | `dev.andcode.app`、`app/tests/` |
+| `pty-launcher.c` | 自有静态 musl PTY 入口,由 /proc/self/exe 定位同目录 loader/daemon,不依赖固定安装路径 | `bundle/launcher/` |
+| `libandcode-usr-lib-opencode-pty-opencode-pty.so` | 预置 process-daemon v0.4.0 ELF 本体;静态 libandcode-opencode-pty.so 入口显式调用 loader | nativeLibraryDir |
+| `oc2` | 固定 V2.2.6 ELF 本体逻辑名,用于 serve,与旧 opencode 分开;物理名 libandcode-oc2.so | bundle bin/oc2.bin |
+| `etc/third-party/opencode-v2-license`、`etc/third-party/opencode-pty-license` | 固定版本 MIT 版权许可文本,随 data 交付 | bundle/APK assets |
 | `andcode-runtime-<sha256>`、`andcode-runtime-stage-<随机值>` | filesDir 内按 manifest/nativeLibraryDir 身份区分的链接/数据目录与原子暂存;从不复制 ELF,不删除旧版本 | APK filesDir |
 | `libandcode-git-core-<命令>.so` | git-core 包装器/自有 launcher 统一前缀;避免 git/receive-pack/upload-pack 等与 usr/bin/*.bin 冲突 | Tier P nativeLibraryDir |
 

@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.24 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.25 (设计稿) · 日期: 2026-11-09
+> v0.4.25 变更(交付链):固定摘要 V2.2.6 与 process-daemon 0.4.0 纳入原生载荷,
+> PTY 通过自有静态入口从 /proc/self/exe 定位同目录 loader/daemon,不在 ELF
+> PT_INTERP 固化随机 APK 安装路径,不解包可执行体。新增 V2/PTY 版本执行门禁,
+> 待 CI/真实应用域验证,不提前声称 Web/工具/原生库闭包已自包含完成。
 > v0.4.24 变更(§4.4/交付链):APK 首启动按 manifest/nativeLibraryDir 身份原子发布
 > 只含数据和原生目录链接的农场,拒绝越界/链接父目录/ELF 数据/manifest 冲突,不删除旧版本。
 > 原生模式禁止回退开发载荷,移除默认代理与禁 TLS 校验;Bash 已在旧设备真实应用域

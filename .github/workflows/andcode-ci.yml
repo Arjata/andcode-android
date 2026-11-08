@@ -69,6 +69,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Launcher argv memory safety and argument preservation
         run: python3 scripts/launcher.test.py
+      - name: PTY entry compiler checks
+        run: cc -Wall -Wextra -Werror -fsyntax-only bundle/launcher/pty-launcher.c
       - name: 项目 ZIP 安全与导出往返测试(平台 JDK,无第三方测试依赖)
         run: |
           mkdir -p "$RUNNER_TEMP/archive-tests"
@@ -151,6 +153,20 @@ jobs:
             || { file -b work/stage/bin/busybox; echo "busybox 非静态"; exit 1; }
           echo "busybox: $(work/stage/bin/busybox | head -n1)"
 
+      - name: Stage pinned V2 and PTY daemon (TLS and SHA-256 required)
+        run: |
+          curl -fLSs https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-linux-arm64.tar.gz -o work/oc2.tar.gz
+          echo 'f2d27600c367e45057d6a16f6a5c2aa8d77b41a9b10d4bc3d849c2f88870e944  work/oc2.tar.gz' | sha256sum -c -
+          mkdir -p work/oc2 work/pty work/stage/usr/lib/opencode-pty
+          tar -xzf work/oc2.tar.gz -C work/oc2
+          cp work/oc2/opencode work/stage/bin/oc2
+          curl -fLSs https://github.com/anomalyco/opencode/releases/download/process-daemon-v0.4.0/opencode-pty-0.4.0-aarch64-unknown-linux-gnu.tar.gz -o work/pty.tar.gz
+          echo '52c421672ad6fadcb87cc2e918ad55622a7da588468d8029abd031d5cc752e57  work/pty.tar.gz' | sha256sum -c -
+          tar -xzf work/pty.tar.gz -C work/pty
+          cp work/pty/opencode-pty work/stage/usr/lib/opencode-pty/opencode-pty
+          curl -fLSs https://raw.githubusercontent.com/anomalyco/opencode/v2.2.6/LICENSE -o work/stage/etc/third-party/opencode-v2-license
+          curl -fLSs https://raw.githubusercontent.com/anomalyco/opencode/5e6ee370634842e0efa99ad103c4d767581b47f0/LICENSE -o work/stage/etc/third-party/opencode-pty-license
+
       - name: 获取 git 前缀(容器内复制,保 GIT_EXEC_PATH 结构)
         run: |
           CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
@@ -192,6 +208,7 @@ jobs:
         run: |
           sudo apt-get install -y -qq musl-tools >/dev/null 2>&1 || true
           musl-gcc -static -O2 -Wl,-z,max-page-size=16384 -o work/andcode-launcher bundle/launcher/launcher.c
+          musl-gcc -static -O2 -Wl,-z,max-page-size=16384 -o work/stage/bin/opencode-pty bundle/launcher/pty-launcher.c
           file -b work/andcode-launcher | grep -q 'statically linked\|static-pie' || { echo "launcher 非静态"; exit 1; }
           mkdir -p dist
           bash bundle/pack-bundle.sh \
@@ -304,6 +321,10 @@ jobs:
           work/jni/arm64-v8a/libandcode-ld-linux.so \
             --library-path work/jni/arm64-v8a --inhibit-cache \
             work/jni/arm64-v8a/libandcode-bash.so --noprofile --norc -c 'printf "Tier P Bash %s\n" "$BASH_VERSION"'
+          HOME="$RUNNER_TEMP" BUN_TMPDIR="$RUNNER_TEMP" GLIBC_TUNABLES=glibc.pthread.rseq=0 \
+            work/jni/arm64-v8a/libandcode-ld-linux.so --library-path work/jni/arm64-v8a --inhibit-cache \
+            work/jni/arm64-v8a/libandcode-oc2.so --version
+          work/jni/arm64-v8a/libandcode-opencode-pty.so --version
 
       - uses: actions/upload-artifact@v4
         with:
