@@ -39,6 +39,21 @@ class FffBuildTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'lacks LOAD'):
                 module.link_inputs('not a GNU map')
 
+    def test_synthetic_linker_stubs_are_not_missing_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'libfixture.a').write_bytes(b'archive')
+            (root / 'linker stubs').write_bytes(b'unrelated')
+            rows = module.link_inputs('LOAD libfixture.a\nLOAD linker stubs\nLOAD linker stubs', root)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0]['path'], str((root / 'libfixture.a').resolve()))
+            self.assertEqual(rows[1]['kind'], 'linker-generated')
+            self.assertEqual(rows[1]['name'], 'linker stubs')
+            self.assertNotIn('path', rows[1])
+            self.assertNotIn('sha256', rows[1])
+            with self.assertRaisesRegex(ValueError, 'lacks LOAD'):
+                module.link_inputs('LOAD linker stubs', root)
+
     def test_failure_never_replaces_input(self):
         for failure in [None, 'elf', 'needed', 'runner-zlib', 'exports', 'probe', 'timeout', 'marker']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:

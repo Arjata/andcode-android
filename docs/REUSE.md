@@ -189,8 +189,18 @@ LOAD 输入仅在链接后仍存在时记录摘要，rustc 删除的临时对象
 回归同时覆盖系统 `libz.so.1` 被拒绝且原输入字节不变，不通过扩展白名单放行。
 该轮包含 fff 实际搜索/glob、最终预置副本与收集运行库 maps，以及 shell/普通及
 持久 PTY/TUI/无运行期 ELF 释放门禁；artifact `13666846466`，248955245 字节。
-CI 报告 ZIP SHA-256 `9ea996e8b7c9d12a5beaed6f16d801bf0e6e491a9785b73ca38bc3fa2f8e8a10`；
-本机下载与全文件 manifest 核验仍在进行，不能把 Actions 上传成功代替逐字节复核。
+ZIP SHA-256 `9ea996e8b7c9d12a5beaed6f16d801bf0e6e491a9785b73ca38bc3fa2f8e8a10`
+与 GitHub API 一致；本机逐字节复核全部 3956 项文件摘要及 ZIP/manifest 集合闭合。
+fff 构建输出、Bun 导入及最终预置副本摘要一致：
+`27dd516b50ae87429ae748c8a9a43485777e36de2be846ace04235f5f0bc03e7`，10417896 字节；
+NEEDED 仅 `libgcc_s.so.1`、`libm.so.6`、`libc.so.6`、`ld-linux-aarch64.so.1`。
+构建与最终预置副本的搜索/glob 日志、120 项选中包中的 116 份 registry 归档摘要、
+三库 fixed-source-ci-rebuild 来源报告与清单一致；所有批准字段仍为 false。
+GNU LOAD 报告 26 项中 19 项链接后可用并记录摘要，6 项对象/归档已不可用，
+另 1 项为 GNU 合成的 `linker stubs`，不是缺失的物理文件。该轮旧报告把后者
+误归为临时路径；后续解析器已单列 linker-generated，不修改既有工件或其摘要。
+19 项摘要仅是 CI 记录，本机未持有这些原始链接输入，不冒称已逐字节重核其内容；
+仍缺逐文件许可、工具链/静态依赖对应源码及准确链接归属，未部署 Android。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

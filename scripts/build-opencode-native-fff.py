@@ -72,15 +72,24 @@ try{
 
 def link_inputs(text, cwd=None):
     """GNU map LOAD records, not proof of which sections survived GC/LTO."""
-    paths = sorted({((Path(cwd) if cwd else Path.cwd()) / line[5:].strip()).resolve()
-                    for line in text.splitlines() if line.startswith('LOAD ')})
+    names = {line[5:].strip() for line in text.splitlines() if line.startswith('LOAD ')}
+    # GNU bfd emits this synthetic entry; it is not a missing disk input,
+    # even if an unrelated file with the same name happens to exist in cwd.
+    synthetic = 'linker stubs' in names
+    names.discard('linker stubs')
+    paths = sorted({((Path(cwd) if cwd else Path.cwd()) / name).resolve() for name in names})
     if not paths:
         raise ValueError('GNU linker map lacks LOAD inputs')
-    return [({'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+    rows = [({'path': str(path), 'kind': 'file', 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
               'bytes': path.stat().st_size, 'availableAfterLink': True} if path.is_file() else
-             {'path': str(path), 'availableAfterLink': False,
-              'limitation': 'Linker temporary input unavailable after rustc cleanup; no hash claimed'})
+             {'path': str(path), 'kind': 'file', 'availableAfterLink': False,
+               'limitation': 'Input unavailable after link; no hash or exact removal cause claimed'})
             for path in paths]
+    if synthetic:
+        rows.append({'kind': 'linker-generated', 'name': 'linker stubs',
+                     'availableAfterLink': False,
+                     'limitation': 'GNU linker synthetic entry, not a filesystem input; no hash claimed'})
+    return rows
 
 
 def validate_and_probe(result, target, output, env):

@@ -5,7 +5,8 @@
 > 工具摘要;离线 Cargo 重建后校验 ELF/16K/导出及 Bun 真实索引/搜索/glob,成功才
 > 替换实验输入。保留选中 crate 归档、Cargo 消息和 GNU LOAD map/可用输入摘要,
 > 临时输入缺失明确记录,不冒称逐节归属或源码/许可闭环;CI 42602199884 已通过
-> Linux 实验门禁,工件本机完整复核中,正式 APK 不变,Android 待 P0/P3 实机验证。
+> Linux 实验门禁,工件 3956 项摘要与清单集合已本机复核,正式 APK 不变,
+> Android 待 P0/P3 实机验证。GNU 合成 linker stubs 单列,不冒称缺失物理输入。
 > v0.4.38 变更(实验 watcher 来源):固定 Parcel watcher 源码、node-addon-api 及
 > Node N-API 头文件归档,显式编译 Linux 源文件列表;16K/glibc/导出检查及 Bun
 > 真实 inotify 创建事件/取消订阅后才替换实验输入。报告区分 npm 与重建来源,
