@@ -39,6 +39,7 @@ jobs:
           python3 scripts/collect-opencode-native-rust.test.py
           python3 scripts/build-opencode-native-pty.test.py
           python3 scripts/build-opencode-native-watcher.test.py
+          python3 scripts/build-opencode-native-fff.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
@@ -52,6 +53,14 @@ jobs:
       - name: Fixed-source watcher rebuild and real file event
         run: |
           python3 scripts/build-opencode-native-watcher.py work/upstream work/native-prototype
+      - name: Fixed Zig build tool and fff source rebuild (diagnostic only)
+        run: |
+          mkdir -p work/zig
+          curl -fLSs --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 180 https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz -o work/zig/zig.tar.xz
+          echo 'ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17  work/zig/zig.tar.xz' | sha256sum -c -
+          tar -xJf work/zig/zig.tar.xz -C work/zig
+          export PATH="$GITHUB_WORKSPACE/work/zig/zig-aarch64-linux-0.16.0:$PATH"
+          python3 scripts/build-opencode-native-fff.py work/upstream work/native-prototype
       - name: Build experimental source V2 including Web assets
         env:
           OPENCODE_CHANNEL: beta
@@ -112,6 +121,16 @@ jobs:
           print(result.stdout + result.stderr)
           result.check_returncode()
           assert 'ANDCODE_SOURCE_WATCHER_EVENT_OK' in result.stdout
+          fff = [row for row in rows if '/@ff-labs/fff-bin-linux-arm64-gnu/' in row[3]]
+          assert len(fff) == 1
+          result = subprocess.run([os.environ['ANDCODE_LOADER'], '--library-path', os.environ['LD_LIBRARY_PATH'],
+                                   '--inhibit-cache', shutil.which('bun'), str(stage / 'native-fff-build/probe.mjs'),
+                                   str(stage / 'native' / fff[0][0]), str(stage / 'native-fff-build')],
+                                  capture_output=True, text=True, timeout=40)
+          (stage / 'native-fff-build/staged-search.log').write_text(result.stdout + result.stderr)
+          print(result.stdout + result.stderr)
+          result.check_returncode()
+          assert 'ANDCODE_SOURCE_FFF_SEARCH_GLOB_OK' in result.stdout
           PY
           export OPENCODE_PTY_BIN="$(find "$GITHUB_WORKSPACE/work/upstream/node_modules/.bun" -path '*/@opencode/pty-linux-arm64-gnu/bin/opencode-pty' -type f -print -quit)"
           test -n "$OPENCODE_PTY_BIN"

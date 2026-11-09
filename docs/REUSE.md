@@ -173,6 +173,14 @@ watcher 重建 ELF SHA-256 `a384a3ab5aa60dda6c61fb87489a99b719910113c00f54c1f376
 25、node-addon-api 3、Node headers 4、runner 系统输入 357；后者仅摘要记录，
 不代表对应源码交付或许可审查。所有批准字段仍为 false，未部署设备。
 
+fff 新增诊断重建配方：同一固定源码/lock，以 `-p fff-c --no-default-features
+--features zlob`、固定 Zig 0.16.0 和 GNU bfd 链接器构建，Cargo fetch --locked
+后离线编译；保留选中目标/feature 的 crate 归档、Cargo JSON 消息和最终 GNU map。
+LOAD 输入仅在链接后仍存在时记录摘要，rustc 删除的临时对象明确记为不可用；
+这不是逐节/逐文件准确链接归属，也不交付系统工具链对应源码。只有 ELF/导出/
+16K/glibc 与 Bun 实际索引/搜索/glob 成功后才替换实验 npm 输入，随后还须使用
+收集运行库检查最终内容寻址副本。当前待 CI，不批准原 npm 对应、分发或 Android。
+
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
 包内 copyright。同日读取现有 Ubuntu 24.04 实例 gcc-14 包 copyright，确认
@@ -209,6 +217,13 @@ libtinfo 关闭 HAVE_SETFSUID，使用上游无身份变更安全打开分支，
 | Ubuntu Base 24.04.4 arm64(开发实机引导) | `https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.4-base-arm64.tar.gz` | 同上,保留包内 copyright/common-licenses;2026-11-09 核对官方 HTTPS SHA256SUMS 与下载归档 | 无本地 Linux/Docker 时的设备开发验证入口,不是 CI 镜像来源替换 | 固定 SHA-256 `04207713ece899c3740823d33690441ad3a7f0ded1101aca744e2b0f37ac7ff2`;只在隔离新 ext4 镜像提取,保留源信息/包清单,正式发布仍须逐包合规 |
 
 ### 2.3 参考实现(谨慎取材)
+
+fff 诊断构建使用 Zig **0.16.0** arm64 官方工具归档(仅 CI，不随包交付)：
+`https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz`，SHA-256
+`ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17`，
+2026-11-09 下载并核对官方 index.json 摘要及归档根 LICENSE：MIT (Expat)，
+Copyright Zig contributors。内附标准库/编译运行时及 LLVM 等不应整体推断为 MIT；
+构建产物中静态工具链输入仍需单独审查，固定工具摘要不是其许可批准。
 
 构建期 Actions（不进入 APK/bundle）：`actions/download-artifact@v4`、
 `actions/setup-java@v4`、`android-actions/setup-android@v3`、

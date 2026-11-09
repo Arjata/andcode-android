@@ -59,7 +59,8 @@ class LicenseEvidenceTest(unittest.TestCase):
                 module.collect(upstream, stage)
 
     def test_rebuilt_origin_must_match_imported_elf(self):
-        for index, report_name in [(3, 'native-pty-build-review.json'), (1, 'native-watcher-build-review.json')]:
+        for index, report_name in [(3, 'native-pty-build-review.json'), (1, 'native-watcher-build-review.json'),
+                                   (2, 'native-fff-build-review.json')]:
             for digest in [hashlib.sha256(str(index).encode()).hexdigest(), '0' * 64]:
                 with self.subTest(index=index, digest=digest), tempfile.TemporaryDirectory() as work:
                     upstream, stage = self.fixture(Path(work))
