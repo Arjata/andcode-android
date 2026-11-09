@@ -29,7 +29,7 @@ class WatcherBuildTest(unittest.TestCase):
             self.assertRegex(checksum, '^[0-9a-f]{64}$')
 
     def test_only_checked_elf_and_successful_event_replace_input(self):
-        for failure in [None, 'elf', 'event']:
+        for failure in [None, 'elf', 'dependency', 'export', 'event', 'timeout']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage = root / 'upstream', root / 'stage'
@@ -58,11 +58,15 @@ class WatcherBuildTest(unittest.TestCase):
                         return subprocess.CompletedProcess(command, 0)
                     if failure == 'event':
                         raise subprocess.CalledProcessError(1, command, output='', stderr='event failed')
+                    if failure == 'timeout':
+                        raise subprocess.TimeoutExpired(command, 30, output=b'event timeout')
                     probe = Path(command[1]).read_text()
                     self.assertIn('watcher.unsubscribe(dir,callback,options)', probe)
                     return subprocess.CompletedProcess(command, 0, stdout='ANDCODE_SOURCE_WATCHER_EVENT_OK', stderr='')
 
-                gate = {'side_effect': ValueError('bad ELF')} if failure == 'elf' else {'return_value': ({}, ['libc.so.6'])}
+                dependencies = ['libunknown.so.1'] if failure == 'dependency' else ['libc.so.6', 'ld-linux-aarch64.so.1']
+                gate = {'side_effect': ValueError('bad ELF')} if failure == 'elf' else {'return_value': ({}, dependencies)}
+                exports = '0: 0 0 FUNC GLOBAL DEFAULT 1 napi_register_module_v1' if failure != 'export' else ''
                 with patch.object(module.sys, 'platform', 'linux'), \
                      patch.object(module.platform, 'machine', return_value='aarch64'), \
                      patch.object(module, 'ORIGINAL', hashlib.sha256(b'original').hexdigest()), \
@@ -70,10 +74,10 @@ class WatcherBuildTest(unittest.TestCase):
                      patch.object(module.pty.rust.sources, 'inspect_archive', return_value={}), \
                      patch.object(module.pty.rust, 'unpack_candidate', side_effect=roots), \
                      patch.object(module.subprocess, 'run', side_effect=run), \
-                     patch.object(module.subprocess, 'check_output', side_effect=['0: 0 0 FUNC GLOBAL DEFAULT 1 napi_register_module_v1', 'c++ fixture']), \
+                     patch.object(module.subprocess, 'check_output', side_effect=[exports, 'c++ fixture']), \
                      patch.object(module.pty.audit, 'elf', **gate):
                     if failure:
-                        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired)):
                             module.build(upstream, stage)
                         self.assertEqual(target.read_bytes(), b'original')
                         self.assertFalse((stage / 'native-watcher-build-review.json').exists())

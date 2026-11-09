@@ -148,6 +148,11 @@ ThreadSafeFunction，未产生替换载荷)，不执行 npm 安装脚本；需�
 声明文本线索。watcher 的 `src/wasm/include.h` 内含 Node.js contributors MIT 原文，
 不因 Linux 分支为空而丢弃声明；系统 GCC/glibc 头文件仅记录摘要，未因此交付对应
 源码。该索引不覆盖编译器内部或链接器输入，不等于逐文件许可审查完成。
+真实事件探针另外使用收集的 loader/libc/libstdc++/libgcc_s 运行最终内容寻址预置
+副本，并检查 maps 全部对应；不能以 runner 默认运行库下的构建后测试替代该门禁。
+CI `42578098328` 已通过重建/真实事件并生成 Bun 导入，随后旧静态白名单拒绝
+重建库 NEEDED 的 `ld-linux-aarch64.so.1`；与运行库闭包及局部门禁统一允许该已
+收集 loader，保留递归符号版本与实际 maps 验证，不引入新系统库依赖。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

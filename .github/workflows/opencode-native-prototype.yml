@@ -90,6 +90,25 @@ jobs:
           export ANDCODE_LOADER="$GITHUB_WORKSPACE/work/native-prototype/runtime/ld-linux-aarch64.so.1"
           export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/work/native-prototype/runtime"
           export HOME="$GITHUB_WORKSPACE/work/probe-home" BUN_TMPDIR="$GITHUB_WORKSPACE/work/probe-tmp"
+          # Exercise the final content-addressed copy with the collected runtime,
+          # not only the build output against runner libraries.
+          python3 - <<'PY'
+          import os, shutil, subprocess
+          from pathlib import Path
+          stage = Path('work/native-prototype').resolve()
+          rows = [line.split('\t') for line in (stage / 'oc2-native.tsv').read_text().splitlines()]
+          watcher = [row for row in rows if '/@parcel/watcher-linux-arm64-glibc/' in row[3]]
+          assert len(watcher) == 1
+          probe = stage / 'native-watcher-build/probe.mjs'
+          result = subprocess.run([os.environ['ANDCODE_LOADER'], '--library-path', os.environ['LD_LIBRARY_PATH'],
+                                   '--inhibit-cache', shutil.which('bun'), str(probe), str(stage / 'native' / watcher[0][0]),
+                                   str(stage / 'native-watcher-build')],
+                                  capture_output=True, text=True, timeout=30)
+          (stage / 'native-watcher-build/staged-event.log').write_text(result.stdout + result.stderr)
+          print(result.stdout + result.stderr)
+          result.check_returncode()
+          assert 'ANDCODE_SOURCE_WATCHER_EVENT_OK' in result.stdout
+          PY
           export OPENCODE_PTY_BIN="$(find "$GITHUB_WORKSPACE/work/upstream/node_modules/.bun" -path '*/@opencode/pty-linux-arm64-gnu/bin/opencode-pty' -type f -print -quit)"
           test -n "$OPENCODE_PTY_BIN"
           EXE="$GITHUB_WORKSPACE/work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode"

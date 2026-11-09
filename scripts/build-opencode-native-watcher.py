@@ -120,9 +120,18 @@ def build(upstream, stage):
     # This test uses only a fresh directory owned by this build and waits for a
     # real inotify event, not just a successful dlopen or exported function list.
     probe = output / 'probe.mjs'
-    probe.write_text('''import {mkdtemp, writeFile, rm} from "node:fs/promises";
+    probe.write_text('''import {mkdtemp, writeFile, readFile, realpath, rm} from "node:fs/promises";
 import path from "node:path";
 const m={exports:{}};process.dlopen(m,process.argv[2]);const watcher=m.exports;
+const nativePath=await realpath(process.argv[2]);
+const maps=await readFile("/proc/self/maps","utf8");
+if(!maps.includes(nativePath))throw new Error("Watcher did not map the requested native ELF");
+if(process.env.ANDCODE_LOADER){
+  for(const name of ["ld-linux-aarch64.so.1","libc.so.6","libstdc++.so.6","libgcc_s.so.1"]){
+    const expected=await realpath(path.join(path.dirname(process.env.ANDCODE_LOADER),name));
+    if(!maps.includes(expected))throw new Error("Watcher runtime mapping mismatch: "+name);
+  }
+}
 const dir=await mkdtemp(path.join(process.argv[3],"event-"));let subscribed=false,callback;
 const options={backend:"inotify"};
 try {

@@ -73,7 +73,8 @@ def audit(root):
     if b'\x7fELF\x02\x01\x01' in exe[bun[4]:bun[4] + bun[5]]:
         raise ValueError('ELF remains embedded in Bun graph')
     allowed = {'libc.so.6', 'libm.so.6', 'libpthread.so.0', 'libdl.so.2',
-               'librt.so.1', 'libutil.so.1', 'libstdc++.so.6', 'libgcc_s.so.1'}
+               'librt.so.1', 'libutil.so.1', 'libstdc++.so.6', 'libgcc_s.so.1',
+               'ld-linux-aarch64.so.1'}
     expected = set()
     for row in (root / 'oc2-native.tsv').read_text(encoding='utf8').splitlines():
         physical, digest, size, source = row.split('\t')
