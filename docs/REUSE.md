@@ -176,6 +176,9 @@ watcher 重建 ELF SHA-256 `a384a3ab5aa60dda6c61fb87489a99b719910113c00f54c1f376
 fff 新增诊断重建配方：同一固定源码/lock，以 `-p fff-c --no-default-features
 --features zlob`、固定 Zig 0.16.0 和 GNU bfd 链接器构建，Cargo fetch --locked
 后离线编译；保留选中目标/feature 的 crate 归档、Cargo JSON 消息和最终 GNU map。
+显式 `LIBZ_SYS_STATIC=1` 使用 lock 内 libz-sys 的内嵌 zlib，
+`LIBGIT2_NO_VENDOR=0` 保留选中 vendored-libgit2 分支，避免无记录地依赖 runner libz；
+这些 C 源码仍在 CI 外部归档，不复制进仓库，也不因静态链接成功批准许可。
 LOAD 输入仅在链接后仍存在时记录摘要，rustc 删除的临时对象明确记为不可用；
 这不是逐节/逐文件准确链接归属，也不交付系统工具链对应源码。只有 ELF/导出/
 16K/glibc 与 Bun 实际索引/搜索/glob 成功后才替换实验 npm 输入，随后还须使用

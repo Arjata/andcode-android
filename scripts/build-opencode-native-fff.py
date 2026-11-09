@@ -91,7 +91,7 @@ def validate_and_probe(result, target, output, env):
         raise ValueError('Unexpected rebuilt fff dependency closure: ' + repr(needed))
     symbols = subprocess.check_output(['readelf', '--dyn-syms', '--wide', str(result)], text=True)
     exports = {line.split()[-1] for line in symbols.splitlines() if line.split() and ' UND ' not in line}
-    # Require all current Bun wrapper functions, not merely a successful dlopen.
+    # Require every function used by this Bun probe, not merely a successful dlopen.
     import re
     required = set(re.findall(r'^(fff_\w+):', PROBE, re.M))
     if required - exports:
@@ -142,10 +142,11 @@ def build(upstream, stage):
     root = pty.rust.unpack_candidate(archive, expected, output / 'source')
     lock = root / 'Cargo.lock'
     original_lock = lock.read_bytes()
-    env = {k: v for k, v in os.environ.items() if not k.startswith(('CARGO_', 'RUST', 'ZIG', 'ZLOB_'))
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('CARGO_', 'RUST', 'ZIG', 'ZLOB_', 'LIBZ_', 'LIBGIT2_'))
            and k not in ('LD_PRELOAD', 'LD_LIBRARY_PATH')}
     env.update(CARGO_HOME=str(work / 'cargo-home'), CARGO_TARGET_DIR=str(work / 'target'),
                CARGO_TERM_COLOR='never', ZIG=str(zig), ZLOB_ZIG_CPU='baseline',
+               LIBZ_SYS_STATIC='1', LIBGIT2_NO_VENDOR='0',
                RUSTFLAGS='-C linker=cc -C link-arg=-fuse-ld=bfd -C link-arg=-Wl,-z,max-page-size=16384')
     base = ['--locked', '--manifest-path', str(root / 'Cargo.toml')]
     commands = [
@@ -198,6 +199,7 @@ def build(upstream, stage):
         'installedInput': str(target.relative_to(upstream)), 'needed': needed, 'commands': commands,
         'selectedPackages': packages, 'linkerLoadInputs': inputs,
         'zigVersion': '0.16.0', 'zigArchiveSha256': ZIG_SHA256,
+        'nativeDependencyEnvironment': {key: env[key] for key in ['LIBZ_SYS_STATIC', 'LIBGIT2_NO_VENDOR', 'ZLOB_ZIG_CPU']},
         'rustcVersion': subprocess.check_output(['rustc', '-vV'], text=True).strip(),
         'ccVersion': subprocess.check_output(['cc', '--version'], text=True).splitlines()[0],
         'searchGate': MARKER,
