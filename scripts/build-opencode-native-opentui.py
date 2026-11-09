@@ -124,6 +124,15 @@ def patch_build(text):
         '    // Test step (native only)')
 
 
+def patch_zlib_dependencies(text):
+    """Record non-system prerequisites during the actual fixed zlib compilation."""
+    return patch_once(text, '      `-I${zlibSource}`,\n      "-c",',
+        '      `-I${zlibSource}`,\n'
+        '      "-MMD", "-MF", join(build, `${file}.d`),\n'
+        '      "-MT", `zlib/${file}.o`,\n'
+        '      "-c",')
+
+
 def unpack_nested(data, destination):
     """Fixed nested sources only: reject links, traversal, duplicates and huge input."""
     seen, expanded = set(), 0
@@ -233,8 +242,8 @@ def ffmpeg_source_inputs(native, prefix, objects):
             raise ValueError('FFmpeg installed object differs from build object')
         dep = original.with_suffix('.d')
         if not dep.exists():
-            # Fixed zlib make recipe does not emit dependency files. This gap
-            # must remain visible; never infer complete source attribution.
+            # Historical zlib builds did not emit dependency files. Preserve the
+            # gap in this reader; new build integration requires them below.
             if library != 'libz':
                 raise ValueError('Missing FFmpeg compiler dependency file')
             missing.append(item)
@@ -268,7 +277,7 @@ def ffmpeg_source_inputs(native, prefix, objects):
                          'dependencies': dependencies})
     return {'objects': mappings, 'files': [files[key] for key in sorted(files)],
             'objectsWithoutDependencyFiles': missing,
-            'scope': 'Retained make dependencies only; no system-header, zlib-header or complete per-file license approval'}
+            'scope': 'Recorded non-system compiler dependencies only; missing objects explicit, no complete compiler-input or per-file license approval'}
 
 
 def probe_ffmpeg_crc(prefix, output, env):
@@ -719,8 +728,9 @@ def build(upstream, stage):
     # dispatch features; otherwise crc.c still references the excluded symbols.
     # The independently selected NEON group remains enabled.
     patched_script = patch_once(patched_script, '    "--disable-gpl",',
-                                '    "--disable-gpl",\n    "--disable-armv8",\n'
-                                '    "--disable-arm-crc",\n    "--disable-pmull",')
+                                 '    "--disable-gpl",\n    "--disable-armv8",\n'
+                                 '    "--disable-arm-crc",\n    "--disable-pmull",')
+    patched_script = patch_zlib_dependencies(patched_script)
     ffmpeg_script.write_text(patched_script, encoding='utf8')
     (output / 'original-build-ffmpeg.ts').write_text(original_script, encoding='utf8')
     downloads = native / '.cache/ffmpeg/downloads'
@@ -764,6 +774,8 @@ def build(upstream, stage):
         shutil.copyfile(source, dest)
     configuration = ffmpeg_configuration((output / 'ffmpeg-config/config.h').read_text(encoding='utf8'))
     source_inputs = ffmpeg_source_inputs(native, prefix, objects)
+    if source_inputs['objectsWithoutDependencyFiles']:
+        raise ValueError('New media build must retain every compiler dependency file')
     notices = retain_ffmpeg_notices(native, source_inputs, output)
     crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)

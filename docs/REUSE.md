@@ -304,6 +304,14 @@ replacement experiment, not complete FFmpeg relinking, corresponding-source
 delivery, Bun/JSC compliance or Android approval. It never replaces the staged
 baseline library or the official APK payload.
 
+The subsequent recipe will request compiler-generated `-MMD` dependencies for
+all eleven zlib objects with explicit `zlib/<name>.o` targets. New builds must
+retain these files and map their cache-local source/header bytes before staging.
+This closes only the previously explicit zlib non-system dependency gap if
+verified by CI; `-MMD` still omits system headers and does not prove complete
+compiler inputs or per-file licensing. Historical artifacts without those files
+remain unchanged and retain their recorded limitation.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

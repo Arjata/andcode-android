@@ -160,6 +160,37 @@ class Tests(unittest.TestCase):
             self.assertEqual(report['objectsWithoutDependencyFiles'], [item])
             self.assertEqual(report['files'], [])
 
+    def test_zlib_dependency_patch_is_exact_and_rejects_repeat(self):
+        source = 'run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);'
+        modified = m.patch_zlib_dependencies(source)
+        self.assertIn('"-MMD", "-MF", join(build, `${file}.d`)', modified)
+        self.assertIn('"-MT", `zlib/${file}.o`', modified)
+        self.assertLess(modified.index('"-MMD"'), modified.index('"-c"'))
+        for invalid in [modified, source + source, source.replace('"-c"', '"-S"')]:
+            with self.assertRaises(ValueError): m.patch_zlib_dependencies(invalid)
+
+    def test_zlib_emitted_dependencies_are_recorded_and_bound_to_object(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            native = Path(tmp)
+            cache = native / '.cache/ffmpeg'
+            build = cache / 'build/aarch64-linux/zlib'
+            build.mkdir(parents=True)
+            prefix = cache / 'prefix/aarch64-linux'
+            (prefix / 'objects/libz').mkdir(parents=True)
+            source = cache / 'sources/zlib-1.3.2'
+            source.mkdir(parents=True)
+            for name in ['fixture.c', 'zlib.h']:
+                (source / name).write_text('/* zlib fixture */\n')
+            (build / 'fixture.o').write_bytes(b'zlib-object')
+            (prefix / 'objects/libz/fixture.o').write_bytes(b'zlib-object')
+            dependencies = [(source / name).as_posix() for name in ['fixture.c', 'zlib.h']]
+            (build / 'fixture.d').write_text('zlib/fixture.o: ' + ' \\\n '.join(dependencies))
+            report = m.ffmpeg_source_inputs(native, prefix, ['objects/libz/fixture.o'])
+            self.assertEqual(report['objectsWithoutDependencyFiles'], [])
+            self.assertEqual(report['objects'][0]['dependencies'],
+                             ['sources/zlib-1.3.2/' + name for name in ['fixture.c', 'zlib.h']])
+            self.assertEqual(len(report['files']), 2)
+
     def test_crc_probe_requires_compilation_execution_and_marker(self):
         for mode in ['ok', 'compile-failed', 'run-failed', 'no-marker']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
@@ -620,7 +651,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -633,8 +664,8 @@ class Tests(unittest.TestCase):
                     '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;\n'
                     '    // Test step (native only)')
                 (native / 'scripts/build-ffmpeg.ts').write_text(
-                    '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")\n'
-                    '    "--disable-gpl",')
+                     '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")\n'
+                    '    "--disable-gpl",\n      `-I${zlibSource}`,\n      "-c",')
                 target = upstream / 'node_modules/.bun/@opentui+core-linux-arm64@0.8.1/node_modules/@opentui/core-linux-arm64/libopentui.so'
                 target.parent.mkdir(parents=True)
                 target.write_bytes(b'original')
@@ -666,9 +697,17 @@ class Tests(unittest.TestCase):
                         if failure == 'source-license':
                             (build / 'libavutil/fixture.c').write_text('GNU General Public License')
                         (build / 'libavutil/fixture.d').write_text('libavutil/fixture.o: libavutil/fixture.c')
+                        if failure == 'missing-zlib-dependencies':
+                            (prefix / 'objects/libz').mkdir()
+                            (prefix / 'objects/libz/fixture.o').write_bytes(b'zlib-object')
+                            (build / 'zlib').mkdir()
+                            (build / 'zlib/fixture.o').write_bytes(b'zlib-object')
+                            with (prefix / 'objects.txt').open('a') as listing:
+                                listing.write('objects/libz/fixture.o\n')
                         self.assertIn('"--disable-armv8",', (native / 'scripts/build-ffmpeg.ts').read_text())
                         self.assertIn('"--disable-arm-crc",', (native / 'scripts/build-ffmpeg.ts').read_text())
                         self.assertIn('"--disable-pmull",', (native / 'scripts/build-ffmpeg.ts').read_text())
+                        self.assertIn('"-MT", `zlib/${file}.o`', (native / 'scripts/build-ffmpeg.ts').read_text())
                         for name in ['config.h', 'ffbuild/config.mak', 'ffbuild/config.log']:
                             (build / name).write_text(self.CONFIG if name == 'config.h' else 'config fixture')
                         if failure == 'configuration':
