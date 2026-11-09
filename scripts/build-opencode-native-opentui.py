@@ -79,10 +79,16 @@ def unpack_nested(data, destination):
 def ffmpeg_configuration(text):
     """Reject license/configuration drift, not a replacement for per-file review."""
     definitions = {}
-    for name, value in re.findall(r'^#define\s+(\w+)\s+([^\r\n]+)', text, re.M):
+    for name, value in re.findall(r'^#define[ \t]+(\w+)[ \t]+([^\r\n]+)', text, re.M):
+        value = value.strip()
         if name in definitions:
+            # Fixed FFmpeg 9.0.2 lists libsmbclient in both GPLV3 and general
+            # external libraries, so configure emits this disabled macro twice.
+            # Permit that exact upstream duplicate only, never conflicting values.
+            if name == 'CONFIG_LIBSMBCLIENT' and definitions[name] == value == '0':
+                continue
             raise ValueError('Duplicate FFmpeg configuration macro: ' + name)
-        definitions[name] = value.strip()
+        definitions[name] = value
     expected = {'FFMPEG_LICENSE': '"LGPL version 2.1 or later"',
                 'CONFIG_GPL': '0', 'CONFIG_VERSION3': '0', 'CONFIG_NONFREE': '0',
                 'CONFIG_NETWORK': '0', 'CONFIG_ZLIB': '1'}

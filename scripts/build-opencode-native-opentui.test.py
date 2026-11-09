@@ -31,6 +31,19 @@ class Tests(unittest.TestCase):
             with self.subTest(configuration=changed), self.assertRaises(ValueError):
                 m.ffmpeg_configuration(changed)
 
+    def test_fixed_ffmpeg_disabled_smb_duplicate(self):
+        generated = ('#ifndef FFMPEG_CONFIG_H\n#define FFMPEG_CONFIG_H\n' + self.CONFIG
+                     + '#define CONFIG_LIBSMBCLIENT 0\n#define CONFIG_LIBSMBCLIENT 0\n#endif\n')
+        self.assertEqual(m.ffmpeg_configuration(generated)['FFMPEG_LICENSE'],
+                         '"LGPL version 2.1 or later"')
+        for duplicate in ['#define CONFIG_LIBSMBCLIENT 1\n', '#define CONFIG_NETWORK 0\n']:
+            with self.subTest(duplicate=duplicate), self.assertRaises(ValueError):
+                m.ffmpeg_configuration(generated + duplicate)
+        # A valueless header guard must not consume the next macro's line.
+        with self.assertRaisesRegex(ValueError, 'FFMPEG_LICENSE'):
+            m.ffmpeg_configuration('#define FFMPEG_CONFIG_H\n'
+                                   + self.CONFIG.replace('LGPL version 2.1', 'GPL version 3'))
+
     def test_exact_anchor(self):
         self.assertEqual(m.patch_once('before anchor after', 'anchor', 'patched'), 'before patched after')
         for text in ['missing', 'anchor anchor']:

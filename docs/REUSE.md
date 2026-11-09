@@ -53,8 +53,12 @@ LICENSE SHA-256 `5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff17
 app-data-tests/build-bundle 已成功，APK 作业在 NDK 下载 ZIP 损坏处失败，未执行
 Gradle 构建，不据此声称 APK 通过。
 构建后额外校验生成的 FFmpeg `config.h`:许可字符串须为 LGPL version 2.1 or
-later，GPL/version3/nonfree/network 必须关闭、zlib 必须启用；缺宏、重复宏或配置
-漂移均拒绝替换实验输入。该配置检查只防配方漂移，不替代 C/汇编逐文件许可、
+later，GPL/version3/nonfree/network 必须关闭、zlib 必须启用；缺宏、冲突宏或配置
+漂移均拒绝替换实验输入。只允许固定 FFmpeg 9.0.2 configure 在 GPLV3/general
+external library 两表重复列出的 `CONFIG_LIBSMBCLIENT 0` 同值重复，其它重复仍
+拒绝。CI `42623976037`(提交 `5c80984`)即因原检查器拒绝这个上游重复而失败，
+不是启用了 Samba/GPL 或源码编译失败；横向空白匹配避免无值头文件保护宏吞掉
+下一行。该配置检查只防配方漂移，不替代 C/汇编逐文件许可、
 专利/地区使用限制或 LGPL 对应源码/重链接材料审查。
 
 源码实验 CI 的 `collect-opencode-native-licenses.py` 对四个固定原生导入逐一核对
