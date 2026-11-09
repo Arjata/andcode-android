@@ -120,6 +120,7 @@ jobs:
           sudo unshare --mount --propagation private bash "$GITHUB_WORKSPACE/scripts/ubuntu-rootfs-test.sh" "$RUNNER_TEMP/ubuntu-mmdebstrap.img"
       - name: Audit candidate baseline ELF compatibility
         run: |
+          set -euo pipefail
           mkdir "$RUNNER_TEMP/ubuntu-mmdebstrap-audit"
           # Compare the original image, not the copy already changed by apt/compilers.
           gzip -dc dist/ubuntu-mmdebstrap/andcode-ubuntu-arm64.img.gz > "$RUNNER_TEMP/ubuntu-mmdebstrap-original.img"
