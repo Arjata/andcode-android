@@ -29,6 +29,74 @@ try{
  console.log("ANDCODE_SOURCE_OPENTUI_ABI_OK");
 }finally{lib.close()}
 '''
+CRC_MARKER = 'ANDCODE_SOURCE_FFMPEG_CRC_OK'
+CRC_PROBE = r'''/* andcode-owned bitwise CRC reference, not copied FFmpeg implementation. */
+#include <stdint.h>
+#include <stdio.h>
+#include <libavutil/crc.h>
+
+static uint32_t swap32(uint32_t value) {
+    return ((value & 255) << 24) | ((value & 65280) << 8)
+         | ((value >> 8) & 65280) | (value >> 24);
+}
+
+static uint32_t reference(const uint8_t *data, size_t size, uint32_t seed,
+                          unsigned bits, uint32_t polynomial, int little) {
+    uint32_t mask = UINT32_MAX >> (32 - bits);
+    uint32_t crc = seed & mask;
+    for (size_t i = 0; i < size; ++i) {
+        crc ^= (uint32_t)data[i] << (little ? 0 : bits - 8);
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            if (little) crc = (crc >> 1) ^ ((crc & 1) ? polynomial : 0);
+            else crc = ((crc << 1) ^ ((crc & (UINT32_C(1) << (bits - 1))) ? polynomial : 0)) & mask;
+        }
+    }
+    return little ? crc : swap32(crc << (32 - bits));
+}
+
+int main(void) {
+    static const struct { AVCRCId id; unsigned bits; uint32_t poly; int little; } specs[] = {
+        { AV_CRC_8_ATM, 8, 0x07, 0 }, { AV_CRC_8_EBU, 8, 0x1d, 0 },
+        { AV_CRC_16_ANSI, 16, 0x8005, 0 }, { AV_CRC_16_ANSI_LE, 16, 0xa001, 1 },
+        { AV_CRC_16_CCITT, 16, 0x1021, 0 }, { AV_CRC_24_IEEE, 24, 0x864cfb, 0 },
+        { AV_CRC_32_IEEE, 32, 0x04c11db7, 0 }, { AV_CRC_32_IEEE_LE, 32, 0xedb88320, 1 }
+    };
+    static const size_t lengths[] = { 0, 1, 7, 32, 1999, 4096 };
+    uint8_t data[4104];
+    for (size_t i = 0; i < sizeof(data); ++i) data[i] = (uint8_t)(i * 73 + i * i);
+    unsigned cases = 0;
+    for (size_t s = 0; s < sizeof(specs) / sizeof(specs[0]); ++s) {
+        AVCRC small[257], large[1024];
+        if (av_crc_init(small, specs[s].little, specs[s].bits, specs[s].poly, sizeof(small)) < 0
+            || av_crc_init(large, specs[s].little, specs[s].bits, specs[s].poly, sizeof(large)) < 0) return 2;
+        const AVCRC *tables[] = { av_crc_get_table(specs[s].id), small, large };
+        for (size_t t = 0; t < 3; ++t) {
+            if (!tables[t]) return 3;
+            for (size_t offset = 0; offset < 8; ++offset) {
+                for (size_t l = 0; l < sizeof(lengths) / sizeof(lengths[0]); ++l) {
+                    for (unsigned use_seed = 0; use_seed < 2; ++use_seed) {
+                        uint32_t seed = use_seed ? UINT32_C(0xa5b6c7d8) >> (32 - specs[s].bits) : 0;
+                        uint32_t initial = specs[s].little ? seed : swap32(seed << (32 - specs[s].bits));
+                        size_t length = lengths[l], split = length / 2;
+                        uint32_t expected = reference(data + offset, length, seed, specs[s].bits, specs[s].poly, specs[s].little);
+                        uint32_t whole = av_crc(tables[t], initial, data + offset, length);
+                        uint32_t chunk = av_crc(tables[t], initial, data + offset, split);
+                        chunk = av_crc(tables[t], chunk, data + offset + split, length - split);
+                        if (whole != expected || chunk != expected) {
+                            fprintf(stderr, "CRC mismatch spec=%zu table=%zu offset=%zu length=%zu seed=%u\n", s, t, offset, length, use_seed);
+                            return 4;
+                        }
+                        ++cases;
+                    }
+                }
+            }
+        }
+    }
+    if (cases != 2304) return 5;
+    puts("ANDCODE_SOURCE_FFMPEG_CRC_OK 2304 cases (Linux only)");
+    return 0;
+}
+'''
 
 
 def patch_once(text, anchor, replacement):
@@ -154,6 +222,26 @@ def ffmpeg_source_inputs(native, prefix, objects):
     return {'objects': mappings, 'files': [files[key] for key in sorted(files)],
             'objectsWithoutDependencyFiles': missing,
             'scope': 'Retained make dependencies only; no system-header, zlib-header or complete per-file license approval'}
+
+
+def probe_ffmpeg_crc(prefix, output, env):
+    """Exercise retained libavutil against an independent bitwise reference."""
+    source, binary = output / 'crc-probe.c', output / 'crc-probe'
+    source.write_text(CRC_PROBE, encoding='utf8', newline='\n')
+    commands = [['cc', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+                 '-I', str(prefix / 'include'), str(source), str(prefix / 'lib/libavutil.a'),
+                 '-lm', '-pthread', '-Wl,-z,max-page-size=16384', '-o', str(binary)], [str(binary)]]
+    with (output / 'crc-probe.log').open('w', encoding='utf8') as log:
+        for command in commands:
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=60)
+            log.write(shlex.join(command) + '\n' + result.stdout + result.stderr)
+            result.check_returncode()
+        if CRC_MARKER + ' 2304 cases (Linux only)' not in result.stdout:
+            raise ValueError('FFmpeg CRC reference probe did not complete')
+    return {'commands': commands, 'cases': 2304, 'marker': CRC_MARKER,
+            'sourceSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+            'binarySha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+            'scope': 'Runner-linked standalone libavutil probe; not Android, decoder or final library export acceptance'}
 
 
 def retain_link_inputs(text, native, output, env):
@@ -378,6 +466,7 @@ def build(upstream, stage):
         shutil.copyfile(source, dest)
     configuration = ffmpeg_configuration((output / 'ffmpeg-config/config.h').read_text(encoding='utf8'))
     source_inputs = ffmpeg_source_inputs(native, prefix, objects)
+    crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
     if Path(link['output']).read_bytes() != result.read_bytes():
@@ -396,6 +485,7 @@ def build(upstream, stage):
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
         'ffmpegSourceInputs': source_inputs,
+        'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
                         'Explicit linker input copies do not prove selected archive members, per-file source attribution or toolchain corresponding source',

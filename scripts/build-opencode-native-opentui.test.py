@@ -160,6 +160,37 @@ class Tests(unittest.TestCase):
             self.assertEqual(report['objectsWithoutDependencyFiles'], [item])
             self.assertEqual(report['files'], [])
 
+    def test_crc_probe_requires_compilation_execution_and_marker(self):
+        for mode in ['ok', 'compile-failed', 'run-failed', 'no-marker']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                calls = []
+
+                def run(command, **kwargs):
+                    calls.append(command)
+                    self.assertEqual(kwargs['env'], {'fixture': 'clean'})
+                    self.assertEqual(kwargs['timeout'], 60)
+                    if len(calls) == 1:
+                        self.assertIn('-Werror', command)
+                        self.assertIn('-Wl,-z,max-page-size=16384', command)
+                        self.assertIn(str(root / 'prefix/lib/libavutil.a'), command)
+                        (root / 'crc-probe').write_bytes(b'probe')
+                    failed = ((mode == 'compile-failed' and len(calls) == 1)
+                              or (mode == 'run-failed' and len(calls) == 2))
+                    stdout = '' if mode == 'no-marker' else m.CRC_MARKER + ' 2304 cases (Linux only)'
+                    return subprocess.CompletedProcess(command, 1 if failed else 0, stdout, '')
+
+                with patch.object(m.subprocess, 'run', side_effect=run):
+                    if mode == 'ok':
+                        report = m.probe_ffmpeg_crc(root / 'prefix', root, {'fixture': 'clean'})
+                        self.assertEqual(report['cases'], 2304)
+                        self.assertEqual(report['sourceSha256'], hashlib.sha256(m.CRC_PROBE.encode()).hexdigest())
+                        self.assertEqual(report['binarySha256'], hashlib.sha256(b'probe').hexdigest())
+                    else:
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                            m.probe_ffmpeg_crc(root / 'prefix', root, {'fixture': 'clean'})
+                self.assertEqual(len(calls), 1 if mode == 'compile-failed' else 2)
+
     def test_failure_keeps_original(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
@@ -328,7 +359,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'link', 'link-output']:
+        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -416,6 +447,8 @@ class Tests(unittest.TestCase):
                         patch.object(m.pty.rust.sources, 'inspect_archive', return_value={}), \
                         patch.object(m.pty.rust, 'unpack_candidate', return_value=source), \
                         patch.object(m, 'unpack_nested'), \
+                        patch.object(m, 'probe_ffmpeg_crc', return_value={'cases': 2304},
+                                     side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None), \
                         patch.object(m.subprocess, 'check_output', return_value='0.17.0'), \
                         patch.object(m.subprocess, 'run', side_effect=run), \
                         patch.object(m, 'validate', side_effect=validate) as probe:
