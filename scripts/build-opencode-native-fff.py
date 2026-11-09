@@ -17,6 +17,72 @@ ORIGINAL = '3e037ac8584fa49eaeedc8eacbb116682854d4a623efcf7feb68f25656e7bfcd'
 ZIG_SHA256 = 'ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17'
 FLAGS = ['-p', 'fff-c', '--no-default-features', '--features', 'zlob']
 MARKER = 'ANDCODE_SOURCE_FFF_SEARCH_GLOB_OK'
+SORT_INPUTS = {
+    'Cargo.toml': '57ce8f9edcb94bbdd28bc930f834882a89c970851ebe3b5203a7632f10f02b1c',
+    'Cargo.lock': '5f862723546a9819de97aab3d6bd25e4326e3c6390d6b1c8a2063589ffa829bd',
+    'crates/fff-core/Cargo.toml': 'aa7653a643fa18ee7f989dab4e6d465f25963ffabba63f6760eaba6eea5a06e6',
+    'crates/fff-core/src/sort_buffer.rs': '73af6547e3ba6645d8aecbbbaf0da9e49f0a15d267c27b02714b548dc4ae937c',
+}
+SORT_ADAPTER = r'''// andcode-owned adapter: use Rust's stable sort, not glidesort source.
+// Modified for the andcode source experiment; shared scratch-buffer optimization removed.
+pub fn sort_with_buffer<T, F>(slice: &mut [T], compare: F)
+where F: FnMut(&T, &T) -> std::cmp::Ordering {
+    slice.sort_by(compare);
+}
+
+pub fn sort_by_key_with_buffer<T, K, F>(slice: &mut [T], key_fn: F)
+where K: Ord, F: FnMut(&T) -> K {
+    slice.sort_by_key(key_fn);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn order_empty_single_and_duplicates() {
+        let mut data = [3, 1, 4, 1, 5, 9, 2, 6];
+        sort_with_buffer(&mut data, |a, b| a.cmp(b));
+        assert_eq!(data, [1, 1, 2, 3, 4, 5, 6, 9]);
+        sort_with_buffer(&mut data, |a, b| b.cmp(a));
+        assert_eq!(data, [9, 6, 5, 4, 3, 2, 1, 1]);
+        let mut empty: [i32; 0] = [];
+        sort_with_buffer(&mut empty, |a, b| a.cmp(b));
+        sort_by_key_with_buffer(&mut empty, |a| *a);
+        let mut single = [42];
+        sort_by_key_with_buffer(&mut single, |a| *a);
+        assert_eq!(single, [42]);
+    }
+    #[test]
+    fn both_entries_preserve_stable_ties_and_non_copy_values() {
+        let original = vec![(2, String::from("a")), (1, String::from("b")),
+                            (2, String::from("c")), (1, String::from("d"))];
+        let mut by = original.clone();
+        let mut calls = 0;
+        sort_with_buffer(&mut by, |a, b| { calls += 1; a.0.cmp(&b.0) });
+        assert!(calls > 0);
+        let mut key = original;
+        sort_by_key_with_buffer(&mut key, |a| a.0);
+        assert_eq!(by, key);
+        assert_eq!(by.iter().map(|a| a.1.as_str()).collect::<Vec<_>>(), ["b", "d", "a", "c"]);
+    }
+    #[test]
+    fn comparator_panic_keeps_owned_elements() {
+        let mut values: Vec<_> = (0..100).rev().map(|i| i.to_string()).collect();
+        let mut calls = 0;
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            sort_with_buffer(&mut values, |a, b| {
+                calls += 1;
+                if calls == 5 { panic!("fixture comparator"); }
+                a.cmp(b)
+            });
+        })).is_err());
+        values.sort();
+        let mut expected: Vec<_> = (0..100).map(|i| i.to_string()).collect();
+        expected.sort();
+        assert_eq!(values, expected);
+    }
+}
+'''
 PROBE = '''import {dlopen,FFIType as T,CString} from "bun:ffi";
 import {mkdtemp,writeFile,readFile,realpath,rm} from "node:fs/promises";
 import path from "node:path";
@@ -68,6 +134,60 @@ try{
  console.log("ANDCODE_SOURCE_FFF_SEARCH_GLOB_OK");
 }finally{try{if(handle)f.fff_destroy(handle)}finally{lib.close();await rm(dir,{recursive:true,force:true})}}
 '''
+
+
+def replace_glidesort(root):
+    """Only transform exact fixed source bytes; preserve the original archive separately."""
+    data = {name: (root / name).read_bytes() for name in SORT_INPUTS}
+    for name, expected in SORT_INPUTS.items():
+        if hashlib.sha256(data[name]).hexdigest() != expected:
+            raise ValueError('Unexpected fff sort adapter source: ' + name)
+    changes = {
+        'Cargo.toml': ('glidesort = "0.1"\n', ''),
+        'crates/fff-core/Cargo.toml': ('glidesort = { workspace = true }\n', ''),
+        'Cargo.lock': (' "glidesort",\n', ''),
+    }
+    updated = {name: value.decode('utf8') for name, value in data.items()}
+    for name, (old, new) in changes.items():
+        if updated[name].count(old) != 1:
+            raise ValueError('Unexpected glidesort dependency occurrence')
+        updated[name] = updated[name].replace(old, new)
+    block = ('[[package]]\nname = "glidesort"\nversion = "0.1.2"\n'
+             'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+             'checksum = "f2e102e6eb644d3e0b186fc161e4460417880a0a0b87d235f2e5b8fb30f2e9e0"\n\n')
+    if updated['Cargo.lock'].count(block) != 1:
+        raise ValueError('Unexpected glidesort lock entry')
+    updated['Cargo.lock'] = updated['Cargo.lock'].replace(block, '')
+    updated['crates/fff-core/src/sort_buffer.rs'] = SORT_ADAPTER
+    lock = tomllib.loads(updated['Cargo.lock'])
+    for package in lock['package']:
+        if package['name'] == 'glidesort' or any(d.split()[0] == 'glidesort' for d in package.get('dependencies', [])):
+            raise ValueError('glidesort remains in modified lockfile')
+    rows = []
+    for name, text in updated.items():
+        payload = text.encode('utf8')
+        (root / name).write_bytes(payload)
+        rows.append({'path': name, 'originalSha256': SORT_INPUTS[name],
+                     'modifiedSha256': hashlib.sha256(payload).hexdigest(), 'bytes': len(payload)})
+    return {'files': rows, 'implementation': 'Rust standard-library stable slice sorting',
+            'scope': 'Removes glidesort from modified build only; no performance or redistribution approval'}
+
+
+def probe_sort_adapter(root, output, env):
+    binary = output / 'sort-test'
+    commands = [['rustc', '--edition=2021', '--test', str(root / 'crates/fff-core/src/sort_buffer.rs'),
+                 '-C', 'link-arg=-Wl,-z,max-page-size=16384', '-o', str(binary)],
+                [str(binary), '--test-threads=1']]
+    log = output / 'sort-test.log'
+    log.write_text('', encoding='utf8')
+    for command in commands:
+        done = subprocess.run(command, env=env, capture_output=True, text=True, timeout=60)
+        with log.open('a', encoding='utf8') as stream:
+            stream.write(' '.join(command) + '\n' + done.stdout + done.stderr)
+        done.check_returncode()
+    if '3 passed; 0 failed' not in done.stdout:
+        raise ValueError('Stable sorting adapter tests did not complete')
+    return {'commands': commands, 'tests': 3, 'sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
 
 
 def link_inputs(text, cwd=None):
@@ -149,6 +269,7 @@ def build(upstream, stage):
     archive = output / f'fff-{commit}.tar.gz'
     archive.write_bytes(data)
     root = pty.rust.unpack_candidate(archive, expected, output / 'source')
+    sort_adapter = replace_glidesort(root)
     lock = root / 'Cargo.lock'
     original_lock = lock.read_bytes()
     env = {k: v for k, v in os.environ.items() if not k.startswith(('CARGO_', 'RUST', 'ZIG', 'ZLOB_', 'LIBZ_', 'LIBGIT2_'))
@@ -156,7 +277,8 @@ def build(upstream, stage):
     env.update(CARGO_HOME=str(work / 'cargo-home'), CARGO_TARGET_DIR=str(work / 'target'),
                CARGO_TERM_COLOR='never', ZIG=str(zig), ZLOB_ZIG_CPU='baseline',
                LIBZ_SYS_STATIC='1', LIBGIT2_NO_VENDOR='0',
-               RUSTFLAGS='-C linker=cc -C link-arg=-fuse-ld=bfd -C link-arg=-Wl,-z,max-page-size=16384')
+                RUSTFLAGS='-C linker=cc -C link-arg=-fuse-ld=bfd -C link-arg=-Wl,-z,max-page-size=16384')
+    sort_probe = probe_sort_adapter(root, output, env)
     base = ['--locked', '--manifest-path', str(root / 'Cargo.toml')]
     commands = [
         ['cargo', 'fetch', *base, '--target', pty.rust.TARGET],
@@ -180,6 +302,8 @@ def build(upstream, stage):
     # Persist the target/feature-selected registry archives actually fetched for
     # this build. This does not turn build scripts or compiler inputs into a sandbox.
     packages = pty.rust.selected_packages((output / 'command-1.log').read_text(), tomllib.loads(original_lock.decode()))
+    if any(package['name'] == 'glidesort' for package in packages):
+        raise ValueError('glidesort remains in selected fff build graph')
     crates = output / 'crates'
     crates.mkdir()
     for package in packages:
@@ -207,6 +331,7 @@ def build(upstream, stage):
         'originalNpmSha256': ORIGINAL, 'rebuiltSha256': hashlib.sha256(result.read_bytes()).hexdigest(),
         'installedInput': str(target.relative_to(upstream)), 'needed': needed, 'commands': commands,
         'selectedPackages': packages, 'linkerLoadInputs': inputs,
+        'sortAdapter': sort_adapter, 'sortProbe': sort_probe,
         'zigVersion': '0.16.0', 'zigArchiveSha256': ZIG_SHA256,
         'nativeDependencyEnvironment': {key: env[key] for key in ['LIBZ_SYS_STATIC', 'LIBGIT2_NO_VENDOR', 'ZLOB_ZIG_CPU']},
         'rustcVersion': subprocess.check_output(['rustc', '-vV'], text=True).strip(),

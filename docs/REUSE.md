@@ -401,6 +401,17 @@ API license=null；`Cargo.toml` 的 `MIT OR Apache-2.0` 声明和 README 的署�
 实际版权/许可通知。未伪造 MIT 作者年份、未从其他项目借许可文本；此项保持
 blocked，待上游补齐或换用经审查的实现，不能仅因源码匹配批准分发。
 
+后续实验配方改用自有薄适配层调用 Rust `slice::sort_by` / `sort_by_key`，不复制
+glidesort 实现。仅在四个固定文件原始摘要匹配时，移除 workspace/fff-core 的
+glidesort 声明与锁文件中唯一依赖边/包记录，替换两个内部排序入口；保存每项
+修改前后摘要及修改后源码/锁文件。继续使用 `--locked` 构建，拒绝依赖图仍选中
+glidesort，独立测试升/降序、稳定同键、空/单元素、非 Copy 与 panic 安全。
+新实现放弃共享临时缓冲优化，不能声称性能等价；新的 Rust 标准库来源/许可仍须
+审查。原始来源候选树和旧工件继续含 glidesort 且 blocked，只有修改后的实验
+构建可声明已排除该依赖；真实 CI 排序/搜索/glob/TUI 尚待回归，不批准 APK。
+本机已对固定四文件实际应用补丁并复核全部修改摘要，Windows rustc 编译后的
+3 项自有排序测试通过；这不替代 arm64/Linux CI 或 Android/性能验证。
+
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
 包内 copyright。同日读取现有 Ubuntu 24.04 实例 gcc-14 包 copyright，确认

@@ -89,7 +89,7 @@ class FffBuildTest(unittest.TestCase):
                         self.assertEqual(target.read_bytes(), b'rebuilt')
 
     def test_locked_build_records_inputs_and_rejects_lock_mutation(self):
-        for failure in [None, 'lock', 'cargo']:
+        for failure in [None, 'lock', 'cargo', 'sort-patch', 'sort-test']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -132,7 +132,11 @@ class FffBuildTest(unittest.TestCase):
                      patch.object(module.shutil, 'which', return_value=str(zig)), \
                      patch.object(module.pty.rust.sources, 'download_archive', return_value=b'source archive'), \
                      patch.object(module.pty.rust.sources, 'inspect_archive', return_value={}), \
-                     patch.object(module.pty.rust, 'unpack_candidate', return_value=source), \
+                      patch.object(module.pty.rust, 'unpack_candidate', return_value=source), \
+                      patch.object(module, 'replace_glidesort', return_value={'files': []},
+                                   side_effect=ValueError('sort patch failed') if failure == 'sort-patch' else None), \
+                      patch.object(module, 'probe_sort_adapter', return_value={'tests': 3},
+                                   side_effect=ValueError('sort tests failed') if failure == 'sort-test' else None), \
                      patch.object(module.subprocess, 'run', side_effect=run), \
                      patch.object(module.subprocess, 'check_output', side_effect=['0.16.0', 'rustc fixture', 'cc fixture']), \
                      patch.object(module, 'validate_and_probe', side_effect=validate) as probe:
@@ -149,6 +153,75 @@ class FffBuildTest(unittest.TestCase):
                         for key in ['redistributionApproved', 'androidApproved', 'originalNpmBinaryCorrespondenceProven']:
                             self.assertIs(report[key], False)
                         self.assertEqual(len(report['linkerLoadInputs']), 1)
+
+    def test_sort_replacement_rejects_source_drift_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in module.SORT_INPUTS:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'changed source')
+            with self.assertRaisesRegex(ValueError, 'Unexpected fff sort adapter source'):
+                module.replace_glidesort(root)
+            self.assertTrue(all((root / name).read_bytes() == b'changed source' for name in module.SORT_INPUTS))
+
+    def test_sort_replacement_removes_only_fixed_dependency_and_records_bytes(self):
+        fixture = {
+            'Cargo.toml': b'[workspace.dependencies]\nglidesort = "0.1"\nother = "1"\n',
+            'crates/fff-core/Cargo.toml': b'[dependencies]\nglidesort = { workspace = true }\n',
+            'crates/fff-core/src/sort_buffer.rs': b'fixture upstream adapter',
+            'Cargo.lock': (b'[[package]]\nname = "fff-core"\nversion = "1"\ndependencies = [\n "glidesort",\n]\n\n'
+                           b'[[package]]\nname = "glidesort"\nversion = "0.1.2"\n'
+                           b'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+                           b'checksum = "f2e102e6eb644d3e0b186fc161e4460417880a0a0b87d235f2e5b8fb30f2e9e0"\n\n'),
+        }
+        for mode in ['ok', 'manifest-shape', 'lock-shape', 'remaining-edge']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                data = dict(fixture)
+                if mode == 'manifest-shape':data['Cargo.toml'] += b'glidesort = "0.1"\n'
+                if mode == 'lock-shape':data['Cargo.lock'] = data['Cargo.lock'].replace(b'0.1.2', b'0.1.3')
+                if mode == 'remaining-edge':data['Cargo.lock'] += b'[[package]]\nname = "other"\nversion = "1"\ndependencies = ["glidesort 0.1.2"]\n'
+                for name, payload in data.items():
+                    path = root / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(payload)
+                pins = {name: hashlib.sha256(payload).hexdigest() for name, payload in data.items()}
+                with patch.object(module, 'SORT_INPUTS', pins):
+                    if mode != 'ok':
+                        with self.assertRaises(ValueError):module.replace_glidesort(root)
+                        self.assertTrue(all((root / name).read_bytes() == payload for name, payload in data.items()))
+                    else:
+                        report = module.replace_glidesort(root)
+                        self.assertEqual(len(report['files']), 4)
+                        self.assertNotIn('glidesort', (root / 'Cargo.lock').read_text())
+                        self.assertEqual((root / 'crates/fff-core/src/sort_buffer.rs').read_bytes(), module.SORT_ADAPTER.encode())
+                        for row in report['files']:
+                            self.assertEqual(row['originalSha256'], pins[row['path']])
+                            self.assertEqual(row['modifiedSha256'], hashlib.sha256((root / row['path']).read_bytes()).hexdigest())
+
+    def test_sort_probe_fails_closed(self):
+        for mode in ['ok', 'compile', 'run', 'marker']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                calls = []
+                def run(command, **kwargs):
+                    calls.append(command)
+                    self.assertEqual(kwargs['env'], {'fixture': 'clean'})
+                    self.assertEqual(kwargs['timeout'], 60)
+                    if len(calls) == 1:
+                        self.assertEqual(command[:3], ['rustc', '--edition=2021', '--test'])
+                        (root / 'sort-test').write_bytes(b'tests')
+                    failed = (mode == 'compile' and len(calls) == 1) or (mode == 'run' and len(calls) == 2)
+                    return subprocess.CompletedProcess(command, 1 if failed else 0,
+                                                       '' if mode == 'marker' else '3 passed; 0 failed', '')
+                with patch.object(module.subprocess, 'run', side_effect=run):
+                    if mode == 'ok':
+                        report = module.probe_sort_adapter(root, root, {'fixture': 'clean'})
+                        self.assertEqual(report['tests'], 3)
+                    else:
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                            module.probe_sort_adapter(root, root, {'fixture': 'clean'})
 
 
 if __name__ == '__main__':

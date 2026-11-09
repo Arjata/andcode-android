@@ -182,6 +182,15 @@ jobs:
           git -C work/upstream rev-parse HEAD > work/native-prototype/upstream-commit.txt
           echo 'DIAGNOSTIC ONLY: no compatibility, transitive license or Android acceptance approval.' > work/native-prototype/README.txt
           python3 scripts/manifest-opencode-native.py work/native-prototype > work/prototype.sha256
+      - name: Preserve failed fff build logs (not an accepted diagnostic package)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-fff-build-logs
+          if-no-files-found: ignore
+          path: |
+            work/native-prototype/native-fff-build/sort-test.log
+            work/native-prototype/native-fff-build/command-*.log
       - name: Preserve failed OpenTUI build logs (not an accepted diagnostic package)
         if: failure()
         uses: actions/upload-artifact@v4
