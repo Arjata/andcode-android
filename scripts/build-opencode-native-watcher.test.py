@@ -41,10 +41,19 @@ class WatcherBuildTest(unittest.TestCase):
                 for folder in roots:
                     folder.mkdir()
                 (roots[0] / 'binding.gyp').write_text('\n'.join('"' + name + '"' for name in module.SOURCES))
+                for name in module.SOURCES:
+                    path = roots[0] / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b'source fixture')
+                header = roots[1] / 'napi.h'
+                header.write_bytes(b'// Copyright fixture\n// MIT License fixture')
 
                 def run(command, **kwargs):
                     if command[0] == 'c++':
                         self.assertIn('-DNAPI_VERSION=4', command)
+                        self.assertIn('-H', command)
+                        kwargs['stdout'].write('. ' + str(header) + '\n')
+                        kwargs['stdout'].flush()
                         Path(command[-1]).write_bytes(b'checked watcher fixture')
                         return subprocess.CompletedProcess(command, 0)
                     if failure == 'event':
@@ -74,6 +83,23 @@ class WatcherBuildTest(unittest.TestCase):
                         self.assertEqual(report['rebuiltSha256'], hashlib.sha256(target.read_bytes()).hexdigest())
                         for key in ['redistributionApproved', 'androidApproved', 'originalNpmBinaryCorrespondenceProven']:
                             self.assertIs(report[key], False)
+
+    def test_compiler_include_index_requires_real_inputs_and_preserves_clues(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            source, header = root / 'source.cc', root / 'header.h'
+            source.write_bytes(b'#include "header.h"')
+            header.write_bytes(b'// Copyright holder\n// SPDX-License-Identifier: MIT\n')
+            with self.assertRaisesRegex(ValueError, 'included headers'):
+                module.compiler_inputs('', [source], {})
+            with self.assertRaises(FileNotFoundError):
+                module.compiler_inputs('. ' + str(root / 'missing.h'), [source], {})
+            result = module.compiler_inputs('. ' + str(header) + '\n.. ' + str(header), [source], {'fixed': root})
+            self.assertIs(result['redistributionApproved'], False)
+            self.assertEqual(len(result['files']), 2)
+            item = next(row for row in result['files'] if row['path'] == 'header.h')
+            self.assertEqual(item['origin'], 'fixed')
+            self.assertEqual(len(item['declarationClues']), 2)
 
 
 if __name__ == '__main__':

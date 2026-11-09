@@ -144,6 +144,10 @@ commit 覆盖，相关回归同时验证两个不同 commit 均保留。
 ThreadSafeFunction，未产生替换载荷)，不执行 npm 安装脚本；需验证原生导出及 Bun
 真实 subscribe/write/unsubscribe 文件事件后，才替换实验输入。仍仅诊断，不批准
 准确原 npm 二进制对应、内嵌源码逐文件许可或 Android 准入。
+后续编译以 GCC `-H` 记录实际引用头文件，连同显式源文件记录摘要、固定来源分类和
+声明文本线索。watcher 的 `src/wasm/include.h` 内含 Node.js contributors MIT 原文，
+不因 Linux 分支为空而丢弃声明；系统 GCC/glibc 头文件仅记录摘要，未因此交付对应
+源码。该索引不覆盖编译器内部或链接器输入，不等于逐文件许可审查完成。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

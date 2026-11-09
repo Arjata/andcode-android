@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -24,6 +25,37 @@ HEADERS = {
     'node-v24.6.0-headers.tar.gz': ('https://nodejs.org/dist/v24.6.0/node-v24.6.0-headers.tar.gz',
                                   '6b891cced2a8ee08fef06b8cb36a890bd6d1dd8aca575e2a392bb78f0970b819'),
 }
+
+
+def compiler_inputs(log, source_files, roots):
+    """Hash actual compiler-observed includes, without copying host system headers."""
+    paths = {Path(item).resolve(strict=True) for item in source_files}
+    for line in log.splitlines():
+        match = re.match(r'^\.+ (.+)$', line)
+        if match:
+            paths.add(Path(match[1]).resolve(strict=True))
+    if len(paths) <= len(source_files):
+        raise ValueError('Compiler did not record included headers')
+    rows = []
+    for path in sorted(paths):
+        if not path.is_file():
+            raise ValueError('Compiler input is not a regular file')
+        origin, relative = 'runner-system-input-unreviewed', str(path)
+        for name, root in roots.items():
+            if path.is_relative_to(root):
+                origin, relative = name, path.relative_to(root).as_posix()
+                break
+        data = path.read_bytes()
+        clues = [{'line': number, 'text': line.strip()[:500]} for number, line in
+                 enumerate(data.decode('utf8', errors='replace').splitlines(), 1)
+                 if re.search(r'copyright|license|licence|SPDX|permission is hereby', line, re.I)]
+        rows.append({'path': relative, 'origin': origin, 'sha256': hashlib.sha256(data).hexdigest(),
+                     'bytes': len(data), 'declarationClues': clues})
+    return {'redistributionApproved': False,
+            'scope': 'Explicit translation units and compiler -H includes; excludes linker inputs and compiler internals',
+            'limitations': ['Text matches are review clues, not exhaustive license identification',
+                            'Runner system headers are hashed, not supplied as corresponding source'],
+            'files': rows}
 
 
 def build(upstream, stage):
@@ -59,7 +91,7 @@ def build(upstream, stage):
         if '"' + item + '"' not in binding:
             raise ValueError('Fixed binding.gyp source mismatch: ' + item)
     result = output / 'watcher.node'
-    command = ['c++', '-shared', '-fPIC', '-O2', '-std=c++17', '-pthread',
+    command = ['c++', '-shared', '-fPIC', '-O2', '-std=c++17', '-pthread', '-H',
                '-DNAPI_VERSION=4', '-DNAPI_DISABLE_CPP_EXCEPTIONS',
                '-DWATCHMAN', '-DINOTIFY', '-DBRUTE_FORCE',
                '-I' + str(addon), '-I' + str(node / 'include/node'),
@@ -70,11 +102,18 @@ def build(upstream, stage):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             print((output / 'compile.log').read_text()[-12000:], file=sys.stderr)
             raise
+    inputs = compiler_inputs((output / 'compile.log').read_text(),
+                             [source / item for item in SOURCES],
+                             {'fixed-watcher-source': source, 'fixed-node-addon-api': addon,
+                              'fixed-node-headers': node})
+    input_report = stage / 'native-watcher-build-inputs.json'
+    input_report.write_text(json.dumps(inputs, indent=2) + '\n', encoding='utf8')
     payload = result.read_bytes()
     _, needed = pty.audit.elf(payload)
     if not needed or set(needed) - {'libstdc++.so.6', 'libm.so.6', 'libgcc_s.so.1', 'libc.so.6',
-                                    'libpthread.so.0', 'libdl.so.2'}:
-        raise ValueError('Unexpected rebuilt watcher dependencies')
+                                    'libpthread.so.0', 'libdl.so.2', 'ld-linux-aarch64.so.1'}:
+        raise ValueError('Unexpected rebuilt watcher dependencies: ' + repr(needed))
+    print('Rebuilt watcher DT_NEEDED:', needed)
     symbols = subprocess.check_output(['readelf', '--dyn-syms', '--wide', str(result)], text=True)
     if not any(line.split()[-1:] == ['napi_register_module_v1'] and ' UND ' not in line for line in symbols.splitlines()):
         raise ValueError('Missing N-API registration export')
@@ -116,6 +155,9 @@ try {
         'redistributionApproved': False, 'androidApproved': False,
         'originalNpmBinaryCorrespondenceProven': False, 'sourceCommit': commit,
         'archives': records, 'commands': [command], 'sourceFiles': SOURCES,
+        'compilerInputs': {'report': input_report.name,
+                           'sha256': hashlib.sha256(input_report.read_bytes()).hexdigest(),
+                           'count': len(inputs['files'])},
         'originalNpmSha256': ORIGINAL, 'rebuiltSha256': hashlib.sha256(payload).hexdigest(),
         'installedInput': str(target.relative_to(upstream)), 'needed': needed,
         'cxxVersion': subprocess.check_output(['c++', '--version'], text=True).splitlines()[0],
