@@ -1,0 +1,121 @@
+"""Candidate target/feature Rust sources, never npm ELF or redistribution approval."""
+import hashlib
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import subprocess
+import sys
+import tarfile
+import tomllib
+import urllib.request
+
+spec = importlib.util.spec_from_file_location('source_evidence', Path(__file__).with_name('collect-opencode-native-sources.py'))
+sources = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sources)
+TARGET = 'aarch64-unknown-linux-gnu'
+CANDIDATES = {
+    'bun-pty': ('rust-pty/Cargo.toml', 'rust-pty/Cargo.lock', []),
+    'fff': ('Cargo.toml', 'Cargo.lock', ['-p', 'fff-c', '--no-default-features', '--features', 'zlob']),
+}
+
+
+def selected_packages(tree, lock):
+    packages = {(p['name'], p['version']): p for p in lock['package']}
+    if len(packages) != len(lock['package']):
+        raise ValueError('Ambiguous package identity in pinned lockfile')
+    selected = set()
+    for line in tree.splitlines():
+        match = re.match(r'^([A-Za-z0-9_-]+) v([^\s|]+)(?:[\s|]|$)', line)
+        if not match:
+            raise ValueError('Unrecognized cargo tree package line')
+        key = match.groups()
+        if key not in packages:
+            raise ValueError('Cargo tree package absent from pinned lockfile')
+        selected.add(key)
+    if not selected:
+        raise ValueError('Empty candidate Cargo graph')
+    return [packages[key] for key in sorted(selected)]
+
+
+def unpack_candidate(archive, expected, destination):
+    data = archive.read_bytes()
+    sources.inspect_archive(data, expected)
+    roots = set()
+    with tarfile.open(fileobj=io.BytesIO(data)) as src:
+        for member in src:
+            path = PurePosixPath(member.name)
+            roots.add(path.parts[0])
+            # Do not materialize symlinks, hardlinks or special files.
+            if member.isfile():
+                output = destination.joinpath(*path.parts)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(src.extractfile(member).read())
+    if len(roots) != 1:
+        raise ValueError('Candidate archive must have one root')
+    return destination / roots.pop()
+
+
+def collect(stage):
+    stage = Path(stage).resolve(strict=True)
+    evidence = stage / 'native-rust-evidence'
+    evidence.mkdir(exist_ok=False)
+    rows = []
+    env = dict(os.environ, CARGO_TERM_COLOR='never')
+    for name, (manifest, lockfile, flags) in CANDIDATES.items():
+        _, commit, expected = sources.SOURCES[name]
+        root = unpack_candidate(stage / 'native-source-evidence' / f'{name}-{commit}.tar.gz',
+                                expected, evidence / 'candidates')
+        lockpath = root / lockfile
+        original = lockpath.read_bytes()
+        command = ['cargo', 'tree', '--locked', '--manifest-path', str(root / manifest),
+                   '--target', TARGET, '--edges', 'normal,build', '--prefix', 'none',
+                   '--format', '{p}|{l}|{f}', *flags]
+        tree = subprocess.check_output(command, text=True, env=env, timeout=300)
+        if lockpath.read_bytes() != original:
+            raise ValueError('Cargo mutated pinned lockfile')
+        (evidence / f'{name}-tree.txt').write_text(tree, encoding='utf8')
+        packages = []
+        for package in selected_packages(tree, tomllib.loads(original.decode())):
+            row = dict(package)
+            row['status'] = 'blocked-binary-correspondence-and-per-file-review'
+            if package.get('source'):
+                if package['source'] != 'registry+https://github.com/rust-lang/crates.io-index':
+                    raise ValueError('Unsupported non-crates.io dependency source')
+                checksum = package.get('checksum', '')
+                if not re.fullmatch('[0-9a-f]{64}', checksum):
+                    raise ValueError('Registry dependency lacks pinned checksum')
+                filename = f"{package['name']}-{package['version']}.crate"
+                archive = evidence / filename
+                if archive.exists():
+                    data = archive.read_bytes()
+                else:
+                    url = f"https://static.crates.io/crates/{package['name']}/{filename}"
+                    with urllib.request.urlopen(url, timeout=90) as response:
+                        data = response.read(sources.LIMIT + 1)
+                row['evidence'] = sources.inspect_archive(data, checksum)
+                if not row['evidence']['noticeFilesByName']:
+                    row['status'] = 'blocked-no-notice-filename-found'
+                archive.write_bytes(data)
+                row['archive'] = filename
+            packages.append(row)
+        rows.append({'name': name, 'sourceCommit': commit, 'target': TARGET,
+                     'cargoFlags': flags, 'lockSha256': hashlib.sha256(original).hexdigest(),
+                     'tree': f'{name}-tree.txt', 'packages': packages})
+    (stage / 'native-rust-review.json').write_text(json.dumps({
+        'redistributionApproved': False, 'binaryCorrespondenceProven': False,
+        'cargoVersion': subprocess.check_output(['cargo', '--version'], text=True).strip(),
+        'rustcVersion': subprocess.check_output(['rustc', '-vV'], text=True).strip(),
+        'scope': 'Candidate release target/feature normal+build graph; no compilation or build.rs execution',
+        'limitations': ['Not proof of npm ELF build inputs, linked code or enabled binary features',
+                        'Host build/proc-macro graph depends on Cargo execution host',
+                        'Crate notice filename scan is not a per-file or nested C/Zig license audit',
+                        'Rust standard library and native build tool/source closure not included'],
+        'candidates': rows}, indent=2) + '\n', encoding='utf8')
+    print('Candidate Rust target/feature evidence collected; redistribution remains BLOCKED')
+
+
+if __name__ == '__main__':
+    collect(sys.argv[1])

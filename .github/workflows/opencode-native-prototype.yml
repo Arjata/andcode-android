@@ -32,6 +32,7 @@ jobs:
           python3 scripts/collect-opencode-native-licenses.test.py
           python3 scripts/collect-opencode-native-sources.test.py
           python3 scripts/collect-opencode-native-runtime.test.py
+          python3 scripts/collect-opencode-native-rust.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
@@ -109,6 +110,7 @@ jobs:
         run: |
           python3 scripts/collect-opencode-native-licenses.py work/upstream work/native-prototype
           python3 scripts/collect-opencode-native-sources.py work/native-prototype
+          python3 scripts/collect-opencode-native-rust.py work/native-prototype
           cp work/upstream/LICENSE work/native-prototype/upstream-LICENSE
           cp work/upstream/bun.lock work/native-prototype/upstream-bun.lock
           cp work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode work/native-prototype/

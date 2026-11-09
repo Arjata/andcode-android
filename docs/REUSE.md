@@ -76,6 +76,20 @@ OpenTUI 内嵌 zig-deps 归档中的声明。四份源码归档于 2026-11-09 �
 误当成目标 feature 闭包，也不把声明文件名扫描当成逐文件完整版权审查。
 报告 `native-source-review.json` 的 `redistributionApproved` 始终 false。
 
+2026-11-09 候选 Rust 目标证据：固定源码的 bun-pty `publish.yml` 使用
+`aarch64-unknown-linux-gnu.2.17`、默认 feature；fff `release.yaml` 的 C FFI
+使用 `aarch64-unknown-linux-gnu.2.31 -p fff-c --no-default-features --features zlob`，
+不是默认 ripgrep。新增 Cargo normal/build 目标树收集器，以 glibc Rust target
+解析候选依赖(不编译、不执行 build.rs)，按 Cargo.lock SHA-256 保存 crate
+归档及声明/构建输入索引。fff 候选图含 `option-ext` MPL-2.0、vendored-libgit2、
+LMDB、zlob；crate 顶层 MIT/Apache 声明不能覆盖内嵌 C/Zig 代码，也不能据此
+断言它们已进入 npm ELF。宿主 build/proc-macro 图受 Cargo 运行主机影响，可信
+Linux CI 才是 arm64 Linux 候选基线；仍需准确二进制对应、逐文件及构建/重链接审查。
+本机同 target 的预审树选中 bun-pty 38 项(37 registry)、fff 121 项(117 registry)，
+所有 registry 归档通过 lock 摘要检查；按文件名未发现 serial、glidesort、heed、
+heed-traits、heed-types、zlob 的独立声明文件。此项只表示声明文件名扫描缺口，
+不等于代码没有许可证；须逐文件/准确上游补充来源审查，不能按 Cargo metadata 放行。
+
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
 包内 copyright。同日读取现有 Ubuntu 24.04 实例 gcc-14 包 copyright，确认
@@ -83,6 +97,12 @@ libstdc++/libgcc 的 GNU GPLv3 + GCC Runtime Library Exception 口径；该例�
 免除库自身对应源码/声明义务，实际包版权原文随诊断工件保留。glibc 仍按 LGPL
 独立审查。新收集器只复制 CI sysroot 的 arm64 库，不使用宿主 runner 库，不进入
 正式 APK/bundle；递归 NEEDED 与版本化符号检查、运行成功均不构成分发批准。
+CI `42543657122`(提交 `4279a3e`)已通过 9 份运行库、14 个 ELF 的依赖/版本与
+16K/glibc≤2.39 门禁、shell/普通及持久 PTY、真实 TUI staged 映射及隔离
+HOME/BUN_TMPDIR 无 ELF 释放检查。下载工件 ZIP SHA-256
+`8d4c27abc3893881f18d4c243fd71cf53302b914129089c921ab18aca2719b0c` 与 API
+一致，44 项文件摘要、9 份库摘要均逐字节复核；glibc `2.39-0ubuntu8.9`、GCC
+运行库 `14.2.0-4ubuntu2~24.04.1`。这只是 Linux 实验，不替代 Android 准入。
 
 2026-11-09 Android libtinfo 自编译核验:Ubuntu
 `ncurses_6.4+20240113.orig.tar.gz` SHA-256
