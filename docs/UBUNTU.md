@@ -22,6 +22,36 @@ upload. Failures retain diagnostics, not installable release output. No device
 instance is touched. Signed live repositories do not pin package versions;
 snapshot/version pinning and corresponding-source delivery remain separate work.
 
+CI `42674527942` (commit `5017bbe`, mmdebstrap job `129352236231`) passed the
+native arm64 bootstrap, archive validation, apt/non-root/PTY namespace smoke and
+glibc/16K audit. Artifact `13699288258`: 373386339-byte ZIP, SHA-256
+`552cb2eef2d8baf76df88199f7ac566e27aae06f2d04ad3513807706b1709634`.
+Independent host review matched API and payload digests, all nine retained
+index files (three InRelease suites), 180 package records, 15165 tar entries
+(465454141 expanded file bytes), guest identity/source configuration, and ext4
+header/label/4294967296-byte size. The host checked PGP framing, **not** signatures;
+signature/expiry enforcement belongs to CI apt. Host review does not establish
+image-tree equivalence or execute the image. Docker remains the default; no
+device instance changed and no Android or distribution approval is granted.
+
+The next candidate additionally emits `andcode-ubuntu-proot.tar.gz` through the
+existing `prepare-proot-gate.py` transformer. Only the trusted CI build passes
+the canonical archive's computed digest explicitly; the legacy two-argument
+invocation still requires the fixed official Ubuntu Base digest. Conversion
+normalizes root-relative symlinks, materializes regular hardlinks, strips
+setuid/setgid and validates bounded output without changing file contents or
+ELF bytes. This is build-time packaging, not a user-supplied archive installer.
+Application-domain extraction, execution, update/recovery and device acceptance
+remain pending; no current instance is replaced.
+
+Host conversion of the independently verified `42674527942` canonical archive
+passed the archive validator (15165 entries, 469579808 materialized file bytes).
+A separate read-only archive comparison verified every regular file digest,
+all five materialized hardlinks and each rewritten/unchanged symlink. Converted
+archive SHA-256: `1c98cd485db4ea94a5959fbc0925cbf05973309664de07128e757bf4bc5478cd`.
+This is host transformation evidence only; gzip metadata is not reproducibly
+fixed, and the converted archive has not been executed on Android.
+
 这是 **root chroot + PRoot 开发原型**，不是已完成自包含交付的 Ubuntu 功能。
 轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
 不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。

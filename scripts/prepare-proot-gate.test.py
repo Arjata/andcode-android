@@ -78,11 +78,58 @@ class PrepareGateTest(unittest.TestCase):
         with tarfile.open(self.output) as archive:
             self.assertEqual(archive.getmember("bin/sh").linkname, "../usr/bin/bash")
 
+    def test_pax_hardlink_size_does_not_override_materialized_content(self):
+        item, data = entry('./bin/tool', tarfile.LNKTYPE, './usr/bin/tool')
+        item.pax_headers = {'path': './bin/tool', 'linkpath': './usr/bin/tool', 'size': '0'}
+        self.archive((item, data), entry('./usr/bin/tool'))
+        gate.prepare(self.source, self.output)
+        with tarfile.open(self.output) as archive:
+            self.assertEqual(archive.getnames(), ['bin/tool', 'usr/bin/tool'])
+            self.assertEqual(archive.extractfile('bin/tool').read(), b'\x7fELF\x00test')
+            self.assertEqual(archive.extractfile('usr/bin/tool').read(), b'\x7fELF\x00test')
+
     def test_wrong_digest(self):
         self.archive(entry("file"))
         with patch.object(gate, "BASE_SHA256", "0" * 64):
             with self.assertRaises(ValueError):
                 gate.prepare(self.source, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_explicit_trusted_ci_digest_and_dot_root(self):
+        self.archive(entry('.', tarfile.DIRTYPE), entry('./usr/bin/bash'))
+        digest = hashlib.sha256(self.source.read_bytes()).hexdigest()
+        with patch.object(gate, 'BASE_SHA256', '0' * 64):
+            gate.prepare(self.source, self.output, digest)
+        with tarfile.open(self.output) as archive:
+            self.assertEqual(archive.getnames(), ['usr/bin/bash'])
+            self.assertEqual(archive.extractfile('usr/bin/bash').read(), b'\x7fELF\x00test')
+
+    def test_explicit_digest_malformed_or_wrong_rejected(self):
+        self.archive(entry('file'))
+        for digest in ['0' * 64, '', 'A' * 64, '../file']:
+            with self.subTest(digest=digest), self.assertRaises(ValueError):
+                gate.prepare(self.source, self.output, digest)
+            self.assertFalse(self.output.exists())
+
+    def test_conversion_entry_and_expansion_limits(self):
+        huge, _ = entry('huge')
+        huge.size = 3 * 1024**3 + 1
+        with patch.object(gate.tarfile, 'open') as mocked:
+            self.source.write_bytes(b'fixture')
+            mocked.return_value.__enter__.return_value = [huge]
+            with self.assertRaisesRegex(ValueError, 'limits'):
+                gate.prepare(self.source, self.output, hashlib.sha256(b'fixture').hexdigest())
+        self.assertFalse(self.output.exists())
+
+    def test_hardlink_expansion_limit(self):
+        large, _ = entry('large')
+        large.size = 2 * 1024**3
+        link, _ = entry('copy', tarfile.LNKTYPE, 'large')
+        with patch.object(gate.tarfile, 'open') as mocked:
+            self.source.write_bytes(b'fixture')
+            mocked.return_value.__enter__.return_value = [large, link]
+            with self.assertRaisesRegex(ValueError, 'materialized'):
+                gate.prepare(self.source, self.output, hashlib.sha256(b'fixture').hexdigest())
         self.assertFalse(self.output.exists())
 
     def test_refuses_overwrite(self):
@@ -103,6 +150,12 @@ class PrepareGateTest(unittest.TestCase):
         for name in ("../bad", "/bad", "a/../bad", "a\\bad"):
             with self.subTest(name=name):
                 self.reject(entry(name))
+
+    def test_invalid_root_and_nul_paths_rejected(self):
+        self.reject(entry('.'))
+        for name in ['file\x00suffix', '']:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                gate.member_name(name)
 
     def test_duplicate_normalized_path(self):
         self.reject(entry("./file"), entry("file"))

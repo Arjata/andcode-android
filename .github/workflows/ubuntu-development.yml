@@ -96,10 +96,20 @@ jobs:
           python3 scripts/build-ubuntu-mmdebstrap.test.py
       - name: Build isolated mmdebstrap rootfs and image
         run: bash scripts/build-ubuntu-mmdebstrap.sh dist/ubuntu-mmdebstrap
+      - name: Convert the trusted canonical archive for PRoot
+        run: |
+          python3 scripts/prepare-proot-gate.test.py
+          cd dist/ubuntu-mmdebstrap
+          sha256sum -c andcode-ubuntu-rootfs.tar.gz.sha256
+          digest="$(cut -d ' ' -f 1 andcode-ubuntu-rootfs.tar.gz.sha256)"
+          python3 "$GITHUB_WORKSPACE/scripts/prepare-proot-gate.py" andcode-ubuntu-rootfs.tar.gz andcode-ubuntu-proot.tar.gz "$digest"
+          python3 "$GITHUB_WORKSPACE/scripts/validate-ubuntu-rootfs.py" andcode-ubuntu-proot.tar.gz
+          sha256sum andcode-ubuntu-proot.tar.gz > andcode-ubuntu-proot.tar.gz.sha256
       - name: Check archive and image, then test a disposable image copy
         run: |
           cd dist/ubuntu-mmdebstrap
           sha256sum -c andcode-ubuntu-rootfs.tar.gz.sha256
+          sha256sum -c andcode-ubuntu-proot.tar.gz.sha256
           sha256sum -c andcode-ubuntu-arm64.img.gz.sha256
           python3 "$GITHUB_WORKSPACE/scripts/validate-ubuntu-rootfs.py" andcode-ubuntu-rootfs.tar.gz
           gzip -dc andcode-ubuntu-arm64.img.gz > "$RUNNER_TEMP/ubuntu-mmdebstrap.img"

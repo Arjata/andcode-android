@@ -108,8 +108,8 @@
 | `proot-gate.txt` | APK 私有临时开发诊断输出 | `files/` |
 | `proot-rootfs`、`proot-rootfs-gate.txt` | 免 root 后端准入的独立 Ubuntu Base 实例与诊断,不共享 chroot 可写层 | APK `files/` |
 | `ubuntu-base-app-gate.tar.gz` | 固定摘要官方 Base 的独立只读开发输入副本,供真实应用域读取 | `/data/local/tmp/` |
-| `prepare-proot-gate.py` | 固定摘要 Base 的开发准入预处理:绝对链接改等价 guest 相对链接,去特权位,ELF 不变 | `scripts/` |
-| `prepare-proot-gate.test.py` | Base 准入预处理的摘要/链接/内容/拒绝覆盖回归测试,不下载依赖 | `scripts/` |
+| `prepare-proot-gate.py` | Build-time conversion of fixed-digest Ubuntu Base or an explicitly digested trusted CI rootfs; bounded hardlink materialization, guest-relative links, privilege stripping, unchanged ELF bytes; not an APK installer | `scripts/` |
+| `prepare-proot-gate.test.py` | Digest, link, content, resource-limit and no-overwrite regression tests for build-time rootfs conversion; no downloads | `scripts/` |
 | `busybox`(root 实例副本) | 复用现有独立 BusyBox 载荷处理 Android Toybox 不兼容的 bind mount/归档提取,root:root 0700 | `/data/adb/andcode-ubuntu/busybox` |
 | `ubuntu-base-24.04.4-base-arm64.tar.gz` | 官方 Ubuntu Base 24.04.4 arm64 开发引导输入,固定 SHA-256 | 开发暂存 `/data/local/tmp/`,不入库 |
 | `andcode-bundle-android-arm64-v<semver>.tar.gz` | Android 应用域专用 seccomp 补丁副本与同名 `.sha256`;不改标准 Linux 原始 bundle | CI 工件,非已验证 locked 交付 |
@@ -139,6 +139,7 @@
 | `build-ubuntu-mmdebstrap.sh` | Build-only native arm64 mmdebstrap experiment; signed Ubuntu repositories, independent output, no device installer | `scripts/` |
 | `build-ubuntu-mmdebstrap.test.py` | Native Linux rejection tests for recipe arguments, architecture and existing outputs; skipped on Windows | `scripts/` |
 | `andcode-ubuntu-rootfs.tar.gz` | Validated canonical rootfs archive from the mmdebstrap experiment; input for future PRoot packaging, not an APK importer | Experimental CI artifact |
+| `andcode-ubuntu-proot.tar.gz`, `andcode-ubuntu-proot.tar.gz.sha256` | Build-time trusted canonical rootfs conversion and digest; hardlinks materialized and absolute symlinks made guest-relative, no ELF patching or device installation | Experimental mmdebstrap artifact |
 | `andcode-ubuntu-rootfs.tar.gz.sha256`, `mmdebstrap.log`, `mmdebstrap-copyright`, `ubuntu-indexes/`, `ubuntu-sources.list` | Archive digest, bootstrap log, installed tool notice, retained signed indexes and exact source configuration | Experimental rootfs output |
 | `andcode-ubuntu-mmdebstrap-prototype` | Independently gated rootfs experiment artifact; never replaces the Docker artifact automatically | CI artifacts |
 | `andcode-ubuntu-mmdebstrap-diagnostics` | Failed bootstrap logs and metadata only; no image/archive release payload | CI artifacts |

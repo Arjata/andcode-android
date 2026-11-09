@@ -80,6 +80,8 @@ An isolated native-arm64 `mmdebstrap` CI experiment now evaluates tool-built
 Ubuntu rootfs archives and ext4 images from signed repositories. Docker remains
 the default pending CI review; existing device instances are not replaced.
 See [the rootfs tool experiment](docs/UBUNTU.md#rootfs-tool-experiment).
+The next isolated candidate also converts that canonical tree to a PRoot archive
+without changing ELF bytes; trusted device installation remains pending.
 
 许可证:**AGPL-3.0-only**(见 `LICENSE`)。
 
