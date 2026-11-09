@@ -262,6 +262,48 @@ class Tests(unittest.TestCase):
                     m.retain_link_inputs(text, native, output, env)
                 self.assertFalse((output / 'link-inputs').exists())
 
+    def test_notice_candidates_keep_late_exact_comments_and_outside_lines(self):
+        content = (b'/* ordinary comment */\n' + b'\n' * 110
+                   + '/* Copyright \u00a9 Fixture\n Permission granted\n */\n'.encode()
+                   + b'// SPDX-License-Identifier: MIT\n'
+                   + b'const char *s = "copyright metadata";\n')
+        candidates = m.notice_candidates(content)
+        self.assertEqual(len(candidates['comments']), 1)
+        item = candidates['comments'][0]
+        raw = content[item['offset']:item['offset'] + item['bytes']]
+        self.assertEqual(raw.decode(), item['text'])
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), item['sha256'])
+        self.assertEqual(item['line'], 112)
+        self.assertEqual(len(candidates['outsideCommentLines']), 2)
+        self.assertEqual(m.notice_candidates(b'no declaration'), {'comments': [], 'outsideCommentLines': []})
+
+    def test_notice_report_is_bound_to_dependency_bytes_without_approval(self):
+        for mode in ['ok', 'changed', 'escape']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                cache = root / 'native/.cache/ffmpeg'
+                cache.mkdir(parents=True)
+                output = root / 'output'
+                output.mkdir()
+                content = b'/* Copyright Fixture; permission granted. */\n'
+                (cache / 'fixture.c').write_bytes(content)
+                (root / 'outside.c').write_bytes(content)
+                row = {'path': '../../../../outside.c' if mode == 'escape' else 'fixture.c',
+                       'bytes': len(content), 'sha256': hashlib.sha256(content).hexdigest()}
+                if mode == 'changed':(cache / 'fixture.c').write_bytes(b'changed')
+                if mode != 'ok':
+                    with self.assertRaises((ValueError, FileNotFoundError)):
+                        m.retain_ffmpeg_notices(root / 'native', {'files': [row]}, output)
+                    self.assertFalse((output / 'ffmpeg-notice-candidates.json').exists())
+                else:
+                    report = m.retain_ffmpeg_notices(root / 'native', {'files': [row]}, output)
+                    payload = (output / report['path']).read_bytes()
+                    self.assertEqual(hashlib.sha256(payload).hexdigest(), report['sha256'])
+                    document = json.loads(payload)
+                    self.assertIs(document['redistributionApproved'], False)
+                    self.assertIs(report['redistributionApproved'], False)
+                    self.assertEqual(document['files'][0]['comments'][0]['text'].encode(), content.rstrip())
+
     def test_same_linker_replay_requires_exact_bytes_reports_and_abi(self):
         for mode in ['ok', 'changed-input', 'compile-failed', 'different-output',
                      'missing-map', 'bad-extraction', 'abi-failed', 'abi-marker']:

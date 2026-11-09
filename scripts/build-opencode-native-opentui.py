@@ -169,6 +169,51 @@ def ffmpeg_configuration(text):
     return expected
 
 
+def notice_candidates(content):
+    """Preserve exact candidate comment bytes, not infer a license from keywords."""
+    keywords = re.compile(rb'copyright|spdx-license-identifier|permission|redistribution|'
+                          rb'general public license|independent jpeg group|public domain', re.I)
+    comments = list(re.finditer(rb'/\*.*?\*/', content, re.S))
+    rows = []
+    for comment in comments:
+        raw = comment.group()
+        if keywords.search(raw):
+            rows.append({'offset': comment.start(), 'bytes': len(raw),
+                         'line': content.count(b'\n', 0, comment.start()) + 1,
+                         'sha256': hashlib.sha256(raw).hexdigest(),
+                         'text': raw.decode('utf8')})
+    outside, offset, cursor = [], 0, 0
+    for number, line in enumerate(content.splitlines(keepends=True), 1):
+        for match in keywords.finditer(line):
+            position = offset + match.start()
+            while cursor < len(comments) and comments[cursor].end() <= position:
+                cursor += 1
+            if cursor >= len(comments) or position < comments[cursor].start():
+                outside.append({'line': number, 'offset': offset, 'text': line.decode('utf8')})
+                break
+        offset += len(line)
+    return {'comments': rows, 'outsideCommentLines': outside}
+
+
+def retain_ffmpeg_notices(native, dependency, output):
+    cache = (native / '.cache/ffmpeg').resolve(strict=True)
+    files = []
+    for row in dependency['files']:
+        path = (cache / row['path']).resolve(strict=True)
+        path.relative_to(cache)
+        content = path.read_bytes()
+        if len(content) != row['bytes'] or hashlib.sha256(content).hexdigest() != row['sha256']:
+            raise ValueError('FFmpeg notice source changed')
+        files.append(dict(row, **notice_candidates(content)))
+    report = {'redistributionApproved': False, 'files': files,
+              'scope': 'Keyword-selected block comments and outside lines from recorded dependencies only; not complete notices, system headers, generators or license approval'}
+    destination = output / 'ffmpeg-notice-candidates.json'
+    destination.write_text(json.dumps(report, indent=2) + '\n', encoding='utf8')
+    return {'path': destination.name, 'bytes': destination.stat().st_size,
+            'sha256': hashlib.sha256(destination.read_bytes()).hexdigest(), 'files': len(files),
+            'redistributionApproved': False, 'scope': report['scope']}
+
+
 def ffmpeg_source_inputs(native, prefix, objects):
     """Bounded make-dependency evidence and GPL-only header guard, not license approval."""
     cache = (native / '.cache/ffmpeg').resolve(strict=True)
@@ -515,6 +560,7 @@ def build(upstream, stage):
         shutil.copyfile(source, dest)
     configuration = ffmpeg_configuration((output / 'ffmpeg-config/config.h').read_text(encoding='utf8'))
     source_inputs = ffmpeg_source_inputs(native, prefix, objects)
+    notices = retain_ffmpeg_notices(native, source_inputs, output)
     crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
@@ -535,6 +581,7 @@ def build(upstream, stage):
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
         'ffmpegSourceInputs': source_inputs,
+        'ffmpegNoticeCandidates': notices,
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
         'finalLinkReplay': replay,
