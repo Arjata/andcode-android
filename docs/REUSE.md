@@ -242,40 +242,54 @@ libc_nonshared 3、compiler-rt 1。提取不等于每个成员所有节最终存
 本机另从保留的五个静态归档逐一读取上述 25 个成员，确认每个成员名唯一、内容
 为 ELF，并记录各自长度/摘要；此举将抽取记录绑定到实际 archive 字节，仍非
 编译参数/预处理输入与源码许可的完整映射，也没有把第三方 ELF 放入仓库。
-后续 DWARF 检查将其中 24 个成员的编译单元路径定位到固定官方 Zig 归档；
-compiler-rt 编译单元仅名为模块 `compiler_rt`，行表另列 90 个官方源文件候选和
-1 个 global cache 生成的 `builtin.zig`，旧工件未保留后者。DWARF 自报路径不
-证明源码到对象可重建或所有节存活，不能据此批准归属。后续配方保存构建后
-global/local cache 中 `b/<hash>/builtin.zig` 原字节、来源路径及摘要，拒绝链接、
-异常路径、ELF 与超限输入；只补生成输入快照，不假称完整编译闭包或回填旧工件。
+Subsequent DWARF inspection located compilation-unit paths for 24 members in the
+pinned official Zig archive. The compiler-rt compilation unit is named only
+`compiler_rt`; its line table lists 90 official source-file candidates and 1
+global-cache-generated `builtin.zig` that the older artifact did not retain.
+Self-reported DWARF paths do not prove source-to-object rebuildability or section
+liveness and cannot establish approved source attribution. The subsequent recipe
+retains post-build `b/<hash>/builtin.zig` bytes, source paths and digests from both
+explicit caches, rejecting symlinks, unexpected paths, ELF and oversized inputs.
+These are generated-input snapshots, not a complete compiler-input closure or a
+retroactive addition to older artifacts.
 
-后续源码实验 `42655395777`(head `5c66a5b`)、`42656714390`(head `412fd1d`)
-及相应常规 CI `42655354765`、`42656524852` 均成功。两份工件已独立复核：
-artifact `13692138201` 为 501250589 字节，ZIP SHA-256
-`77ca20972725eda50f08d66427ec265652a5716e006cb4ad5106ecf046d70e87`，29801
-项清单闭合；artifact `13694046156` 为 501336313 字节，ZIP SHA-256
-`5887e5a57da3788fe6d4106bb362c74709a0335a588f73a8789d2a1c3b03f6b8`，29802
-项清单闭合，均与 API 一致。四文件排序补丁从固定原始归档重做后与实际构建树
-逐字节相同，修改 lock 和 119 项选中依赖无 glidesort，3 项 arm64 排序测试与
-搜索/glob 通过；原始候选图仍含该依赖，不改写旧证据。Bun/WebKit 六文件的提交/
-摘要/原字节逐项匹配。两轮同 linker 446 输入重放字节一致、ABI、CRC 2304 组及
-Linux PTY/TUI/隔离目录无 ELF 通过。最新随包声明候选报告对 733 份实际依赖
-全文重算完全一致；这些成功不构成完整 notices、对应源码、修改版重链接或
-Android 批准。
+Source experiments `42655395777` (head `5c66a5b`) and `42656714390` (head `412fd1d`),
+and their regular CI runs `42655354765` and `42656524852`, all succeeded. Both
+artifacts were independently verified: artifact `13692138201` is 501250589 bytes,
+with ZIP SHA-256 `77ca20972725eda50f08d66427ec265652a5716e006cb4ad5106ecf046d70e87`
+and a closed 29801-file manifest; artifact `13694046156` is 501336313 bytes, with
+ZIP SHA-256 `5887e5a57da3788fe6d4106bb362c74709a0335a588f73a8789d2a1c3b03f6b8`
+and a closed 29802-file manifest. Both match the API metadata. Reapplying the
+four-file sorting patch to the pinned original archive reproduced the build tree
+byte for byte. The modified lockfile and 119 selected dependencies exclude
+glidesort; 3 arm64 sorting tests and search/glob probes passed. The original
+candidate graph still includes that dependency; historical evidence is unchanged.
+All six Bun/WebKit declaration files matched their commits, digests and retained
+bytes. Both runs passed byte-identical same-linker replay of 446 inputs, ABI,
+2304 CRC cases, Linux PTY/TUI and the isolated-directory no-runtime-ELF gate.
+Full-text recomputation of declaration candidates for all 733 actual dependencies
+matched the latest bundled report. These results do not constitute complete
+notices, corresponding source, modified-library relinking or Android approval.
 
-生成 builtin 快照配方 `5d444e0` 的源码 CI `42661927969`、常规 CI
-`42661893364` 均成功；artifact `13696046606` 已完整下载独立复核，501356265
-字节，ZIP SHA-256 `bdafa515d7e840b625c5efcdf911a1a0f83dd20b05a363ad5dc9d3bd1e375940`，
-与 API 一致，29816 项清单闭合。14 份生成 `builtin.zig` 共 41148 字节，保留路径、
-逐项摘要与字节数均匹配；本轮均来自 global cache，local cache 没有候选。
-同 Zig 446 输入重放字节一致、25 条归档抽取记录、119 项修改后 fff 候选、
-六文件声明、733 份依赖声明重算、2304 组 CRC 与 Linux 运行门禁继续通过。
-从本轮实际保留的 `libcompiler_rt.a` 唯一成员读取 DWARF 行表，91 个文件条目中
-生成路径 `b/2a01436ccce52344c33c97b4d9478f83/builtin.zig` 对应本轮保留的 2340
-字节文件，SHA-256 `9840d59c686c7d7fa6904bc02eb9e1029aedc5b39cbfe20ac3b3d3b9ff2c2c06`。
-这是本轮生成路径缺口的补齐，不回填旧工件：本轮 compiler-rt 成员摘要与
-`42652931946` 不同，相同缓存路径不能证明跨轮内容相同；仍未证明完整编译输入、
-源码到对象可重建、存活节或修改版库替换重链接，所有批准字段继续为 false。
+For generated-builtin retention recipe `5d444e0`, source CI `42661927969` and
+regular CI `42661893364` both succeeded. Artifact `13696046606` was fully downloaded
+and independently verified: 501356265 bytes, ZIP SHA-256
+`bdafa515d7e840b625c5efcdf911a1a0f83dd20b05a363ad5dc9d3bd1e375940`, matching the
+API metadata, with a closed 29816-file manifest. All 14 generated `builtin.zig`
+snapshots, totaling 41148 bytes, matched their retained paths, digests and sizes.
+All candidates in this run came from the global cache; the local cache had none.
+The same-Zig byte-identical 446-input replay, 25 archive extraction records,
+119 modified fff candidates, six declaration files, declaration recomputation for
+733 dependencies, 2304 CRC cases and Linux runtime gates continued to pass.
+The DWARF line table of the sole member of the retained `libcompiler_rt.a` lists
+91 files. Its generated path `b/2a01436ccce52344c33c97b4d9478f83/builtin.zig`
+resolves to the retained 2340-byte file with SHA-256
+`9840d59c686c7d7fa6904bc02eb9e1029aedc5b39cbfe20ac3b3d3b9ff2c2c06`.
+This resolves that generated-path gap for this run, not for historical artifacts:
+the compiler-rt member digest differs from run `42652931946`, and matching cache
+paths do not prove identical contents across runs. Complete compiler inputs,
+source-to-object rebuildability, section liveness and modified-library replacement
+and relinking remain unproven. All approval fields remain false.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

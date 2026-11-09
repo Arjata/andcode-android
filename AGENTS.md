@@ -104,8 +104,9 @@ feat: add serialization abstraction and JSON codec
 - shell 脚本必须 **LF**(见 `.gitattributes`);shebang 涉及设备侧的脚本要 POSIX sh
   兼容(用 `/system/bin/sh` 可执行的子集,禁止 bashism——`smoke-test.sh`、
   `bundle/overlay/sbin/*` 属于此类)。
-- 用户中文交流;文档、注释、commit 正文中英文皆可,但**术语与 NAMING.md 注册表
-  保持一致**(`andcode-`、`libandcode-*`、`ANDCODE_*`、Tier M/A/P)。
+- Communicate with the user in Chinese. Write all new or updated documentation and
+  code comments in English. Keep commit messages in English and terminology consistent
+  with the NAMING.md registry (`andcode-`, `libandcode-*`, `ANDCODE_*`, Tier M/A/P).
 
 ## 5. 当前进行时(待办,动手前先认领)
 
