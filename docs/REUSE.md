@@ -121,8 +121,9 @@ manifest 不闭合，不能作为完整诊断包；已显式保留隔离 stage �
 arm64 runner 执行 Cargo fetch --locked 后离线 build --locked，强制 GNU 链接器
 PT_LOAD≥16K；记录源码/lock/工具/命令/输出摘要，将重建 ELF 替换实验安装树内
 唯一固定 glibc 输入，再由 Bun 插件重新计算物理名。它不是原 npm ELF 可重现证明；
-Cargo offline 不隔离第三方 build.rs 的网络/主机访问，Rust sysroot/工具链与 serial
-声明缺口仍须审查。仅诊断构建，不接入正式 bundle/APK，不因此批准分发。
+Cargo offline 不隔离第三方 build.rs 的网络/主机访问，Rust sysroot/工具链及所有
+适用声明义务仍须审查(serial 补充来源见上文)。仅诊断构建，不接入正式 bundle/APK，
+不因此批准分发。
 CI `42574333144`(提交 `13c271b`)固定源码重建、16K/glibc/导出、运行库闭包、
 普通/持久 PTY 与 TUI/无 ELF 释放均通过。下载 ZIP SHA-256
 `4f0af54875ac816333562592dcbc4276fe2ab1eb90c473b06d1802c162ab733a` 与 API
@@ -162,6 +163,15 @@ CI `42578098328` 已通过重建/真实事件并生成 Bun 导入，随后旧静
 门禁，但下载固定 media 源码超时；`42579064629`、`42579438063` 则在固定 Bun
 下载持续 HTTP 504。只增加有界传输重试及同一 GitHub asset ID `665259460`
 的 API 下载路径，仍强制原 SHA-256；不跳过源码证据、TLS 或摘要门禁。
+CI `42579620831`(提交 `40252c0`)完整成功，artifact `13656956805`，225990521
+字节，ZIP SHA-256 `bd5424f935494df0622f3f961bf5f89d4f266e2663be433397065a52db193a8d`
+与 API 一致；3461 项文件摘要及 ZIP/清单文件集合完全匹配(除清单自身)。
+watcher 重建 ELF SHA-256 `a384a3ab5aa60dda6c61fb87489a99b719910113c00f54c1f3760aeea3662d42`，
+623824 字节，构建输出、Bun 导入清单及预置副本相同；普通构建环境及收集运行库
+下的真实事件日志均通过。bun-pty 重建 ELF 摘要仍为上述 `2f4cbc71…`，两库来源
+报告均标注 fixed-source-ci-rebuild。编译输入索引摘要复核通过：389 项中 watcher
+25、node-addon-api 3、Node headers 4、runner 系统输入 357；后者仅摘要记录，
+不代表对应源码交付或许可审查。所有批准字段仍为 false，未部署设备。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
