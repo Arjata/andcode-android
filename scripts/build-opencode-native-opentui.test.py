@@ -428,6 +428,116 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.retain_link_inputs(shlex.join(args), native, output, env)
 
+    CRC_FIXTURE = (b'/* upstream license fixture */\n#include "config.h"\n#include "crc.h"\n'
+                   b'int av_crc_init(void) { return 0; }\n'
+                   b'const AVCRC *av_crc_get_table(void) { return 0; }\n'
+                   b'uint32_t av_crc(const AVCRC *ctx, uint32_t crc,\n'
+                   b'                const uint8_t *buffer, size_t length)\n{\n return crc;\n}\n')
+
+    def test_modified_crc_transform_pins_bytes_preserves_header_and_changes_calls(self):
+        with patch.object(m, 'CRC_SOURCE_SHA256', hashlib.sha256(self.CRC_FIXTURE).hexdigest()):
+            modified = m.modified_crc_source(self.CRC_FIXTURE)
+            self.assertTrue(modified.startswith(b'/* upstream license fixture */\n'))
+            self.assertIn(b'Modified by andcode on 2026-11-10', modified)
+            self.assertIn(b'#undef av_pure\n#define av_pure', modified)
+            self.assertEqual(modified.count(b'++andcode_crc_calls;'), 1)
+            self.assertEqual(modified.count(b'__attribute__((visibility("default")))'), 4)
+            for invalid in [modified, self.CRC_FIXTURE + b'drift']:
+                with self.assertRaises(ValueError):
+                    m.modified_crc_source(invalid)
+
+    def test_modified_crc_relink_requires_single_substitution_and_final_library_execution(self):
+        modes = ['ok', 'missing-object', 'duplicate-object', 'changed-input', 'compile-failed',
+                 'wrong-source', 'unchanged-object', 'link-failed', 'unchanged-library',
+                 'missing-map', 'bad-extraction', 'wrong-map', 'dependencies',
+                 'abi-failed', 'abi-marker', 'probe-compile', 'probe-run', 'probe-marker']
+        for mode in modes:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                native, output, env, args, paths = self.link_fixture(Path(tmp))
+                cache = native / '.cache/ffmpeg'
+                source = cache / 'sources/ffmpeg-9.0.2/libavutil/crc.c'
+                source.parent.mkdir(parents=True)
+                source.write_bytes(self.CRC_FIXTURE)
+                build = cache / 'build/aarch64-linux'
+                (build / 'libavutil').mkdir(parents=True)
+                (build / 'libavutil/crc.o').write_bytes(b'original-object')
+                crc = cache / 'prefix/aarch64-linux/objects/libavutil/crc.o'
+                crc.parent.mkdir(parents=True)
+                crc.write_bytes(b'original-object')
+                args.append(str(crc))
+                link = m.retain_link_inputs(shlex.join(args), native, output, env)
+                result = Path(link['output'])
+                if mode == 'missing-object': link['inputs'].pop()
+                if mode == 'duplicate-object': link['inputs'].append(dict(link['inputs'][-1]))
+                if mode == 'changed-input': (output / link['inputs'][0]['retainedPath']).write_bytes(b'drift')
+                directory = output / 'modified-crc-relink'
+                calls = []
+
+                def run(command, **kwargs):
+                    calls.append(command)
+                    index = len(calls)
+                    self.assertEqual(kwargs['env'], env)
+                    stdout = ''
+                    if index == 1:
+                        self.assertEqual(command[:3], ['make', '-C', str(directory / 'build')])
+                        self.assertIn('SRC_LINK=' + str(directory / 'source'), command)
+                        self.assertFalse((directory / 'build/libavutil/crc.o').exists())
+                        self.assertEqual((directory / 'source/libavutil/crc.c').read_bytes(),
+                                         m.modified_crc_source(self.CRC_FIXTURE))
+                        (directory / 'build/libavutil/crc.o').write_bytes(
+                            b'original-object' if mode == 'unchanged-object' else b'modified-object')
+                        (directory / 'build/libavutil/crc.d').write_bytes(b'fixture dependency')
+                        stdout = '' if mode == 'wrong-source' else str(directory / 'source/libavutil/crc.c')
+                    elif index == 2:
+                        self.assertEqual(command[:2], ['fixed-zig', 'ld.lld'])
+                        for row in link['inputs']:
+                            expected = directory / 'crc.o' if row['path'] == str(crc) else output / row['retainedPath']
+                            self.assertEqual(command[row['argumentIndex'] + 1], str(expected))
+                        (directory / 'libopentui.so').write_bytes(b'linked' if mode == 'unchanged-library' else b'modified-library')
+                        if mode != 'missing-map':
+                            (directory / 'link.map').write_text('wrong' if mode == 'wrong-map' else str(directory / 'crc.o'))
+                        (directory / 'archive-extraction.tsv').write_text(
+                            'wrong' if mode == 'bad-extraction' else 'reference\textracted\tsymbol\n')
+                    elif index == 3:
+                        self.assertEqual(command, ['bun', str(directory / 'probe.mjs'), str(directory / 'libopentui.so')])
+                        stdout = '' if mode == 'abi-marker' else m.MARKER
+                    elif index == 4:
+                        self.assertIn(str(directory / 'libopentui.so'), command)
+                        self.assertNotIn(str(cache / 'prefix/aarch64-linux/lib/libavutil.a'), command)
+                        probe = (directory / 'crc-probe.c').read_text()
+                        self.assertIn('(*volatile modified_crc)', probe)
+                        self.assertIn('andcode_crc_relink_calls() != cases * 3', probe)
+                        (directory / 'crc-probe').write_bytes(b'probe')
+                    else:
+                        self.assertEqual(command, [str(directory / 'crc-probe')])
+                        stdout = m.CRC_MARKER + ' 2304 cases (Linux only)\n'
+                        if mode != 'probe-marker': stdout += 'ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)\n'
+                    failed = {1: 'compile-failed', 2: 'link-failed', 3: 'abi-failed',
+                              4: 'probe-compile', 5: 'probe-run'}.get(index) == mode
+                    return subprocess.CompletedProcess(command, int(failed), stdout, '')
+
+                def elf(payload):
+                    return None, ['wrong.so' if mode == 'dependencies' and payload == b'modified-library' else 'libc.so.6']
+
+                with patch.object(m, 'CRC_SOURCE_SHA256', hashlib.sha256(self.CRC_FIXTURE).hexdigest()), \
+                        patch.object(m.subprocess, 'run', side_effect=run), patch.object(m.pty.audit, 'elf', side_effect=elf):
+                    if mode == 'ok':
+                        report = m.probe_modified_crc_relink(native, link, Path('fixed-zig'), result, output, env)
+                        self.assertEqual(len(calls), 5)
+                        self.assertEqual(report['inputCount'], 4)
+                        self.assertEqual(report['modifiedCalls'], 6912)
+                        for flag in ['redistributionApproved', 'androidApproved', 'relinkingApproved']:
+                            self.assertIs(report[flag], False)
+                        for row in report['files']:
+                            payload = (output / row['path']).read_bytes()
+                            self.assertEqual(hashlib.sha256(payload).hexdigest(), row['sha256'])
+                    else:
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                            m.probe_modified_crc_relink(native, link, Path('fixed-zig'), result, output, env)
+                self.assertEqual(result.read_bytes(), b'linked')
+                self.assertEqual(source.read_bytes(), self.CRC_FIXTURE)
+                self.assertEqual((build / 'libavutil/crc.o').read_bytes(), b'original-object')
+
     def resource_archive(self, entries):
         data = io.BytesIO()
         with tarfile.open(fileobj=data, mode='w:xz') as archive:
@@ -510,7 +620,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output', 'replay', 'generated']:
+        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -605,6 +715,8 @@ class Tests(unittest.TestCase):
                                      side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None), \
                         patch.object(m, 'replay_link_inputs', return_value={'byteIdentical': True},
                                      side_effect=ValueError('Replay failed') if failure == 'replay' else None), \
+                        patch.object(m, 'probe_modified_crc_relink', return_value={'modifiedCalls': 6912},
+                                     side_effect=ValueError('Modified relink failed') if failure == 'modified-relink' else None), \
                         patch.object(m.subprocess, 'check_output', return_value='0.17.0'), \
                         patch.object(m.subprocess, 'run', side_effect=run), \
                         patch.object(m, 'validate', side_effect=validate) as probe:
@@ -624,6 +736,7 @@ class Tests(unittest.TestCase):
                         self.assertEqual(report['finalLink']['inputs'][0]['sha256'],
                                          hashlib.sha256(b'linked object').hexdigest())
                         self.assertEqual(len(report['zigGeneratedSources']['files']), 1)
+                        self.assertEqual(report['modifiedCrcRelink']['modifiedCalls'], 6912)
                         self.assertIs(report['zigGeneratedSources']['sourceAttributionApproved'], False)
                         self.assertEqual(target.read_bytes(), b'rebuilt')
 

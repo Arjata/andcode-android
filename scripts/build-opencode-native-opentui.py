@@ -1,4 +1,5 @@
 """Fixed-source OpenTUI diagnostic rebuild, never license or Android approval."""
+import difflib
 import hashlib
 import importlib.util
 import io
@@ -30,6 +31,7 @@ try{
 }finally{lib.close()}
 '''
 CRC_MARKER = 'ANDCODE_SOURCE_FFMPEG_CRC_OK'
+CRC_SOURCE_SHA256 = 'fbcab458ebddda14d121333622525cb0547c1d428645e9286534690c48366ad5'
 CRC_PROBE = r'''/* andcode-owned bitwise CRC reference, not copied FFmpeg implementation. */
 #include <stdint.h>
 #include <stdio.h>
@@ -503,6 +505,152 @@ def replay_link_inputs(link, zig, result, output, env):
             'scope': 'Same fixed Zig linker retained-input replay only; not modified-library rebuild or LGPL/Android approval'}
 
 
+def modified_crc_source(content):
+    """Instrument one pinned upstream translation unit without changing its grant."""
+    if hashlib.sha256(content).hexdigest() != CRC_SOURCE_SHA256:
+        raise ValueError('Unexpected original FFmpeg CRC source')
+    text = content.decode('utf8')
+    text = patch_once(text, '#include "config.h"',
+        '/* Modified by andcode on 2026-11-10 for a single-threaded Linux-only\n'
+        ' * relink diagnostic: count calls and expose CRC entry points.\n'
+        ' * Disable the pure declaration locally because counting is a side effect.\n'
+        ' */\n#include "config.h"')
+    text = patch_once(text, '#include "crc.h"',
+        '#include "attributes.h"\n#undef av_pure\n#define av_pure\n#include "crc.h"')
+    text = patch_once(text, 'uint32_t av_crc(const AVCRC *ctx, uint32_t crc,',
+        'static unsigned andcode_crc_calls;\n'
+        'unsigned andcode_crc_relink_calls(void);\n'
+        '__attribute__((visibility("default"))) unsigned andcode_crc_relink_calls(void)\n'
+        '{ return andcode_crc_calls; }\n\n'
+        'uint32_t av_crc(const AVCRC *ctx, uint32_t crc,')
+    text = patch_once(text, 'const uint8_t *buffer, size_t length)\n{\n',
+        'const uint8_t *buffer, size_t length)\n{\n    ++andcode_crc_calls;\n')
+    for symbol in ('int av_crc_init(', 'const AVCRC *av_crc_get_table(', 'uint32_t av_crc('):
+        text = patch_once(text, '\n' + symbol,
+                          '\n__attribute__((visibility("default"))) ' + symbol)
+    return text.encode('utf8')
+
+
+def probe_modified_crc_relink(native, link, zig, result, output, env):
+    """Replace one CRC object; never install the modified diagnostic library."""
+    candidates = [row for row in link['inputs'] if Path(row['path']).as_posix().endswith(
+        '/prefix/aarch64-linux/objects/libavutil/crc.o')]
+    if len(candidates) != 1:
+        raise ValueError('Expected one retained generic FFmpeg CRC object')
+    selected = candidates[0]
+    source = native / '.cache/ffmpeg/sources/ffmpeg-9.0.2/libavutil/crc.c'
+    original = source.read_bytes()
+    modified = modified_crc_source(original)
+    directory = output / 'modified-crc-relink'
+    directory.mkdir(exist_ok=False)
+    (directory / 'original-crc.c').write_bytes(original)
+    changed = directory / 'modified-crc.c'
+    changed.write_bytes(modified)
+    (directory / 'crc.patch').write_text(''.join(difflib.unified_diff(
+        original.decode('utf8').splitlines(keepends=True),
+        modified.decode('utf8').splitlines(keepends=True),
+        fromfile='original/libavutil/crc.c', tofile='modified/libavutil/crc.c')),
+        encoding='utf8', newline='\n')
+    build = native / '.cache/ffmpeg/build/aarch64-linux'
+    replacement = directory / 'crc.o'
+    # Reuse the configured rule in separate trees. SRC_LINK must not resolve to
+    # the original build's src symlink, or make would compile the unmodified file.
+    isolated = directory / 'source'
+    shutil.copytree(source.parent.parent, isolated)
+    (isolated / 'libavutil/crc.c').write_bytes(modified)
+    isolated_build = directory / 'build'
+    shutil.copytree(build, isolated_build,
+                    ignore=shutil.ignore_patterns('src', '*.o', '*.a', '*.d', 'zlib'))
+    compile_command = ['make', '-C', str(isolated_build), 'V=1', 'libavutil/crc.o',
+                       'SRC_PATH=' + str(isolated), 'SRC_LINK=' + str(isolated)]
+    object_path = isolated_build / 'libavutil/crc.o'
+    done = subprocess.run(compile_command, env=env, capture_output=True, text=True, timeout=120)
+    (directory / 'compile.log').write_text(done.stdout + done.stderr, encoding='utf8')
+    done.check_returncode()
+    if str(isolated / 'libavutil/crc.c') not in done.stdout:
+        raise ValueError('Modified CRC compilation source not recorded')
+    shutil.copyfile(object_path, replacement)
+    shutil.copyfile(isolated_build / 'libavutil/crc.d', directory / 'crc.d')
+    if replacement.read_bytes() == (output / selected['retainedPath']).read_bytes():
+        raise ValueError('Modified CRC object did not change')
+    command = [str(zig), *link['command']]
+    for row in link['inputs']:
+        retained = output / row['retainedPath']
+        if (retained.stat().st_size != row['bytes']
+                or hashlib.sha256(retained.read_bytes()).hexdigest() != row['sha256']):
+            raise ValueError('Retained modified-relink input changed')
+        command[row['argumentIndex'] + 1] = str(replacement if row == selected else retained)
+    binary = directory / 'libopentui.so'
+    command[link['command'].index('-o') + 2] = str(binary)
+    command.extend(['--Map=' + str(directory / 'link.map'),
+                    '--why-extract=' + str(directory / 'archive-extraction.tsv')])
+    done = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+    (directory / 'link.log').write_text(done.stdout + done.stderr, encoding='utf8')
+    done.check_returncode()
+    if binary.read_bytes() == result.read_bytes():
+        raise ValueError('Modified CRC library did not change')
+    for name in ['link.map', 'archive-extraction.tsv']:
+        if not (directory / name).is_file() or not (directory / name).stat().st_size:
+            raise ValueError('Missing modified linker map or extraction report')
+    if not (directory / 'archive-extraction.tsv').read_text(encoding='utf8').startswith('reference\textracted\tsymbol\n'):
+        raise ValueError('Unexpected modified linker archive extraction report')
+    if str(replacement) not in (directory / 'link.map').read_text(encoding='utf8'):
+        raise ValueError('Replacement object missing from modified linker map')
+    _, needed = pty.audit.elf(binary.read_bytes())
+    if sorted(needed) != sorted(pty.audit.elf(result.read_bytes())[1]):
+        raise ValueError('Modified CRC dependencies changed')
+    abi_source = directory / 'probe.mjs'
+    abi_source.write_text(PROBE, encoding='utf8')
+    abi_command = ['bun', str(abi_source), str(binary)]
+    done = subprocess.run(abi_command, env=env, capture_output=True, text=True, timeout=30)
+    (directory / 'abi.log').write_text(done.stdout + done.stderr, encoding='utf8')
+    done.check_returncode()
+    if MARKER not in done.stdout:
+        raise ValueError('Modified CRC ABI probe did not complete')
+    probe = directory / 'crc-probe.c'
+    text = patch_once(CRC_PROBE, 'int main(void) {',
+                      'extern unsigned andcode_crc_relink_calls(void);\n'
+                      'static uint32_t (*volatile modified_crc)(const AVCRC *, uint32_t,\n'
+                      '                                          const uint8_t *, size_t) = av_crc;\n'
+                      '#define av_crc modified_crc\nint main(void) {')
+    text = patch_once(text, '    if (cases != 2304) return 5;',
+                      '    if (cases != 2304) return 5;\n'
+                      '    if (andcode_crc_relink_calls() != cases * 3) return 6;\n'
+                      '    puts("ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)");')
+    probe.write_text(text, encoding='utf8', newline='\n')
+    probe_binary = directory / 'crc-probe'
+    probe_commands = [['cc', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+                       '-I', str(native / '.cache/ffmpeg/prefix/aarch64-linux/include'),
+                       str(probe), str(binary), '-Wl,-rpath,' + str(directory),
+                       '-Wl,-z,max-page-size=16384', '-o', str(probe_binary)], [str(probe_binary)]]
+    with (directory / 'crc-probe.log').open('w', encoding='utf8') as log:
+        for probe_command in probe_commands:
+            done = subprocess.run(probe_command, env=env, capture_output=True, text=True, timeout=60)
+            log.write(shlex.join(probe_command) + '\n' + done.stdout + done.stderr)
+            done.check_returncode()
+        if (CRC_MARKER + ' 2304 cases (Linux only)' not in done.stdout
+                or 'ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)' not in done.stdout):
+            raise ValueError('Modified-library CRC probe did not complete')
+    if source.read_bytes() != original:
+        raise ValueError('Baseline CRC source changed')
+    for row in link['inputs']:
+        retained = output / row['retainedPath']
+        if (retained.stat().st_size != row['bytes']
+                or hashlib.sha256(retained.read_bytes()).hexdigest() != row['sha256']):
+            raise ValueError('Retained input changed during modified relink')
+    files = []
+    for path in sorted(directory.rglob('*')):
+        if path.is_file():
+            files.append({'path': path.relative_to(output).as_posix(), 'bytes': path.stat().st_size,
+                          'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+    print('ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)')
+    return {'compileCommand': compile_command, 'command': command, 'abiCommand': abi_command,
+            'probeCommands': probe_commands, 'files': files, 'replacement': selected,
+            'inputCount': len(link['inputs']), 'crcCases': 2304, 'modifiedCalls': 6912,
+            'redistributionApproved': False, 'androidApproved': False, 'relinkingApproved': False,
+            'scope': 'One instrumented CRC object and final shared-library execution only; not complete source, general replacement, decoder/TUI or LGPL approval'}
+
+
 def validate(result, target, output, env):
     payload = result.read_bytes()
     _, needed = pty.audit.elf(payload)
@@ -623,6 +771,7 @@ def build(upstream, stage):
     if Path(link['output']).read_bytes() != result.read_bytes():
         raise ValueError('Installed OpenTUI differs from final-link output')
     replay = replay_link_inputs(link, zig, result, output, env)
+    modified_relink = probe_modified_crc_relink(native, link, zig, result, output, env)
     generated_sources = retain_zig_generated_sources(output, env)
     shutil.copyfile(result, output / 'libopentui.so')
     needed = validate(result, target, output, env)
@@ -643,6 +792,7 @@ def build(upstream, stage):
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
         'finalLinkReplay': replay,
+        'modifiedCrcRelink': modified_relink,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
                         'Explicit linker input copies do not prove selected archive members, per-file source attribution or toolchain corresponding source',
                         'Per-file notices, Bun/JSC obligations and Android remain under review']

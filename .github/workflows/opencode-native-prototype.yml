@@ -207,6 +207,12 @@ jobs:
             work/native-prototype/native-opentui-build/link-replay/*.log
             work/native-prototype/native-opentui-build/link-replay/link.map
             work/native-prototype/native-opentui-build/link-replay/archive-extraction.tsv
+            work/native-prototype/native-opentui-build/modified-crc-relink/*.log
+            work/native-prototype/native-opentui-build/modified-crc-relink/*.c
+            work/native-prototype/native-opentui-build/modified-crc-relink/crc.patch
+            work/native-prototype/native-opentui-build/modified-crc-relink/crc.d
+            work/native-prototype/native-opentui-build/modified-crc-relink/link.map
+            work/native-prototype/native-opentui-build/modified-crc-relink/archive-extraction.tsv
       - uses: actions/upload-artifact@v4
         with:
           name: opencode-native-prototype-diagnostic

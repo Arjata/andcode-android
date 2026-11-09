@@ -291,6 +291,19 @@ paths do not prove identical contents across runs. Complete compiler inputs,
 source-to-object rebuildability, section liveness and modified-library replacement
 and relinking remain unproven. All approval fields remain false.
 
+The next Linux-only diagnostic modifies the pinned FFmpeg `libavutil/crc.c`
+(SHA-256 `fbcab458ebddda14d121333622525cb0547c1d428645e9286534690c48366ad5`)
+in an isolated copy, retaining its original license header and recording the
+transformation. It adds a call counter, rebuilds only that object through the
+existing configured FFmpeg make rule, substitutes exactly one retained linker
+argument, and links with the same fixed Zig tool. The modified library must differ
+from the baseline, retain the expected ABI/dependencies, and execute the CRC
+reference cases through its exported functions with the counter checked. All
+other retained inputs must remain unchanged. This is a pending single-object
+replacement experiment, not complete FFmpeg relinking, corresponding-source
+delivery, Bun/JSC compliance or Android approval. It never replaces the staged
+baseline library or the official APK payload.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

@@ -132,6 +132,9 @@
 | `sort-test`、`sort-test.log` | 自有标准库稳定排序适配层的独立 Rust 测试 ELF 与编译/运行日志;仅 Linux 源码实验,不进入 APK | `native-fff-build/` |
 | `ffmpeg-notice-candidates.json` | 从实际编译依赖全文中保留声明候选注释的字节范围、原文与摘要;不是正式 notices 或完整许可判定 | `native-opentui-build/` |
 | `zig-generated-sources/` | Original bytes and per-file digests of `b/<hash>/builtin.zig` from the pinned Zig global/local caches after building; generated-input snapshots only, not proof of complete compiler inputs | `native-opentui-build/` |
+| `modified-crc-relink/` | Isolated modified FFmpeg CRC source, replacement object, retained-input relink, map and runtime probes; Linux diagnostic only, never a staged APK input | `native-opentui-build/` |
+| `original-crc.c`, `modified-crc.c`, `crc.patch`, `crc.o`, `crc.d`, `compile.log`, `link.log`, `source/`, `build/` | Original/transformed bytes, recorded diff, replacement object/dependencies, logs and isolated configured trees for the single-object relink diagnostic | `modified-crc-relink/` |
+| `andcode_crc_relink_calls` | Diagnostic-only exported counter accessor added to the modified CRC translation unit; not a product ABI | Experimental `modified-crc-relink/libopentui.so` |
 | `failed-fff-build-logs` | fff 实验构建失败时保留排序/编译日志的诊断工件,不含可分发批准 | CI artifacts |
 | `probe-opencode-native.py` | Linux CI 实验 API 准入:普通/持久 PTY、shell,口令只在内存使用不输出 | `scripts/` |
 | `probe-opencode-native-tui.py` | Linux CI 独立 PTY 启动源码实验 TUI,要求实际映射预置 OpenTUI 并渲染;仅终止自有进程组 | `scripts/` |
