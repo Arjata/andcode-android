@@ -31,6 +31,7 @@ jobs:
           python3 scripts/audit-opencode-native.test.py
           python3 scripts/collect-opencode-native-licenses.test.py
           python3 scripts/collect-opencode-native-sources.test.py
+          python3 scripts/collect-opencode-native-runtime.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
@@ -51,17 +52,30 @@ jobs:
           cp work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode work/native-prototype/
           python3 scripts/audit-opencode-native.py work/native-prototype
           bash baseline/check-compat.sh --page-align work/native-prototype
+      - name: Explicit Ubuntu 24.04 runtime closure (not runner libraries)
+        run: |
+          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          trap 'docker rm -f "$CID" >/dev/null' EXIT
+          docker start "$CID" >/dev/null
+          docker exec "$CID" sh -ec 'apt-get update -qq; apt-get install -y -qq --no-install-recommends libstdc++6 libgcc-s1'
+          IMAGE=$(docker inspect --format '{{.Image}}' "$CID")
+          docker export "$CID" -o work/runtime-rootfs.tar
+          mkdir -p work/runtime-rootfs
+          tar -xf work/runtime-rootfs.tar -C work/runtime-rootfs
+          python3 scripts/collect-opencode-native-runtime.py work/runtime-rootfs work/native-prototype "$IMAGE"
       - name: Execution, shell, PTYs and empty extraction directory gate
         run: |
           set -euo pipefail
           mkdir -p work/probe-home work/probe-tmp
           export ANDCODE_EXE_DIR="$GITHUB_WORKSPACE/work/native-prototype/native"
+          export ANDCODE_LOADER="$GITHUB_WORKSPACE/work/native-prototype/runtime/ld-linux-aarch64.so.1"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/work/native-prototype/runtime"
           export HOME="$GITHUB_WORKSPACE/work/probe-home" BUN_TMPDIR="$GITHUB_WORKSPACE/work/probe-tmp"
           export OPENCODE_PTY_BIN="$(find "$GITHUB_WORKSPACE/work/upstream/node_modules/.bun" -path '*/@opencode/pty-linux-arm64-gnu/bin/opencode-pty' -type f -print -quit)"
           test -n "$OPENCODE_PTY_BIN"
           EXE="$GITHUB_WORKSPACE/work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode"
-          "$EXE" --version
-          "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
+          "$ANDCODE_LOADER" --library-path "$LD_LIBRARY_PATH" --inhibit-cache "$EXE" --version
+          "$ANDCODE_LOADER" --library-path "$LD_LIBRARY_PATH" --inhibit-cache "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
           ready=0

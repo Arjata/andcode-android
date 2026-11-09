@@ -76,6 +76,14 @@ OpenTUI 内嵌 zig-deps 归档中的声明。四份源码归档于 2026-11-09 �
 误当成目标 feature 闭包，也不把声明文件名扫描当成逐文件完整版权审查。
 报告 `native-source-review.json` 的 `redistributionApproved` 始终 false。
 
+2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
+`libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
+包内 copyright。同日读取现有 Ubuntu 24.04 实例 gcc-14 包 copyright，确认
+libstdc++/libgcc 的 GNU GPLv3 + GCC Runtime Library Exception 口径；该例外不等于
+免除库自身对应源码/声明义务，实际包版权原文随诊断工件保留。glibc 仍按 LGPL
+独立审查。新收集器只复制 CI sysroot 的 arm64 库，不使用宿主 runner 库，不进入
+正式 APK/bundle；递归 NEEDED 与版本化符号检查、运行成功均不构成分发批准。
+
 2026-11-09 Android libtinfo 自编译核验:Ubuntu
 `ncurses_6.4+20240113.orig.tar.gz` SHA-256
 `37a12a0f8ae2605012c9a164dd286b0cfa02b51b5055836d09eb3d597fc351b1`，

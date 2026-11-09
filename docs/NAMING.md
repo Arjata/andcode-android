@@ -78,6 +78,8 @@
 | `build-android-tinfo.sh`、`android-tinfo.test.py` | Android 专用 ncurses 构建及真实初始化/内核权限/无身份调用回归;固定 Ubuntu 源码与补丁,不改标准 Linux bundle | `scripts/` |
 | `collect-opencode-native-sources.py`、`collect-opencode-native-sources.test.py` | 固定四个原生扩展的候选源码归档摘要/构建输入/声明与嵌套依赖清单;只采集证据,不批准分发 | `scripts/` |
 | `native-source-evidence`、`native-source-review.json` | 源码实验的候选对应源码归档与审查索引;仅 CI 诊断工件,不进入 APK | 实验 stage/ |
+| `collect-opencode-native-runtime.py`、`collect-opencode-native-runtime.test.py` | 从 CI Ubuntu 24.04 sysroot 收集实验 glibc/GCC 动态库,验证递归依赖及版本化符号,不修改正式 bundle | `scripts/` |
+| `runtime`、`native-runtime-review.json` | 源码实验运行库目录与包版本/源码包/摘要/依赖证据;仅诊断工件,非许可批准 | 实验 stage/ |
 | `ncurses-build.txt`、`ncurses-upstream-copying` | Android libtinfo 固定源码摘要/构建配置/上游版权声明,随包 manifest 跟踪 | `etc/third-party/` |
 | `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |
 | `proot-rootfs-gate.sh` | 应用域原版 Ubuntu Base Bash 独立实例准入,不修改 SELinux 或 glibc | `scripts/` |

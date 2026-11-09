@@ -32,7 +32,10 @@ def controlling_terminal():
 
 
 try:
-    process = subprocess.Popen([str(exe), '--standalone'], stdin=slave, stdout=slave,
+    command = [str(exe), '--standalone']
+    if env.get('ANDCODE_LOADER'):
+        command = [env['ANDCODE_LOADER'], '--library-path', env['LD_LIBRARY_PATH'], '--inhibit-cache', *command]
+    process = subprocess.Popen(command, stdin=slave, stdout=slave,
                                stderr=slave, env=env, preexec_fn=controlling_terminal)
     os.close(slave)
     slave = None
@@ -50,6 +53,12 @@ try:
         if mapped and b'\x1b[' in output and b'opencode' in output.lower():
             break
     assert mapped, 'Preinstalled OpenTUI was not actually mapped'
+    if env.get('ANDCODE_LOADER'):
+        runtime = Path(env['ANDCODE_LOADER']).resolve().parent
+        assert str(runtime / 'libc.so.6') in maps, 'TUI used host libc instead of staged runtime'
+        for line in maps.splitlines():
+            if any(name in line for name in ('libstdc++.so.', 'libgcc_s.so.')):
+                assert str(runtime) + '/' in line, 'TUI used unstaged C++ runtime'
     assert b'\x1b[' in output and b'opencode' in output.lower(), 'No rendered OpenCode TUI'
     print('ANDCODE_SOURCE_TUI_NATIVE_OK (Linux CI only)')
 finally:
