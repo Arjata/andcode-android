@@ -261,7 +261,21 @@ artifact `13692138201` 为 501250589 字节，ZIP SHA-256
 摘要/原字节逐项匹配。两轮同 linker 446 输入重放字节一致、ABI、CRC 2304 组及
 Linux PTY/TUI/隔离目录无 ELF 通过。最新随包声明候选报告对 733 份实际依赖
 全文重算完全一致；这些成功不构成完整 notices、对应源码、修改版重链接或
-Android 批准。生成 builtin 快照是这两轮之后新增配方，真实 CI 尚待执行。
+Android 批准。
+
+生成 builtin 快照配方 `5d444e0` 的源码 CI `42661927969`、常规 CI
+`42661893364` 均成功；artifact `13696046606` 已完整下载独立复核，501356265
+字节，ZIP SHA-256 `bdafa515d7e840b625c5efcdf911a1a0f83dd20b05a363ad5dc9d3bd1e375940`，
+与 API 一致，29816 项清单闭合。14 份生成 `builtin.zig` 共 41148 字节，保留路径、
+逐项摘要与字节数均匹配；本轮均来自 global cache，local cache 没有候选。
+同 Zig 446 输入重放字节一致、25 条归档抽取记录、119 项修改后 fff 候选、
+六文件声明、733 份依赖声明重算、2304 组 CRC 与 Linux 运行门禁继续通过。
+从本轮实际保留的 `libcompiler_rt.a` 唯一成员读取 DWARF 行表，91 个文件条目中
+生成路径 `b/2a01436ccce52344c33c97b4d9478f83/builtin.zig` 对应本轮保留的 2340
+字节文件，SHA-256 `9840d59c686c7d7fa6904bc02eb9e1029aedc5b39cbfe20ac3b3d3b9ff2c2c06`。
+这是本轮生成路径缺口的补齐，不回填旧工件：本轮 compiler-rt 成员摘要与
+`42652931946` 不同，相同缓存路径不能证明跨轮内容相同；仍未证明完整编译输入、
+源码到对象可重建、存活节或修改版库替换重链接，所有批准字段继续为 false。
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
