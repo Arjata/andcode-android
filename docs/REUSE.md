@@ -99,11 +99,16 @@ GPL-2.0 源码入本仓库；fff 中的静态组合、例外适用范围、对�
 仓库根 LICENSE 均为 MIT，可作归档缺失声明的补充候选(逐提交 SHA-256 由收集器
 固定并保留原文)；glidesort 对应提交根目录未找到声明文件，serial 无随包 VCS
 定位信息，二者仍待补齐。补充来源不证明二进制对应，也不覆盖所有内嵌代码。
+crate 证据索引同时记录 `build.rs` 和 `.cargo_vcs_info.json` 摘要，便于复核
+实际原生构建分支及补充声明提交；收集器从不执行这些构建脚本。
 CI `42544621101` 的 arm64 Linux 候选树为 bun-pty 38/37 registry、fff 120/116
 registry(与 Windows host 预审相差 1 项)；registry 源码摘要全部复核，报告仍为
 blocked。该轮 upload-artifact 默认漏传展开候选源码的 dotfiles，导致全文件
-manifest 不闭合，不能作为完整诊断包；已显式保留隔离 stage 内固定源码的 dotfiles，
-待后续成功 run 重新核验完整 manifest。
+manifest 不闭合，不能作为完整诊断包；已显式保留隔离 stage 内固定源码的 dotfiles。
+修复后 CI `42545320876`(提交 `16a3d19`)全成功，工件 ZIP SHA-256
+`eaf7f920ad9cbcf9af64fe832b612f7e181821a25a720c8240a6fd59b7ae6e65` 与 API
+一致；600 项全文件摘要、两组 registry 归档摘要和 4 份补充声明均核验通过，
+源码/许可/运行库报告仍不批准分发，未部署到设备或作为正式 APK 输入。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

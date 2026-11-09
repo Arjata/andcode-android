@@ -52,6 +52,13 @@ class SourceEvidenceTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.inspect_archive(archive([]), '0' * 64)
 
+    def test_native_build_script_and_crate_vcs_are_indexed(self):
+        data = archive([('crate/build.rs', b'fn main() {}'),
+                        ('crate/.cargo_vcs_info.json', b'{"git":{"sha1":"example"}}')])
+        result = module.inspect_archive(data, module.digest(data))
+        self.assertEqual([p['path'] for p in result['buildInputs']],
+                         ['crate/build.rs', 'crate/.cargo_vcs_info.json'])
+
     def test_xz_source(self):
         data = archive([('ffmpeg/COPYING.LGPLv2.1', b'license example')], mode='w:xz')
         result = module.inspect_archive(data, module.digest(data))

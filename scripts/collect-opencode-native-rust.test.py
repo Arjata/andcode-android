@@ -6,6 +6,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('rust_evidence', Path(__file__).with_name('collect-opencode-native-rust.py'))
 module = importlib.util.module_from_spec(spec)
@@ -65,6 +66,40 @@ class CandidateGraphTest(unittest.TestCase):
         module.validate_vcs(data.getvalue(), 'a' * 40)
         with self.assertRaisesRegex(ValueError, 'does not match'):
             module.validate_vcs(data.getvalue(), 'b' * 40)
+
+    def test_collection_stays_blocked_with_pinned_registry_sources(self):
+        def archive(entries):
+            data = io.BytesIO()
+            with tarfile.open(fileobj=data, mode='w:gz') as out:
+                for name, content in entries:
+                    member = tarfile.TarInfo(name)
+                    member.size = len(content)
+                    out.addfile(member, io.BytesIO(content))
+            return data.getvalue()
+
+        crate = archive([('dep-1/LICENSE', b'example notice')])
+        sha = hashlib.sha256(crate).hexdigest()
+        lock = ('[[package]]\nname="root"\nversion="1"\n'
+                '[[package]]\nname="dep"\nversion="1"\n'
+                'source="registry+https://github.com/rust-lang/crates.io-index"\n'
+                f'checksum="{sha}"\n').encode()
+        candidate = archive([('root/Cargo.toml', b'[package]'), ('root/Cargo.lock', lock)])
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp)
+            (stage / 'native-source-evidence').mkdir()
+            (stage / 'native-source-evidence/fixture-commit.tar.gz').write_bytes(candidate)
+            with patch.object(module, 'CANDIDATES', {'fixture': ('Cargo.toml', 'Cargo.lock', [])}), \
+                 patch.object(module.sources, 'SOURCES', {'fixture': ('repo', 'commit', hashlib.sha256(candidate).hexdigest())}), \
+                 patch.object(module.subprocess, 'check_output', side_effect=['root v1|MIT|\ndep v1|MIT|\n', 'cargo fixture', 'rustc fixture']), \
+                 patch.object(module.urllib.request, 'urlopen', return_value=io.BytesIO(crate)):
+                module.collect(stage)
+            report = json.loads((stage / 'native-rust-review.json').read_text())
+            self.assertIs(report['redistributionApproved'], False)
+            self.assertIs(report['binaryCorrespondenceProven'], False)
+            dependency = report['candidates'][0]['packages'][0]
+            self.assertEqual(dependency['checksum'], sha)
+            self.assertTrue(dependency['status'].startswith('blocked-'))
+            self.assertEqual((stage / 'native-rust-evidence/dep-1.crate').read_bytes(), crate)
 
 
 if __name__ == '__main__':

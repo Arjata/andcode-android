@@ -57,7 +57,8 @@ def inspect_archive(data, expected, depth=0):
                 raise ValueError('Candidate source archive expansion exceeds bound')
             name = path.name
             notice = re.match(r'^(license|copying|notice|copyright|authors|patents)(?:$|[._-])', name, re.I)
-            build = (name in {'Cargo.toml', 'Cargo.lock', 'build.zig', 'build.zig.zon', 'binding.gyp', 'package.json'}
+            build = (name in {'Cargo.toml', 'Cargo.lock', 'build.rs', '.cargo_vcs_info.json',
+                              'build.zig', 'build.zig.zon', 'binding.gyp', 'package.json'}
                      or str(path).endswith('/scripts/build-ffmpeg.ts'))
             if notice or build or name == 'zig-deps.tar.gz':
                 content = archive.extractfile(member).read()
