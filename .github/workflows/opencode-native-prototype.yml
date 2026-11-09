@@ -193,6 +193,9 @@ jobs:
             work/native-prototype/native-opentui-build/crc-probe.c
             work/native-prototype/native-opentui-build/crc-probe.log
             work/native-prototype/native-opentui-build/ffmpeg-config/
+            work/native-prototype/native-opentui-build/link-replay/*.log
+            work/native-prototype/native-opentui-build/link-replay/link.map
+            work/native-prototype/native-opentui-build/link-replay/archive-extraction.tsv
       - uses: actions/upload-artifact@v4
         with:
           name: opencode-native-prototype-diagnostic

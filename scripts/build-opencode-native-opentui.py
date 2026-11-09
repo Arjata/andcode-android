@@ -353,6 +353,55 @@ def retain_zig_resources(archive_path, output):
             'scope': 'Pinned tool archive lib/ resources and root notices, not complete toolchain corresponding source'}
 
 
+def replay_link_inputs(link, zig, result, output, env):
+    """Replay with the same fixed linker; byte equality binds map to original output."""
+    directory = output / 'link-replay'
+    directory.mkdir(exist_ok=False)
+    arguments = list(link['command'])
+    if arguments[0] != 'ld.lld' or arguments.count('-o') != 1:
+        raise ValueError('Unexpected linker replay command')
+    for item in link['inputs']:
+        path = (output / item['retainedPath']).resolve(strict=True)
+        path.relative_to((output / 'link-inputs').resolve(strict=True))
+        if (arguments[item['argumentIndex']] != item['path']
+                or path.stat().st_size != item['bytes']
+                or hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']):
+            raise ValueError('Retained linker replay input changed')
+        arguments[item['argumentIndex']] = str(path)
+    binary = directory / 'libopentui.so'
+    arguments[arguments.index('-o') + 1] = str(binary)
+    command = [str(zig), *arguments,
+               '--Map=' + str(directory / 'link.map'),
+               '--why-extract=' + str(directory / 'archive-extraction.tsv')]
+    done = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)
+    (directory / 'link.log').write_text(done.stdout + done.stderr, encoding='utf8')
+    done.check_returncode()
+    payload = binary.read_bytes()
+    if payload != result.read_bytes():
+        raise ValueError('Same-linker replay differs from original OpenTUI bytes')
+    _, needed = pty.audit.elf(payload)
+    for name in ['link.map', 'archive-extraction.tsv']:
+        if not (directory / name).is_file() or not (directory / name).stat().st_size:
+            raise ValueError('Missing linker replay map or extraction report')
+    if not (directory / 'archive-extraction.tsv').read_text(encoding='utf8').startswith('reference\textracted\tsymbol\n'):
+        raise ValueError('Unexpected linker archive extraction report')
+    probe = output / 'probe.mjs'
+    probe.write_text(PROBE, encoding='utf8', newline='\n')
+    done = subprocess.run(['bun', str(probe), str(binary)], env=env, capture_output=True,
+                          text=True, timeout=30)
+    (directory / 'abi.log').write_text(done.stdout + done.stderr, encoding='utf8')
+    done.check_returncode()
+    if MARKER not in done.stdout:
+        raise ValueError('Linker replay ABI probe did not complete')
+    files = []
+    for path in sorted(directory.iterdir()):
+        files.append({'path': path.relative_to(output).as_posix(), 'bytes': path.stat().st_size,
+                      'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+    return {'command': command, 'files': files, 'inputCount': len(link['inputs']),
+            'byteIdentical': True, 'needed': needed, 'abiGate': MARKER,
+            'scope': 'Same fixed Zig linker retained-input replay only; not modified-library rebuild or LGPL/Android approval'}
+
+
 def validate(result, target, output, env):
     payload = result.read_bytes()
     _, needed = pty.audit.elf(payload)
@@ -471,6 +520,7 @@ def build(upstream, stage):
     result = native / 'lib/aarch64-linux/libopentui.so'
     if Path(link['output']).read_bytes() != result.read_bytes():
         raise ValueError('Installed OpenTUI differs from final-link output')
+    replay = replay_link_inputs(link, zig, result, output, env)
     shutil.copyfile(result, output / 'libopentui.so')
     needed = validate(result, target, output, env)
     (stage / 'native-opentui-build-review.json').write_text(json.dumps({
@@ -487,6 +537,7 @@ def build(upstream, stage):
         'ffmpegSourceInputs': source_inputs,
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
+        'finalLinkReplay': replay,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
                         'Explicit linker input copies do not prove selected archive members, per-file source attribution or toolchain corresponding source',
                         'Per-file notices, Bun/JSC obligations and Android remain under review']

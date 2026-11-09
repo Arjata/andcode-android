@@ -262,6 +262,60 @@ class Tests(unittest.TestCase):
                     m.retain_link_inputs(text, native, output, env)
                 self.assertFalse((output / 'link-inputs').exists())
 
+    def test_same_linker_replay_requires_exact_bytes_reports_and_abi(self):
+        for mode in ['ok', 'changed-input', 'compile-failed', 'different-output',
+                     'missing-map', 'bad-extraction', 'abi-failed', 'abi-marker']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                native, output, env, args, paths = self.link_fixture(root)
+                link = m.retain_link_inputs(shlex.join(args), native, output, env)
+                result = Path(link['output'])
+                if mode == 'changed-input':
+                    (output / link['inputs'][0]['retainedPath']).write_bytes(b'tampered')
+                calls = []
+
+                def run(command, **kwargs):
+                    calls.append(command)
+                    self.assertEqual(kwargs['env'], env)
+                    directory = output / 'link-replay'
+                    if len(calls) == 1:
+                        self.assertEqual(command[:2], ['fixed-zig', 'ld.lld'])
+                        for item in link['inputs']:
+                            self.assertEqual(command[item['argumentIndex'] + 1],
+                                             str((output / item['retainedPath']).resolve()))
+                        self.assertIn('--Map=' + str(directory / 'link.map'), command)
+                        self.assertIn('--why-extract=' + str(directory / 'archive-extraction.tsv'), command)
+                        self.assertEqual(kwargs['timeout'], 120)
+                        (directory / 'libopentui.so').write_bytes(b'different' if mode == 'different-output' else b'linked')
+                        if mode != 'missing-map': (directory / 'link.map').write_text('fixture map')
+                        (directory / 'archive-extraction.tsv').write_text(
+                            'bad' if mode == 'bad-extraction' else 'reference\textracted\tsymbol\n')
+                    else:
+                        self.assertEqual(command, ['bun', str(output / 'probe.mjs'), str(directory / 'libopentui.so')])
+                        self.assertEqual(kwargs['timeout'], 30)
+                    failure = ((mode == 'compile-failed' and len(calls) == 1)
+                               or (mode == 'abi-failed' and len(calls) == 2))
+                    return subprocess.CompletedProcess(command, 1 if failure else 0,
+                                                       '' if mode == 'abi-marker' else m.MARKER, '')
+
+                with patch.object(m.subprocess, 'run', side_effect=run), \
+                        patch.object(m.pty.audit, 'elf', return_value=(None, ['libc.so.6'])):
+                    if mode == 'ok':
+                        report = m.replay_link_inputs(link, Path('fixed-zig'), result, output, env)
+                        self.assertTrue(report['byteIdentical'])
+                        self.assertEqual(report['inputCount'], 3)
+                        self.assertEqual(len(report['files']), 5)
+                        for row in report['files']:
+                            payload = (output / row['path']).read_bytes()
+                            self.assertEqual(row['bytes'], len(payload))
+                            self.assertEqual(row['sha256'], hashlib.sha256(payload).hexdigest())
+                    else:
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                            m.replay_link_inputs(link, Path('fixed-zig'), result, output, env)
+                self.assertEqual(result.read_bytes(), b'linked')
+                self.assertEqual(len(calls), 0 if mode == 'changed-input' else 2 if mode in (
+                    'ok', 'abi-failed', 'abi-marker') else 1)
+
     def test_link_input_symlink_escape_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -359,7 +413,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output']:
+        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output', 'replay']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -449,6 +503,8 @@ class Tests(unittest.TestCase):
                         patch.object(m, 'unpack_nested'), \
                         patch.object(m, 'probe_ffmpeg_crc', return_value={'cases': 2304},
                                      side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None), \
+                        patch.object(m, 'replay_link_inputs', return_value={'byteIdentical': True},
+                                     side_effect=ValueError('Replay failed') if failure == 'replay' else None), \
                         patch.object(m.subprocess, 'check_output', return_value='0.17.0'), \
                         patch.object(m.subprocess, 'run', side_effect=run), \
                         patch.object(m, 'validate', side_effect=validate) as probe:
