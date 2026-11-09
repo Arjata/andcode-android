@@ -86,6 +86,25 @@ are retained as `andcode-ubuntu-tree-review.json`. Timestamps, ACLs, xattrs and
 sparse allocation are outside this gate. Synthetic POSIX tests and actual
 image-tree acceptance must run in Linux CI; Windows does not validate them.
 
+The tree gate passed native arm64 CI `42684788108` (commit `db1c693`, job
+`129388559581`): 15166 entries including the root, 12456 regular-file/hardlink
+entries, 1266 symlinks, five hardlinks and 469579808 materialized bytes. The job
+log SHA-256 is `6f8cde3313c9d9344267e008a5002de0952e3bbd2fd5b2728f13f6aeab6ad91e`.
+Thirteen non-root synthetic cases passed; the root-only nonempty recovery-
+directory case was skipped. The next optional job runs these tests as root to
+exercise that case too. Artifact bytes still require independent review.
+
+Independent HTTPS source-index review of snapshot `20261110T000000Z` verified
+all six main/universe source indexes against InRelease SHA-256/size records.
+All 100 unique source-package/version pairs from the earlier 180-package live
+run were present (this is not proof of a new snapshot bootstrap's selections).
+Review JSON SHA-256:
+`5d7a019b2b0dfdc14c024b56af9af60caf2e63bf665e64e31d23bf7bd736034a`.
+Some identical source versions occur in different pool component directories;
+the review retains each location and requires identical file hashes. Source
+archives were not downloaded, PGP signatures were not independently verified,
+and complete corresponding-source delivery remains unproven.
+
 这是 **root chroot + PRoot 开发原型**，不是已完成自包含交付的 Ubuntu 功能。
 轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
 不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。

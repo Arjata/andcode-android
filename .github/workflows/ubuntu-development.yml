@@ -96,7 +96,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends mmdebstrap ubuntu-keyring e2fsprogs
           bash -n scripts/build-ubuntu-mmdebstrap.sh
           python3 scripts/ubuntu-rootfs-validator.test.py
-          python3 scripts/compare-ubuntu-rootfs.test.py
+          sudo python3 scripts/compare-ubuntu-rootfs.test.py
           python3 scripts/build-ubuntu-mmdebstrap.test.py
       - name: Build isolated mmdebstrap rootfs and image
         run: bash scripts/build-ubuntu-mmdebstrap.sh dist/ubuntu-mmdebstrap
