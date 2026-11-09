@@ -3,7 +3,8 @@
 > 版本: v0.4.36 (设计稿) · 日期: 2026-11-09
 > v0.4.36 变更(源码实验闭包):从独立 Ubuntu 24.04 CI sysroot 收集 glibc/GCC
 > 动态库,记录 image/dpkg/版权/摘要,递归检查 NEEDED 与所需符号版本;实验服务/TUI
-> 显式 loader 与库目录执行并检查映射。不修改正式载荷,仍不批准分发或 Android 准入。
+> 固定实验 PT_INTERP 与库目录执行并检查映射(显式 loader 影响上游 self-spawn,
+> 不可等价替代)。不修改正式载荷,仍不批准分发或 Android 准入。
 > v0.4.35 变更(Android libtinfo):v0.4.34 拦截方案被实际初始化门禁证伪(内部绑定
 > 绕过 shim),已移除。改用固定 Ubuntu ncurses 源码/安全补丁自编译,关闭
 > HAVE_SETFSUID,保留上游无身份变更 safe-open 分支与内核权限检查;标准 Linux

@@ -1,5 +1,6 @@
 """Linux CI: exercise the real OpenTUI dlopen path, not just serve/version."""
 import fcntl
+import errno
 import os
 from pathlib import Path
 import pty
@@ -32,20 +33,24 @@ def controlling_terminal():
 
 
 try:
-    command = [str(exe), '--standalone']
-    if env.get('ANDCODE_LOADER'):
-        command = [env['ANDCODE_LOADER'], '--library-path', env['LD_LIBRARY_PATH'], '--inhibit-cache', *command]
-    process = subprocess.Popen(command, stdin=slave, stdout=slave,
+    # Use the ELF's staged interpreter. Explicit `ld.so opencode` changes
+    # /proc/self/exe and can break the CLI's self-spawn path in --standalone.
+    process = subprocess.Popen([str(exe), '--standalone'], stdin=slave, stdout=slave,
                                stderr=slave, env=env, preexec_fn=controlling_terminal)
     os.close(slave)
     slave = None
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        assert process.poll() is None, 'TUI exited before native rendering'
+        assert process.poll() is None, f'TUI exited before native rendering ({process.returncode}): {bytes(output[-4096:])!r}'
         maps = Path(f'/proc/{process.pid}/maps').read_text()
         mapped = str(stage / opentui[0]) in maps
         if select.select([master], [], [], .2)[0]:
-            output.extend(os.read(master, 65536))
+            try:
+                output.extend(os.read(master, 65536))
+            except OSError as error:
+                if error.errno != errno.EIO:
+                    raise
+                raise AssertionError(f'TUI PTY closed ({process.poll()}): {bytes(output[-4096:])!r}') from error
         if len(output) > 2 * 1024 * 1024:
             raise AssertionError('Unexpectedly large TUI output')
         # dlopen alone is not enough: require terminal rendering with visible
@@ -55,6 +60,7 @@ try:
     assert mapped, 'Preinstalled OpenTUI was not actually mapped'
     if env.get('ANDCODE_LOADER'):
         runtime = Path(env['ANDCODE_LOADER']).resolve().parent
+        assert str(runtime / 'ld-linux-aarch64.so.1') in maps, 'TUI used host ELF interpreter'
         assert str(runtime / 'libc.so.6') in maps, 'TUI used host libc instead of staged runtime'
         for line in maps.splitlines():
             if any(name in line for name in ('libstdc++.so.', 'libgcc_s.so.')):

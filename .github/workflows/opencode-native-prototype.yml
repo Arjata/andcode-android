@@ -62,7 +62,16 @@ jobs:
           docker export "$CID" -o work/runtime-rootfs.tar
           mkdir -p work/runtime-rootfs
           tar -xf work/runtime-rootfs.tar -C work/runtime-rootfs
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq patchelf
+          # Self-spawning TUI must retain the CLI in /proc/self/exe. An explicit
+          # `ld.so CLI` invocation is not equivalent; point PT_INTERP at staged ld.
+          EXE="$GITHUB_WORKSPACE/work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode"
+          patchelf --set-interpreter "$GITHUB_WORKSPACE/work/native-prototype/runtime/ld-linux-aarch64.so.1" "$EXE"
+          cp "$EXE" work/native-prototype/opencode
+          python3 scripts/audit-opencode-native.py work/native-prototype
           python3 scripts/collect-opencode-native-runtime.py work/runtime-rootfs work/native-prototype "$IMAGE"
+          bash baseline/check-compat.sh --page-align work/native-prototype
       - name: Execution, shell, PTYs and empty extraction directory gate
         run: |
           set -euo pipefail
@@ -75,7 +84,7 @@ jobs:
           test -n "$OPENCODE_PTY_BIN"
           EXE="$GITHUB_WORKSPACE/work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode"
           "$ANDCODE_LOADER" --library-path "$LD_LIBRARY_PATH" --inhibit-cache "$EXE" --version
-          "$ANDCODE_LOADER" --library-path "$LD_LIBRARY_PATH" --inhibit-cache "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
+          "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
           ready=0

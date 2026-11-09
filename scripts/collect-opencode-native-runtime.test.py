@@ -36,6 +36,19 @@ Version needs section '.gnu.version_r' contains 1 entry:
              patch.object(module, 'versions', return_value=({'GLIBC_2.39'}, {'libc.so.6': {'GLIBC_2.39'}})):
             self.assertEqual(module.verify_closure([Path('app')], [lib])[0]['needed'], ['libc.so.6'])
 
+    def test_transitive_runtime_dependency_is_checked(self):
+        app, lib = Path('app'), Path('libstdc++.so.6')
+        with patch.object(Path, 'read_bytes', side_effect=lambda: b'fixture'), \
+             patch.object(module.elf_module, 'elf', side_effect=[({}, ['libstdc++.so.6']), ({}, ['libgcc_s.so.1'])]), \
+             patch.object(module, 'versions', return_value=(set(), {})):
+            with self.assertRaisesRegex(ValueError, 'libgcc_s.so.1'):
+                module.verify_closure([app, lib], [lib])
+
+    def test_duplicate_provider_rejected(self):
+        with patch.object(module, 'versions', return_value=(set(), {})):
+            with self.assertRaisesRegex(ValueError, 'Duplicate'):
+                module.verify_closure([], [Path('one/libc.so.6'), Path('two/libc.so.6')])
+
 
 if __name__ == '__main__':
     unittest.main()

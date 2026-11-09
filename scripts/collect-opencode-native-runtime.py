@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -20,7 +21,10 @@ LIBRARIES = {
 
 
 def versions(path):
-    text = subprocess.check_output(['readelf', '--version-info', '--wide', str(path)], text=True)
+    # Parsing binutils output requires a deterministic language even on a runner
+    # configured with a non-English locale.
+    text = subprocess.check_output(['readelf', '--version-info', '--wide', str(path)],
+                                   text=True, env=dict(os.environ, LC_ALL='C'))
     definitions, requirements = set(), {}
     mode, provider = None, None
     for line in text.splitlines():
