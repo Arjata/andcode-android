@@ -91,8 +91,8 @@ def collect(stage):
     rows = []
     env = dict(os.environ, CARGO_TERM_COLOR='never')
     for name, (manifest, lockfile, flags) in CANDIDATES.items():
-        _, commit, expected = sources.SOURCES[name]
-        root = unpack_candidate(stage / 'native-source-evidence' / f'{name}-{commit}.tar.gz',
+        _, source_commit, expected = sources.SOURCES[name]
+        root = unpack_candidate(stage / 'native-source-evidence' / f'{name}-{source_commit}.tar.gz',
                                 expected, evidence / 'candidates')
         lockpath = root / lockfile
         original = lockpath.read_bytes()
@@ -143,7 +143,7 @@ def collect(stage):
                 archive.write_bytes(data)
                 row['archive'] = filename
             packages.append(row)
-        rows.append({'name': name, 'sourceCommit': commit, 'target': TARGET,
+        rows.append({'name': name, 'sourceCommit': source_commit, 'target': TARGET,
                      'cargoFlags': flags, 'lockSha256': hashlib.sha256(original).hexdigest(),
                      'tree': f'{name}-tree.txt', 'packages': packages})
     (stage / 'native-rust-review.json').write_text(json.dumps({

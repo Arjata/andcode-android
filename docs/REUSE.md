@@ -110,6 +110,13 @@ manifest 不闭合，不能作为完整诊断包；已显式保留隔离 stage �
 一致；600 项全文件摘要、两组 registry 归档摘要和 4 份补充声明均核验通过，
 源码/许可/运行库报告仍不批准分发，未部署到设备或作为正式 APK 输入。
 
+下一阶段 bun-pty 实验重建仅使用上述固定归档与 Cargo.lock：在 Ubuntu 24.04
+arm64 runner 执行 Cargo fetch --locked 后离线 build --locked，强制 GNU 链接器
+PT_LOAD≥16K；记录源码/lock/工具/命令/输出摘要，将重建 ELF 替换实验安装树内
+唯一固定 glibc 输入，再由 Bun 插件重新计算物理名。它不是原 npm ELF 可重现证明；
+Cargo offline 不隔离第三方 build.rs 的网络/主机访问，Rust sysroot/工具链与 serial
+声明缺口仍须审查。仅诊断构建，不接入正式 bundle/APK，不因此批准分发。
+
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
 包内 copyright。同日读取现有 Ubuntu 24.04 实例 gcc-14 包 copyright，确认

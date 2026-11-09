@@ -94,6 +94,7 @@ class CandidateGraphTest(unittest.TestCase):
                  patch.object(module.urllib.request, 'urlopen', return_value=io.BytesIO(crate)):
                 module.collect(stage)
             report = json.loads((stage / 'native-rust-review.json').read_text())
+            self.assertEqual(report['candidates'][0]['sourceCommit'], 'commit')
             self.assertIs(report['redistributionApproved'], False)
             self.assertIs(report['binaryCorrespondenceProven'], False)
             dependency = report['candidates'][0]['packages'][0]

@@ -43,6 +43,14 @@ try:
             break
         time.sleep(.1)
     assert marker.read_text() == 'ANDCODE_SOURCE_PTY_OK'
+    # Ordinary PTY must map the exact preinstalled bun-pty ELF, including when
+    # the experiment replaces the npm binary with a fixed-source rebuild.
+    rows = [row.split('\t') for row in (Path(os.environ['ANDCODE_EXE_DIR']).parent / 'oc2-native.tsv').read_text().splitlines()]
+    native_pty = [row for row in rows if '/bun-pty/rust-pty/' in row[3] and 'musl' not in row[3]]
+    assert len(native_pty) == 1
+    pid = os.environ['ANDCODE_SERVE_PID']
+    maps = Path('/proc/' + pid + '/maps').read_text()
+    assert str(Path(os.environ['ANDCODE_EXE_DIR']) / native_pty[0][0]) in maps, 'Ordinary PTY did not map staged bun-pty'
     session = request('POST', '/api/session', {'title': 'andcode source native CI'})['data']['id']
     pty = request('POST', '/api/experimental/session/' + session + '/terminal', {'command': '/bin/sh', 'args': ['-c', 'test -t 0 && printf ANDCODE_SOURCE_PERSISTENT_PTY_OK; exec /bin/sh'], 'title': 'andcode source CI', 'env': {}, 'size': {'cols': 80, 'rows': 24}})['data']
     created.append(('/api/experimental/persistent-pty/', pty['id']))

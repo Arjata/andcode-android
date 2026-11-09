@@ -33,12 +33,17 @@ jobs:
           python3 scripts/collect-opencode-native-sources.test.py
           python3 scripts/collect-opencode-native-runtime.test.py
           python3 scripts/collect-opencode-native-rust.test.py
+          python3 scripts/build-opencode-native-pty.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
           bun install --frozen-lockfile
           cd ../..
           python3 scripts/prepare-opencode-native-build.py work/upstream
+      - name: Fixed-source bun-pty rebuild (diagnostic only)
+        run: |
+          mkdir -p work/native-prototype
+          python3 scripts/build-opencode-native-pty.py work/upstream work/native-prototype
       - name: Build experimental source V2 including Web assets
         env:
           OPENCODE_CHANNEL: beta
@@ -87,6 +92,7 @@ jobs:
           "$ANDCODE_LOADER" --library-path "$LD_LIBRARY_PATH" --inhibit-cache "$EXE" --version
           "$EXE" serve --hostname 127.0.0.1 --port 4096 > work/prototype-serve.log 2>&1 &
           pid=$!
+          export ANDCODE_SERVE_PID="$pid"
           trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
           ready=0
           for i in $(seq 1 60); do
