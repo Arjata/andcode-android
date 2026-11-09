@@ -60,7 +60,7 @@ def build(upstream, stage):
             raise ValueError('Fixed binding.gyp source mismatch: ' + item)
     result = output / 'watcher.node'
     command = ['c++', '-shared', '-fPIC', '-O2', '-std=c++17', '-pthread',
-               '-DNAPI_VERSION=3', '-DNAPI_DISABLE_CPP_EXCEPTIONS',
+               '-DNAPI_VERSION=4', '-DNAPI_DISABLE_CPP_EXCEPTIONS',
                '-DWATCHMAN', '-DINOTIFY', '-DBRUTE_FORCE',
                '-I' + str(addon), '-I' + str(node / 'include/node'),
                '-Wl,-z,max-page-size=16384', *[str(source / item) for item in SOURCES], '-o', str(result)]

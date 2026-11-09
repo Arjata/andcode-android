@@ -44,6 +44,7 @@ class WatcherBuildTest(unittest.TestCase):
 
                 def run(command, **kwargs):
                     if command[0] == 'c++':
+                        self.assertIn('-DNAPI_VERSION=4', command)
                         Path(command[-1]).write_bytes(b'checked watcher fixture')
                         return subprocess.CompletedProcess(command, 0)
                     if failure == 'event':

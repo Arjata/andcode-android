@@ -140,7 +140,8 @@ commit 覆盖，相关回归同时验证两个不同 commit 均保留。
 官方 headers 归档 SHA-256 `6b891cced2a8ee08fef06b8cb36a890bd6d1dd8aca575e2a392bb78f0970b819`
 与 nodejs.org 官方 SHASUMS256.txt 一致。头文件包含 Node MIT/其它声明，随归档
 保留，不能把整份头文件闭包简化为一种许可。以固定 binding.gyp Linux 分支明确
-源文件列表和 NAPI_VERSION=3 编译，不执行 npm 安装脚本；需验证原生导出及 Bun
+源文件列表和 NAPI_VERSION=4 编译(首轮 CI `42577241899` 证明版本 3 缺
+ThreadSafeFunction，未产生替换载荷)，不执行 npm 安装脚本；需验证原生导出及 Bun
 真实 subscribe/write/unsubscribe 文件事件后，才替换实验输入。仍仅诊断，不批准
 准确原 npm 二进制对应、内嵌源码逐文件许可或 Android 准入。
 
