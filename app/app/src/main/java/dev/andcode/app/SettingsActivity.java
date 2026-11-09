@@ -9,6 +9,23 @@ import com.google.android.material.switchmaterial.SwitchMaterial;
 
 public class SettingsActivity extends UtilityActivity {
     private SeekBar mSizeSlider;
+    private TextView mCaStatus;
+    private SwitchMaterial mCaSwitch;
+    private boolean mRefreshingCa;
+    private final androidx.activity.result.ActivityResultLauncher<String[]> caPicker = registerForActivityResult(
+        new androidx.activity.result.contract.ActivityResultContracts.OpenDocument(), uri -> {
+            if (uri == null) return;
+            new Thread(() -> {
+                try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+                    byte[] bytes = CustomCa.read(in);
+                    CustomCa.Info info = CustomCa.inspect(bytes);
+                    runOnUiThread(() -> { if (!isFinishing() && !isDestroyed()) confirmCa(bytes, info); });
+                } catch (Exception error) {
+                    runOnUiThread(() -> caMessage("读取 CA 失败：" + error.getMessage()));
+                }
+            }, "andcode-ca-import").start();
+        });
+
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         pageTitle("设置", "让工作区适合你的使用习惯");
@@ -81,6 +98,45 @@ public class SettingsActivity extends UtilityActivity {
         toggle(backend, "Ubuntu 显式使用设备代理", "仅新 Ubuntu 会话使用 127.0.0.1:7890；默认关闭，"
             + "需设备自行提供代理，不关闭 TLS 校验。", "ubuntu-loopback-proxy", AppSettings.ubuntuProxy(this));
 
+        section("OpenCode 网络信任", "可选 · 默认关闭 · 下次后端启动生效");
+        LinearLayout trust = card(body, false);
+        trust.addView(label("自定义 CA", 16, true, false));
+        gap(trust, 8);
+        trust.addView(label("仅追加信任到新启动的 OpenCode Web 后端及继承环境的子进程；保留默认根证书。"
+            + "不修改 Android / WebView、独立终端、Ubuntu 或系统证书库。此 CA 可为任意站点签发证书，"
+            + "请通过独立可信渠道核对文件 SHA-256；不自动下载，不关闭 TLS 校验。", 12, false, true));
+        gap(trust, 10);
+        mCaStatus = label("", 12, false, true);
+        mCaStatus.setTextIsSelectable(true);
+        trust.addView(mCaStatus);
+        mCaSwitch = new SwitchMaterial(this);
+        mCaSwitch.setText("追加信任已导入的 CA");
+        mCaSwitch.setContentDescription("追加信任已导入的 CA，默认关闭");
+        mCaSwitch.setMinimumHeight(dp(48));
+        trust.addView(mCaSwitch);
+        mCaSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            if (mRefreshingCa) return;
+            if (enabled) {
+                try { CustomCa.verify(getFilesDir().toPath(), AppSettings.customCaDigest(this)); }
+                catch (java.io.IOException error) {
+                    mCaSwitch.setChecked(false);
+                    caMessage("不能启用：" + error.getMessage());
+                    return;
+                }
+            }
+            AppSettings.prefs(this).edit().putBoolean("custom-ca-enabled", enabled).apply();
+            refreshCa();
+            caMessage("已有服务不变；请在主页手动停止并重新启动 OpenCode 服务。");
+        });
+        trust.addView(action("导入 CA PEM 并核对摘要", false,
+            () -> caPicker.launch(new String[]{"*/*"})), new LinearLayout.LayoutParams(-1, -2));
+        trust.addView(action("停用并清除 CA 选择", false, () -> {
+            AppSettings.prefs(this).edit().putBoolean("custom-ca-enabled", false).remove("custom-ca-sha256").apply();
+            refreshCa();
+            caMessage("已清除选择；旧副本保留供运行中服务读取。重启后端后不再追加信任。");
+        }), new LinearLayout.LayoutParams(-1, -2));
+        refreshCa();
+
         section("导出与隐私", "ZIP 归档");
         LinearLayout archive = card(body, false);
         toggle(archive, "包含 Git 历史", "导出时保留 .git 目录，默认关闭", "include-git", AppSettings.includeGit(this));
@@ -120,6 +176,57 @@ public class SettingsActivity extends UtilityActivity {
         super.onResume();
         // 页面可被复用;同步终端双指手势保存的字号及其预览。
         mSizeSlider.setProgress(AppSettings.terminalSize(this) - 10);
+        refreshCa();
+    }
+
+    private void caMessage(String text) {
+        if (!isFinishing() && !isDestroyed()) android.widget.Toast.makeText(this, text,
+            android.widget.Toast.LENGTH_LONG).show();
+    }
+
+    private void refreshCa() {
+        if (mCaStatus == null) return;
+        String digest = AppSettings.customCaDigest(this);
+        boolean enabled = AppSettings.customCaEnabled(this);
+        mCaStatus.setText((enabled ? "已启用（下次启动）" : "未启用（使用默认信任）")
+            + (digest.isEmpty() ? "\n尚未导入 CA" : "\nPEM 文件 SHA-256：\n" + digest));
+        mRefreshingCa = true;
+        mCaSwitch.setChecked(enabled);
+        mRefreshingCa = false;
+    }
+
+    private void confirmCa(byte[] bytes, CustomCa.Info info) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(8), dp(24), 0);
+        TextView details = label("主体：" + info.subject + "\n有效期至：" + info.expires
+            + "\n证书 DER SHA-256：\n" + info.fingerprint
+            + "\n\n请输入从独立可信渠道取得的 PEM 文件 SHA-256；导入不自动启用。", 12, false, true);
+        details.setTextIsSelectable(true);
+        content.addView(details);
+        com.google.android.material.textfield.TextInputLayout field = new com.google.android.material.textfield.TextInputLayout(this);
+        field.setHint("预期 PEM 文件 SHA-256（64 位）");
+        com.google.android.material.textfield.TextInputEditText expected = new com.google.android.material.textfield.TextInputEditText(this);
+        expected.setSingleLine(true);
+        expected.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        field.addView(expected);
+        content.addView(field);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(content);
+        androidx.appcompat.app.AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("确认导入自定义 CA").setView(scroll)
+            .setNegativeButton("取消", null).setPositiveButton("核对并导入", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            try {
+                CustomCa.Info installed = CustomCa.install(getFilesDir().toPath(), bytes, expected.getText().toString());
+                AppSettings.prefs(this).edit().putString("custom-ca-sha256", installed.sha256)
+                    .putBoolean("custom-ca-enabled", false).apply();
+                refreshCa();
+                dialog.dismiss();
+                caMessage("已导入且保持关闭；需要时显式开启，手动重启后端生效。");
+            } catch (java.io.IOException error) { field.setError(error.getMessage()); }
+        }));
+        dialog.show();
     }
 
     private void toggle(LinearLayout parent, String title, String detail, String key, boolean checked) {

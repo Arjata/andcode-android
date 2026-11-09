@@ -192,6 +192,7 @@ public final class ServeManager {
         // Do not ship the development proxy or inherit a disabled TLS verifier.
         for (String key : new String[]{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
                 "ALL_PROXY", "all_proxy", "NODE_TLS_REJECT_UNAUTHORIZED"}) env.remove(key);
+        CustomCa.apply(env, files.toPath(), AppSettings.customCaEnabled(app), AppSettings.customCaDigest(app));
 
         final Process proc = pb.redirectErrorStream(true).start();
         synchronized (ServeManager.class) { sProcess = proc; sPassword = null; }

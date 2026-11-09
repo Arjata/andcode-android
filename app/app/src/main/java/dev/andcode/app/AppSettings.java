@@ -24,6 +24,14 @@ public final class AppSettings {
         return prefs(context).getBoolean("include-git", false);
     }
 
+    static boolean customCaEnabled(Context context) {
+        return prefs(context).getBoolean("custom-ca-enabled", false);
+    }
+
+    static String customCaDigest(Context context) {
+        return prefs(context).getString("custom-ca-sha256", "");
+    }
+
     static boolean ubuntuTerminal(Context context) {
         return "ubuntu-proot".equals(prefs(context).getString("terminal-backend", "bash"));
     }

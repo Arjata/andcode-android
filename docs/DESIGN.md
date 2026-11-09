@@ -1,6 +1,12 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.39 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.40 (设计稿) · 日期: 2026-11-09
+> v0.4.40 变更(可选 CA):Tier P 设置提供 SAF 单 PEM CA 导入/文件摘要核对与
+> 默认关闭的追加信任开关;仅新启动 OpenCode Web 后端设置 NODE_EXTRA_CA_CERTS,
+> 保留内置根/主机名校验,不改 Android 全局/WebView/独立终端/Ubuntu 信任。
+> 导入不自动启用,不联网获取 CA,启用后文件缺失/摘要改变/过期拒绝启动;
+> 停用不重启既有会话,需手动停止/启动后端。本机 26 项 Java 校验、APK build/lint
+> 及 Bun 1.4.4 真实 TLS 开/关/主机名拒绝通过;待 CI 及 P0/P3 实机验证。
 > v0.4.39 变更(实验 fff 来源):固定 fff 源码/lock、zlob feature 和 Zig 0.16.0
 > 工具摘要;离线 Cargo 重建后校验 ELF/16K/导出及 Bun 真实索引/搜索/glob,成功才
 > 替换实验输入。保留选中 crate 归档、Cargo 消息和 GNU LOAD map/可用输入摘要,

@@ -87,6 +87,12 @@ jobs:
           java -cp "$RUNNER_TEMP/archive-tests" dev.andcode.app.ProjectArchiveTest
       - name: Web terminal IME regression tests
         run: node --test app/tests/andcode-terminal-ime.test.mjs
+      - name: Optional CA import, digest and trust environment isolation
+        run: |
+          mkdir -p "$RUNNER_TEMP/ca-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/ca-tests" \
+            app/app/src/main/java/dev/andcode/app/CustomCa.java app/tests/CustomCaTest.java
+          java -cp "$RUNNER_TEMP/ca-tests" dev.andcode.app.CustomCaTest
       - name: Native link farm and data safety regression
         run: |
           mkdir -p "$RUNNER_TEMP/runtime-tests"

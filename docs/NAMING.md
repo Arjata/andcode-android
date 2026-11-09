@@ -164,6 +164,7 @@
 
 | 变量 | 含义 | 取值示例 |
 |---|---|---|
+| `NODE_EXTRA_CA_CERTS` | Bun/Node 上游追加 CA 文件;Tier P 仅显式启用后向新 OpenCode Web 后端及其继承环境的子进程设置,不替换内置根 | 应用私有 `custom-ca/<sha256>.pem` |
 | `ANDCODE_ROOT` | 逻辑根目录(包装器据此寻址) | `/data/adb/andcode`、`$HOME/andcode` |
 | `ANDCODE_EXE_DIR` | 可执行物理目录 | Tier P = `nativeLibraryDir`;其余 = `$ANDCODE_ROOT` |
 | `ANDCODE_LOADER` | glibc 动态链接器绝对路径(launcher 用) | `$ROOT/lib/ld-linux-aarch64.so.1` |
@@ -183,6 +184,13 @@
 - 禁止使用未登记的环境变量名;新增变量须先进 §8 注册表。
 
 ## 6. 物理名规范
+
+Tier P 可选 CA 数据注册：`CustomCa.java` / `CustomCaTest.java` 为应用侧校验与
+平台 JDK 测试类；`files/custom-ca/<sha256>.pem` 为用户 SAF 导入的单证书副本，
+`custom-ca-enabled` / `custom-ca-sha256` 为应用私有偏好键。默认关闭，不预置任何
+站点 CA，不联网下载，不进入 native manifest，不改 Android 全局证书库。
+`scripts/custom-ca-tls.test.py` 为固定 Bun 的 loopback TLS 追加信任/错误主机名拒绝测试，
+仅生成临时测试 CA，不下载或持久信任外部证书。
 
 ### 6.1 规范布局(bundle 内,binding Tier M/A)
 
