@@ -193,6 +193,67 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.retain_link_inputs(shlex.join(args), native, output, env)
 
+    def resource_archive(self, entries):
+        data = io.BytesIO()
+        with tarfile.open(fileobj=data, mode='w:xz') as archive:
+            for name, content in entries:
+                item = tarfile.TarInfo(name)
+                item.size = len(content)
+                archive.addfile(item, io.BytesIO(content))
+        return data.getvalue()
+
+    def resource_entries(self):
+        return [('zig/' + name, ('fixture-' + name).encode()) for name in [
+            'LICENSE', 'lib/libcxx/LICENSE.TXT', 'lib/libcxxabi/LICENSE.TXT',
+            'lib/libunwind/LICENSE.TXT', 'lib/libc/glibc/LICENSES', 'lib/compiler_rt.zig']]
+
+    def test_zig_resources_keep_source_bytes_but_not_tool_binary(self):
+        entries = self.resource_entries()
+        data = self.resource_archive(entries + [('zig/zig', b'\x7fELFtool')])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / 'tool.tar.xz'
+            path.write_bytes(data)
+            with patch.object(m, 'ZIG_SHA256', hashlib.sha256(data).hexdigest()):
+                result = m.retain_zig_resources(path, root)
+            self.assertEqual(len(result['files']), len(entries))
+            with tarfile.open(root / result['archive']) as archive:
+                self.assertEqual(set(archive.getnames()), {n.partition('/')[2] for n, _ in entries})
+                for row in result['files']:
+                    content = archive.extractfile(row['path']).read()
+                    self.assertEqual(hashlib.sha256(content).hexdigest(), row['sha256'])
+
+    def test_zig_resources_reject_digest_paths_duplicates_elf_and_missing_notices(self):
+        for mode in ['digest', 'path', 'duplicate', 'elf', 'missing']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                entries = self.resource_entries()
+                if mode == 'path': entries.append(('zig/lib/../escape', b'bad'))
+                if mode == 'duplicate': entries.append(entries[0])
+                if mode == 'elf': entries.append(('zig/lib/binary', b'\x7fELFbad'))
+                if mode == 'missing': entries.pop()
+                data = self.resource_archive(entries)
+                root = Path(tmp)
+                path = root / 'tool.tar.xz'
+                path.write_bytes(data)
+                with patch.object(m, 'ZIG_SHA256', '0' * 64 if mode == 'digest' else hashlib.sha256(data).hexdigest()):
+                    with self.assertRaises(ValueError):
+                        m.retain_zig_resources(path, root)
+
+    def test_zig_resources_reject_links(self):
+        data = io.BytesIO()
+        with tarfile.open(fileobj=data, mode='w:xz') as archive:
+            item = tarfile.TarInfo('zig/lib/link')
+            item.type = tarfile.SYMTYPE
+            item.linkname = '/outside'
+            archive.addfile(item)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / 'tool.tar.xz'
+            path.write_bytes(data.getvalue())
+            with patch.object(m, 'ZIG_SHA256', hashlib.sha256(data.getvalue()).hexdigest()):
+                with self.assertRaisesRegex(ValueError, 'link or special'):
+                    m.retain_zig_resources(path, root)
+
     def test_exports_probe_and_success_gate(self):
         symbols = '\n'.join('1 GLOBAL FUNC ot_' + s for s in [
             'context_abi_version', 'context_create', 'context_destroy', 'video_open'])
@@ -284,6 +345,7 @@ class Tests(unittest.TestCase):
                         patch.object(m.platform, 'machine', return_value='aarch64'), \
                         patch.object(m, 'ORIGINAL', hashlib.sha256(b'original').hexdigest()), \
                         patch.object(m, 'ZIG_SHA256', hashlib.sha256(b'tool archive').hexdigest()), \
+                        patch.object(m, 'retain_zig_resources', return_value={'archive': 'fixture'}), \
                         patch.object(m.shutil, 'which', return_value=str(zig)), \
                         patch.object(m.pty.rust.sources, 'download_archive', return_value=b'archive'), \
                         patch.object(m.pty.rust.sources, 'inspect_archive', return_value={}), \

@@ -162,6 +162,52 @@ def retain_link_inputs(text, native, output, env):
     return {'command': arguments, 'output': str(linked_output), 'inputs': rows}
 
 
+def retain_zig_resources(archive_path, output):
+    """Keep source/notice resources from the verified tool archive, not its binary."""
+    with archive_path.open('rb') as source:
+        if hashlib.file_digest(source, 'sha256').hexdigest() != ZIG_SHA256:
+            raise ValueError('Unexpected fixed OpenTUI Zig archive')
+    destination = output / 'zig-library-resources.tar.gz'
+    rows, seen, roots, expanded = [], set(), set(), 0
+    with tarfile.open(archive_path) as src, tarfile.open(destination, 'w:gz') as dest:
+        for member in src:
+            path = PurePosixPath(member.name)
+            if (path.is_absolute() or not path.parts or '..' in path.parts or '\\' in member.name
+                    or path.as_posix() in seen):
+                raise ValueError('Unsafe Zig resource archive path')
+            seen.add(path.as_posix())
+            roots.add(path.parts[0])
+            if len(roots) != 1 or len(seen) > 50000:
+                raise ValueError('Unexpected Zig resource archive roots or entry count')
+            relative = PurePosixPath(*path.parts[1:])
+            if str(relative) not in ('LICENSE', 'README.md') and relative.parts[:1] != ('lib',):
+                continue
+            if member.isdir():
+                continue
+            if not member.isfile():
+                raise ValueError('Zig source resource link or special entry')
+            expanded += member.size
+            if expanded > 512 * 1024 * 1024 or member.size > 128 * 1024 * 1024:
+                raise ValueError('Zig source resource expansion exceeds bounds')
+            content = src.extractfile(member).read()
+            if content.startswith(b'\x7fELF'):
+                raise ValueError('Executable ELF in Zig source resources')
+            entry = tarfile.TarInfo(relative.as_posix())
+            entry.size = len(content)
+            entry.mode = 0o644
+            dest.addfile(entry, io.BytesIO(content))
+            rows.append({'path': relative.as_posix(), 'bytes': len(content),
+                         'sha256': hashlib.sha256(content).hexdigest()})
+    required = {'LICENSE', 'lib/libcxx/LICENSE.TXT', 'lib/libcxxabi/LICENSE.TXT',
+                'lib/libunwind/LICENSE.TXT', 'lib/libc/glibc/LICENSES', 'lib/compiler_rt.zig'}
+    if required - {row['path'] for row in rows}:
+        raise ValueError('Missing Zig runtime source or notice resource')
+    with destination.open('rb') as source:
+        checksum = hashlib.file_digest(source, 'sha256').hexdigest()
+    return {'archive': destination.name, 'sha256': checksum, 'files': rows,
+            'scope': 'Pinned tool archive lib/ resources and root notices, not complete toolchain corresponding source'}
+
+
 def validate(result, target, output, env):
     payload = result.read_bytes()
     _, needed = pty.audit.elf(payload)
@@ -205,6 +251,7 @@ def build(upstream, stage):
         raise ValueError('Unexpected fixed OpenTUI Zig archive')
     if subprocess.check_output([str(zig), 'version'], text=True).strip() != '0.17.0':
         raise ValueError('Expected Zig 0.17.0')
+    zig_resources = retain_zig_resources(zig.parent.parent / 'zig.tar.xz', output)
     repo, commit, expected = pty.rust.sources.SOURCES['opentui']
     data = pty.rust.sources.download_archive(f'https://codeload.github.com/{repo}/tar.gz/{commit}')
     pty.rust.sources.inspect_archive(data, expected)
@@ -277,6 +324,7 @@ def build(upstream, stage):
         'originalNpmSha256': ORIGINAL, 'rebuiltSha256': hashlib.sha256(result.read_bytes()).hexdigest(),
         'installedInput': str(target.relative_to(upstream)), 'needed': needed, 'commands': commands,
         'zigVersion': '0.17.0', 'zigArchiveSha256': ZIG_SHA256,
+        'zigLibraryResources': zig_resources,
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
         'finalLink': link,
