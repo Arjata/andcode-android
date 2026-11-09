@@ -379,8 +379,29 @@ The pinned helper captures subprocess stdout, so `V=1` alone discards that
 evidence. The updated transformation explicitly records command/arguments/cwd
 as JSON and forwards captured stdout before checking the child exit status.
 New builds reject logs without the actual verbose CRC compiler invocation.
-This forwarding fix still awaits trusted CI; earlier recipes are not credited
-with retaining the discarded compiler output.
+The forwarding fix passed source CI `42676981376` (commit `0776ef6`, job
+`129360890884`) and independent artifact review. Artifact `13700954839` is a
+536648166-byte ZIP, SHA-256
+`07e533d6b47c3c50245b98f5d975d8e9241f79aee6dbb36a1d5e8d605a26d4c5`.
+The closed 40284-file manifest, all 345 dependency mappings / 755 files, original
+replay, single-object modification probe and Linux runtime gates passed again.
+OpenTUI SHA-256 is `4cfc1787f31e3f5c57fa5ab7ae85ae6965132c3d161d3859c0be47999acc46b7`;
+independent verification log SHA-256 is
+`f0c5509dab276cecbf9dc05228d23b4d42b34f48907f978986f880b55999f4e0`.
+A separate host review associated the observed argv/cwd/source paths with all
+345 retained objects (334 FFmpeg and eleven zlib) and their recorded non-system
+dependencies. Its JSON evidence SHA-256 is
+`9a2517c7e0f33c422d44a65d6cbc7d11381df3e8b712f8d63e9210b50886156b`.
+Earlier recipes are not credited with retaining the discarded compiler output.
+
+The next recipe adds `ffmpegCompileCommands` to the existing build report and
+requires one observed compiler invocation per retained media object. It binds
+source/object/wrapper digests to recorded command arguments, working directory
+and log line, rejecting absent, duplicate, unexpected-wrapper or source/dependency
+mismatches before staging. The new recipe still awaits trusted CI. Recorded
+commands are evidence, never re-executed as input; they do not capture complete
+preprocessing, system headers, generated-input provenance, surviving sections or
+license obligations. All approval fields remain false.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

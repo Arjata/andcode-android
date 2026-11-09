@@ -174,6 +174,76 @@ def verify_media_command_log(text):
         raise ValueError('Actual verbose FFmpeg compiler output was not retained')
 
 
+def media_compile_commands(text, native, prefix, objects, dependency):
+    """Bind retained media objects to observed commands; never execute log content."""
+    cache = (native / '.cache/ffmpeg').resolve(strict=True)
+    build = cache / 'build/aarch64-linux'
+    expected = {}
+    for item in objects:
+        parts = PurePosixPath(item).parts
+        if len(parts) < 3 or parts[0] != 'objects' or '..' in parts or '\\' in item:
+            raise ValueError('Unsafe media compile object')
+        group = 'zlib' if parts[1] == 'libz' else parts[1]
+        path = (build / group / str(PurePosixPath(*parts[2:]))).resolve(strict=True)
+        path.relative_to(build)
+        if path in expected:
+            raise ValueError('Duplicate media compile object')
+        if path.read_bytes() != (prefix / item).read_bytes():
+            raise ValueError('Media compile object bytes changed')
+        expected[path] = item
+    dependencies = {row['object']: set(row['dependencies']) for row in dependency['objects']}
+    if set(dependencies) != set(objects) or dependency['objectsWithoutDependencyFiles']:
+        raise ValueError('Incomplete media compile dependency coverage')
+    commands, make_dirs = [], set()
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.startswith('ANDCODE_MEDIA_COMMAND '):
+            continue
+        row = json.loads(line.removeprefix('ANDCODE_MEDIA_COMMAND '))
+        if row['command'] == 'make' and 'V=1' in row['args']:
+            make_dirs.add(Path(row['cwd']).resolve(strict=True))
+        elif '-c' in row['args']:
+            commands.append((number, row['command'], row['args'], Path(row['cwd'])))
+    if make_dirs != {build.resolve(strict=True)}:
+        raise ValueError('Unexpected verbose media make directory')
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.startswith('ANDCODE_MEDIA_COMMAND ') or not re.search(r'(?:^|\s)-c(?:\s|$)', line):
+            continue
+        args = shlex.split(line)
+        if '-c' in args and '-o' in args:
+            commands.append((number, args[0], args[1:], build))
+    mapped = {}
+    for number, command, args, cwd in commands:
+        if args.count('-c') != 1 or args.count('-o') != 1 or args.index('-o') + 1 >= len(args):
+            raise ValueError('Ambiguous media compiler invocation')
+        output = Path(args[args.index('-o') + 1])
+        output = (output if output.is_absolute() else cwd / output).resolve()
+        if output not in expected:
+            continue
+        item = expected[output]
+        if item in mapped:
+            raise ValueError('Duplicate media compiler invocation: ' + item)
+        compiler = Path(command).resolve(strict=True)
+        if compiler != (cache / 'toolchains/aarch64-linux/cc').resolve(strict=True):
+            raise ValueError('Unexpected media compiler wrapper')
+        source_args = [arg for arg in args if arg.endswith(('.c', '.S', '.s'))]
+        if len(source_args) != 1:
+            raise ValueError('Ambiguous media compiler source')
+        source = Path(source_args[0])
+        source = (source if source.is_absolute() else cwd / source).resolve(strict=True)
+        relative = source.relative_to(cache).as_posix()
+        if relative not in dependencies[item]:
+            raise ValueError('Compiler source absent from recorded dependencies')
+        mapped[item] = {'object': item, 'logLine': number, 'command': command,
+                        'args': args, 'cwd': str(cwd), 'source': relative,
+                        'objectSha256': hashlib.sha256(output.read_bytes()).hexdigest(),
+                        'sourceSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+                        'compilerWrapperSha256': hashlib.sha256(compiler.read_bytes()).hexdigest()}
+    if set(mapped) != set(objects):
+        raise ValueError('Missing actual media compiler invocations: ' + repr(sorted(set(objects) - set(mapped))))
+    return {'objects': [mapped[item] for item in objects], 'redistributionApproved': False,
+            'scope': 'Observed compiler argv/cwd/source matched to retained objects and non-system dependencies; not system-header, preprocessing, provenance or complete source approval'}
+
+
 def ffmpeg_configuration(text):
     """Reject license/configuration drift, not a replacement for per-file review."""
     definitions = {}
@@ -795,6 +865,8 @@ def build(upstream, stage):
     source_inputs = ffmpeg_source_inputs(native, prefix, objects)
     if source_inputs['objectsWithoutDependencyFiles']:
         raise ValueError('New media build must retain every compiler dependency file')
+    compile_commands = media_compile_commands((output / 'command-0.log').read_text(encoding='utf8'),
+                                              native, prefix, objects, source_inputs)
     notices = retain_ffmpeg_notices(native, source_inputs, output)
     crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
@@ -819,6 +891,7 @@ def build(upstream, stage):
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
         'ffmpegSourceInputs': source_inputs,
+        'ffmpegCompileCommands': compile_commands,
         'ffmpegNoticeCandidates': notices,
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,

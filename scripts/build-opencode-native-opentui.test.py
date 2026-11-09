@@ -212,6 +212,52 @@ class Tests(unittest.TestCase):
             with self.subTest(log=invalid), self.assertRaises(ValueError):
                 m.verify_media_command_log(invalid)
 
+    def test_media_compile_commands_match_objects_sources_and_dependencies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            native = Path(tmp)
+            cache = native / '.cache/ffmpeg'
+            build = cache / 'build/aarch64-linux'
+            prefix = cache / 'prefix/aarch64-linux'
+            compiler = cache / 'toolchains/aarch64-linux/cc'
+            compiler.parent.mkdir(parents=True)
+            compiler.write_bytes(b'wrapper')
+            objects = ['objects/libavutil/crc.o', 'objects/libz/adler32.o']
+            deps = []
+            for item, group, filename in [(objects[0], 'libavutil', 'crc'),
+                                           (objects[1], 'zlib', 'adler32')]:
+                (build / group).mkdir(parents=True, exist_ok=True)
+                (build / group / (filename + '.o')).write_bytes(b'object')
+                (build / group / (filename + '.c')).write_bytes(b'source')
+                dest = prefix / item
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(b'object')
+                deps.append({'object': item, 'dependencies': [f'build/aarch64-linux/{group}/{filename}.c']})
+            dependency = {'objects': deps, 'objectsWithoutDependencyFiles': []}
+            make = 'ANDCODE_MEDIA_COMMAND ' + json.dumps(
+                {'command': 'make', 'args': ['V=1'], 'cwd': str(build)}) + '\n'
+            ffmpeg = shlex.join([str(compiler), '-c', '-o', 'libavutil/crc.o', 'libavutil/crc.c']) + '\n'
+            zlib = 'ANDCODE_MEDIA_COMMAND ' + json.dumps({'command': str(compiler),
+                'args': ['-c', str(build / 'zlib/adler32.c'), '-o', str(build / 'zlib/adler32.o')],
+                'cwd': str(native)}) + '\n'
+            log = make + ffmpeg + zlib
+            report = m.media_compile_commands(log, native, prefix, objects, dependency)
+            self.assertEqual(len(report['objects']), 2)
+            self.assertEqual(report['objects'][0]['logLine'], 2)
+            self.assertIs(report['redistributionApproved'], False)
+            for invalid in [make + ffmpeg, log + ffmpeg, log.replace('V=1', 'V=0'),
+                            log.replace('-c -o', '-c -c -o'),
+                            log.replace(str(compiler), str(build / 'libavutil/crc.c'))]:
+                with self.subTest(log=invalid), self.assertRaises(ValueError):
+                    m.media_compile_commands(invalid, native, prefix, objects, dependency)
+            with self.assertRaises(ValueError):
+                m.media_compile_commands(log, native, prefix, objects + objects[:1], dependency)
+            with self.assertRaises(ValueError):
+                m.media_compile_commands(log, native, prefix, objects,
+                    {'objects': [], 'objectsWithoutDependencyFiles': objects})
+            deps[0]['dependencies'] = []
+            with self.assertRaises(ValueError):
+                m.media_compile_commands(log, native, prefix, objects, dependency)
+
     def test_crc_probe_requires_compilation_execution_and_marker(self):
         for mode in ['ok', 'compile-failed', 'run-failed', 'no-marker']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
@@ -672,7 +718,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'media-log', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -704,10 +750,6 @@ class Tests(unittest.TestCase):
                     self.assertTrue(env['ZIG_LOCAL_CACHE_DIR'].endswith('opentui-zig-local-cache'))
                     self.assertEqual(kwargs['cwd'], native)
                     if command[0] == 'bun':
-                        if failure != 'media-log':
-                            kwargs['stdout'].write('ANDCODE_MEDIA_COMMAND ' + json.dumps(
-                                {'command': 'make', 'args': ['V=1', '-j2'], 'cwd': str(native)})
-                                + '\ncc -c -o libavutil/crc.o src/libavutil/crc.c\n')
                         prefix = native / '.cache/ffmpeg/prefix/aarch64-linux'
                         (prefix / 'objects/libavutil').mkdir(parents=True)
                         (prefix / 'objects/libavutil/fixture.o').write_bytes(b'object')
@@ -724,6 +766,16 @@ class Tests(unittest.TestCase):
                         if failure == 'source-license':
                             (build / 'libavutil/fixture.c').write_text('GNU General Public License')
                         (build / 'libavutil/fixture.d').write_text('libavutil/fixture.o: libavutil/fixture.c')
+                        compiler = native / '.cache/ffmpeg/toolchains/aarch64-linux/cc'
+                        compiler.parent.mkdir(parents=True)
+                        compiler.write_bytes(b'wrapper')
+                        if failure != 'media-log':
+                            kwargs['stdout'].write('ANDCODE_MEDIA_COMMAND ' + json.dumps(
+                                {'command': 'make', 'args': ['V=1', '-j2'], 'cwd': str(build)})
+                                + '\ncc -c -o libavutil/crc.o src/libavutil/crc.c\n'
+                                + ('' if failure == 'compile-command' else
+                                   shlex.join([str(compiler), '-c', '-o', 'libavutil/fixture.o',
+                                               'libavutil/fixture.c']) + '\n'))
                         if failure == 'missing-zlib-dependencies':
                             (prefix / 'objects/libz').mkdir()
                             (prefix / 'objects/libz/fixture.o').write_bytes(b'zlib-object')
@@ -803,6 +855,7 @@ class Tests(unittest.TestCase):
                                          hashlib.sha256(b'linked object').hexdigest())
                         self.assertEqual(len(report['zigGeneratedSources']['files']), 1)
                         self.assertEqual(report['modifiedCrcRelink']['modifiedCalls'], 6912)
+                        self.assertEqual(len(report['ffmpegCompileCommands']['objects']), 1)
                         self.assertIs(report['zigGeneratedSources']['sourceAttributionApproved'], False)
                         self.assertEqual(target.read_bytes(), b'rebuilt')
 
