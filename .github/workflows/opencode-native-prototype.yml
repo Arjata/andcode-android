@@ -144,8 +144,8 @@ jobs:
           cp work/upstream/bun.lock work/native-prototype/upstream-bun.lock
           cp work/upstream/packages/cli/dist/cli-linux-arm64/bin/opencode work/native-prototype/
           git -C work/upstream rev-parse HEAD > work/native-prototype/upstream-commit.txt
-          find work/native-prototype -type f -exec sha256sum {} + > work/prototype.sha256
           echo 'DIAGNOSTIC ONLY: no compatibility, transitive license or Android acceptance approval.' > work/native-prototype/README.txt
+          find work/native-prototype -type f -exec sha256sum {} + > work/prototype.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: opencode-native-prototype-diagnostic

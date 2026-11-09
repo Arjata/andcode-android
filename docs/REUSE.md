@@ -153,6 +153,11 @@ ThreadSafeFunction，未产生替换载荷)，不执行 npm 安装脚本；需�
 CI `42578098328` 已通过重建/真实事件并生成 Bun 导入，随后旧静态白名单拒绝
 重建库 NEEDED 的 `ld-linux-aarch64.so.1`；与运行库闭包及局部门禁统一允许该已
 收集 loader，保留递归符号版本与实际 maps 验证，不引入新系统库依赖。
+前一轮 `42575345307`(提交 `125ec97`)ZIP SHA-256
+`19550896df80985dd5850408382209f6a49b0da14511db441e15ae5adce3dff8` 与 API
+一致，642 项清单摘要匹配，包含 serial 六文件匹配与 bun-pty 来源报告；其中
+诊断 README 在清单生成后写入，仅受 ZIP/API 摘要保护。已将 README 前移，后续
+工件应额外核验 ZIP 文件集合与摘要清单集合完全一致(除清单自身)。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
