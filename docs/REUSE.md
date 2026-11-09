@@ -158,6 +158,10 @@ CI `42578098328` 已通过重建/真实事件并生成 Bun 导入，随后旧静
 一致，642 项清单摘要匹配，包含 serial 六文件匹配与 bun-pty 来源报告；其中
 诊断 README 在清单生成后写入，仅受 ZIP/API 摘要保护。已将 README 前移，后续
 工件应额外核验 ZIP 文件集合与摘要清单集合完全一致(除清单自身)。
+网络记录：`42578577616` 完成 watcher staged maps/真实事件与 shell/PTY/TUI/无 ELF
+门禁，但下载固定 media 源码超时；`42579064629`、`42579438063` 则在固定 Bun
+下载持续 HTTP 504。只增加有界传输重试及同一 GitHub asset ID `665259460`
+的 API 下载路径，仍强制原 SHA-256；不跳过源码证据、TLS 或摘要门禁。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

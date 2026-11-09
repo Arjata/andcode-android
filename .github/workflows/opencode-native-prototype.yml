@@ -21,7 +21,11 @@ jobs:
       - name: Fixed Bun build tool (not a new shipped runtime dependency)
         run: |
           mkdir -p work/bun
-          curl -fLSs --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 180 https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip -o work/bun.zip
+          if ! curl -fLSs --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 180 https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip -o work/bun.zip; then
+            # Same fixed public release asset, different GitHub download route;
+            # never accept metadata/HTML or a different tool without the hash.
+            curl -fLSs --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 180 -H 'Accept: application/octet-stream' https://api.github.com/repos/oven-sh/bun/releases/assets/665259460 -o work/bun.zip
+          fi
           echo 'baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e  work/bun.zip' | sha256sum -c -
           unzip -q work/bun.zip -d work/bun
           echo "$GITHUB_WORKSPACE/work/bun/bun-linux-aarch64" >> "$GITHUB_PATH"
