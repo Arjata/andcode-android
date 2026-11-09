@@ -93,6 +93,7 @@
 | `build-opencode-native-opentui.py`、`build-opencode-native-opentui.test.py` | 固定 OpenTUI/Zig 0.17.0/FFmpeg/zlib 的 Linux arm64 诊断重建,失败不替换 npm 输入 | `scripts/` |
 | `native-opentui-build`、`native-opentui-build-review.json` | OpenTUI 固定源码/补丁/构建命令/日志/FFmpeg 配置和对象摘要/前后 ELF 证据;不批准分发 | 实验 stage/ |
 | `andcode-library-only` | OpenTUI 实验 Zig 构建选项;仅配置明确的 library-target,不配置无关 musl 测试/benchmark 图,不关闭所选库视频门禁 | 构建期 `-D` |
+| `manifest-opencode-native.py`、`manifest-opencode-native.test.py` | 实验工件全文件 SHA-256 清单与回归;跟随内部链接,拒绝越界/循环/特殊文件,与上传器实际文件集合一致 | `scripts/` |
 | `ANDCODE_SERVE_PID` | Linux 源码实验 API 探针读取自有服务 maps 的 PID;不用于设备进程发现或终止 | 实验 CI |
 | `ncurses-build.txt`、`ncurses-upstream-copying` | Android libtinfo 固定源码摘要/构建配置/上游版权声明,随包 manifest 跟踪 | `etc/third-party/` |
 | `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |

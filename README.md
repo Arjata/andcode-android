@@ -51,6 +51,12 @@ Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页�
 仍待 P3 实机验证。ZIP 数据组件测试由 CI 的 `app-data-tests` 独立运行。
 当前仍是开发部署,完整自包含 jniLibs/CI 集成和 locked 设备验证尚未完成。
 
+独立原生源码实验已在 Linux arm64 CI 从固定来源重建 OpenTUI、watcher、fff 和
+bun-pty，通过预置库映射、普通/持久 PTY、TUI 及无运行期 ELF 释放门禁；**尚未
+接入正式 APK**。首轮工件因 FFmpeg 目录链接导致全文件清单集合缺口，已逐项对照
+源字节并修正后续清单生成，仍需下一轮工件复核。许可/重链接材料、Bun/JSC
+义务及 Android 准入均未批准，详见 [原生实验审查记录](docs/REUSE.md#21-交付包核心组件宽松许可随包分发)。
+
 Ubuntu 开发环境正在实施双后端：新增 Ubuntu 24.04 arm64 开发镜像配方、
 root chroot 普通用户会话原型与独立 CI。旧设备真实应用域的 PRoot 已通过显式代理
 HTTPS/apt、新安装/编译 ELF、PTY/子进程及 glibc 更新；终端提供

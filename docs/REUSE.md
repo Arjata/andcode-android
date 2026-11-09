@@ -68,6 +68,35 @@ external library 两表重复列出的 `CONFIG_LIBSMBCLIENT 0` 同值重复，�
 `redistributionApproved` 始终 false。它不是传递源码审查，也不覆盖 Bun/JS/Web 整体依赖，
 不能把 CI 成功或收集到 LICENSE 理解为合规交付完成。
 
+OpenTUI 首次完整 Linux 实验 CI `42623009744` 与常规 CI `42622973489` 均成功，
+head 为 `1a43a9e9baea98e934ca4ca16c21d275ff408d32`。诊断 artifact
+`13678007813`，442621775 字节，ZIP SHA-256
+`018e7de71f9c0775e2d4d5eccd0b90b83cbb23df52eb7d56147cbb6bb5794fb6` 与 API
+一致；初次下载截断，保留断点续传后才核验。18946 项原清单摘要全部匹配，另有
+10399 项上传器沿 FFmpeg build/src 目录链接解引用收录的文件未列入原清单；这些
+额外文件已逐字节摘要对照清单内 `sources/ffmpeg-9.0.2` 同相对路径源码，全部相同。
+**原工件文件集合仍不闭合**，不把额外源码有一致字节等同原清单完整；后续用
+`manifest-opencode-native.py` 按上传器解引用视图生成清单，拒绝越界/循环链接及
+特殊文件。是否闭合须下载下一轮工件重新核对。
+
+本轮重建 OpenTUI ELF 32974432 字节，SHA-256
+`312aa75db50cd70dc92fedc458ad20db5e9a5e7b68a4a2f1b021d1f090be6b0d`，构建输出与
+Bun 预置副本一致；NEEDED 为 libc/libm/libpthread/libdl，ELF glibc≤2.39/16K 门禁
+通过。347 个 FFmpeg/zlib 对象与报告路径/长度/摘要全部复核；对工件内实际生成
+config.h 运行修正后的检查器通过 LGPL2.1、GPL/version3/nonfree/network=0、zlib=1
+门禁。四库来源均为 fixed-source-ci-rebuild，ABI、真实文件事件、索引/搜索/glob、
+普通/持久 PTY、TUI 渲染/预置库 maps 及隔离 HOME/BUN_TMPDIR 无运行期 ELF 日志
+均通过；这只代表 Linux 实验，不代表 Android 应用域、原 npm ELF 可重现或许可批准。
+后续提交 `5c80984` 常规 CI `42623847446` 成功；其源码实验失败边界见上文。
+
+2026-11-09 固定 OpenTUI 源码声明预审另核对了嵌套 Yoga/Ghostty/uucode 的 MIT
+原文、lcms2 MIT、libwebp COPYING 与 PATENTS、stb 双许可、Wuffs Apache-2.0，
+以及 miniaudio.h 尾部 Unlicense / MIT-0 双选原文(Copyright 2025 David Reid)。
+其中 miniaudio 许可内嵌于头文件，不会出现在仅按 LICENSE 文件名扫描的结果中；
+该事实不证明其它内嵌 dr_* 实现或生成数据已逐文件闭环。Zig build.zig 明确设置
+Yoga `link_libcpp=true`，工具链 C++ 运行库对应源码/通知也不能漏算；这些均未
+新增依赖或取码入库，仍需按实际编译/链接输入做完整通知与义务审查。
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。
