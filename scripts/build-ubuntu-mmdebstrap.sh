@@ -14,11 +14,23 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 cleanup() {
   # Never traverse mounts when deleting the one freshly allocated CI tree.
-  if sudo findmnt -rn -o TARGET | grep -Fq "$WORK/"; then
-    echo "refusing cleanup of mounted work tree: $WORK" >&2
-    return
+  local status=$? mounts target
+  if ! mounts="$(sudo findmnt -rn -o TARGET)"; then
+    echo "cannot inspect mounts; preserving work tree: $WORK" >&2
+    [ "$status" -ne 0 ] || status=1
+    return "$status"
   fi
+  while IFS= read -r target; do
+    case "$target" in
+      "$WORK"|"$WORK/"*)
+        echo "refusing cleanup of mounted work tree: $WORK" >&2
+        [ "$status" -ne 0 ] || status=1
+        return "$status"
+        ;;
+    esac
+  done <<< "$mounts"
   sudo rm -rf --one-file-system -- "$WORK"
+  return "$status"
 }
 trap cleanup EXIT
 {

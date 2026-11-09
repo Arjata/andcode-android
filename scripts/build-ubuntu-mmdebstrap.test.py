@@ -9,6 +9,38 @@ import unittest
 
 @unittest.skipUnless(sys.platform == 'linux', 'Native Linux CI only; no local Bash validation')
 class RecipeGuards(unittest.TestCase):
+    def test_cleanup_mount_inspection_fails_closed(self):
+        recipe = Path(__file__).with_name('build-ubuntu-mmdebstrap.sh').read_text()
+        cleanup = recipe[recipe.index('cleanup() {'):recipe.index('trap cleanup EXIT')]
+        # The sudo stand-in records deletion requests; no privileged tool runs.
+        for mode, expected, deletes in [('empty', 0, True), ('mount', 1, False),
+                                         ('exact', 1, False), ('error', 1, False),
+                                         ('prefix', 0, True), ('original-error', 7, True)]:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                marker = Path(tmp) / 'deleted'
+                script = '''
+WORK=/allocated/work
+sudo() {
+  case "$1" in
+    findmnt)
+      case "$MODE" in
+        mount) printf '/allocated/work/proc\\n' ;;
+        exact) printf '/allocated/work\\n' ;;
+        error) return 1 ;;
+        prefix) printf '/allocated/work-other/proc\\n' ;;
+      esac ;;
+    rm) printf 'requested' > "$MARKER" ;;
+    *) return 99 ;;
+  esac
+}
+''' + cleanup + '\n(exit "$INITIAL"); cleanup\n'
+                env = dict(os.environ, MODE=mode, MARKER=str(marker),
+                           INITIAL='7' if mode == 'original-error' else '0')
+                result = subprocess.run(['bash', '-c', script], env=env,
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual(marker.exists(), deletes)
+
     def run_recipe(self, *arguments, architecture='aarch64'):
         with tempfile.TemporaryDirectory() as tmp:
             uname = Path(tmp) / 'uname'
