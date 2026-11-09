@@ -36,6 +36,8 @@ def patch_once(text, anchor, replacement):
 
 
 def patch_build(text):
+    if 'andcode-library-only' in text or 'shared.link_z_max_page_size = 16384;' in text:
+        raise ValueError('OpenTUI source is already patched')
     text = patch_once(text,
         '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;',
         '    shared.link_z_max_page_size = 16384;\n'
