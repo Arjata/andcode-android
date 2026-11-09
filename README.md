@@ -76,6 +76,11 @@ HTTPS/apt/Git 已通过（仍保留设备现有 VPN）。
 网络规则阻断 UID 60000；未修改设备策略或借用 APK UID 绕过。
 状态、可信镜像安装和验收清单见 [docs/UBUNTU.md](docs/UBUNTU.md)。
 
+An isolated native-arm64 `mmdebstrap` CI experiment now evaluates tool-built
+Ubuntu rootfs archives and ext4 images from signed repositories. Docker remains
+the default pending CI review; existing device instances are not replaced.
+See [the rootfs tool experiment](docs/UBUNTU.md#rootfs-tool-experiment).
+
 许可证:**AGPL-3.0-only**(见 `LICENSE`)。
 
 目录(随阶段填充,见设计文档 §5/§6):

@@ -136,6 +136,12 @@
 | `original-crc.c`, `modified-crc.c`, `crc.patch`, `crc.o`, `crc.d`, `compile.log`, `link.log`, `source/`, `build/` | Original/transformed bytes, recorded diff, replacement object/dependencies, logs and isolated configured trees for the single-object relink diagnostic | `modified-crc-relink/` |
 | `andcode_crc_relink_calls` | Diagnostic-only exported counter accessor added to the modified CRC translation unit; not a product ABI | Experimental `modified-crc-relink/libopentui.so` |
 | `failed-fff-build-logs` | fff 实验构建失败时保留排序/编译日志的诊断工件,不含可分发批准 | CI artifacts |
+| `build-ubuntu-mmdebstrap.sh` | Build-only native arm64 mmdebstrap experiment; signed Ubuntu repositories, independent output, no device installer | `scripts/` |
+| `build-ubuntu-mmdebstrap.test.py` | Native Linux rejection tests for recipe arguments, architecture and existing outputs; skipped on Windows | `scripts/` |
+| `andcode-ubuntu-rootfs.tar.gz` | Validated canonical rootfs archive from the mmdebstrap experiment; input for future PRoot packaging, not an APK importer | Experimental CI artifact |
+| `andcode-ubuntu-rootfs.tar.gz.sha256`, `mmdebstrap.log`, `mmdebstrap-copyright`, `ubuntu-indexes/`, `ubuntu-sources.list` | Archive digest, bootstrap log, installed tool notice, retained signed indexes and exact source configuration | Experimental rootfs output |
+| `andcode-ubuntu-mmdebstrap-prototype` | Independently gated rootfs experiment artifact; never replaces the Docker artifact automatically | CI artifacts |
+| `andcode-ubuntu-mmdebstrap-diagnostics` | Failed bootstrap logs and metadata only; no image/archive release payload | CI artifacts |
 | `probe-opencode-native.py` | Linux CI 实验 API 准入:普通/持久 PTY、shell,口令只在内存使用不输出 | `scripts/` |
 | `probe-opencode-native-tui.py` | Linux CI 独立 PTY 启动源码实验 TUI,要求实际映射预置 OpenTUI 并渲染;仅终止自有进程组 | `scripts/` |
 | `opencode-native-prototype.yml` | 手动执行的原生扩展预置源码构建实验;失败/未审计工件不得接入 APK | `.github/workflows/` |

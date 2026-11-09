@@ -2,6 +2,11 @@ name: ubuntu-development-prototype
 
 on:
   workflow_dispatch:
+    inputs:
+      evaluate_mmdebstrap:
+        description: Build an independent mmdebstrap candidate (no device installation)
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -13,6 +18,7 @@ on:
   pull_request:
     paths:
       - scripts/build-ubuntu-rootfs.sh
+      - scripts/build-ubuntu-mmdebstrap.sh
       - scripts/validate-ubuntu-rootfs.py
       - scripts/ubuntu-rootfs-validator.test.py
       - scripts/ubuntu-rootfs-test.sh
@@ -41,6 +47,7 @@ jobs:
       - name: Recipe syntax
         run: |
           bash -n scripts/build-ubuntu-rootfs.sh
+          bash -n scripts/build-ubuntu-mmdebstrap.sh
           bash -n scripts/ubuntu-rootfs-test.sh
           sh -n runtime/ubuntu/andcode-ubuntu
           sh -n runtime/ubuntu/andcode-ubuntu-install
@@ -52,6 +59,7 @@ jobs:
           python3 -m py_compile scripts/validate-ubuntu-rootfs.py scripts/prepare-proot-gate.py
           python3 scripts/ubuntu-rootfs-validator.test.py
           python3 scripts/prepare-proot-gate.test.py
+          python3 scripts/build-ubuntu-mmdebstrap.test.py
       - name: Build trusted development image
         run: bash scripts/build-ubuntu-rootfs.sh dist/ubuntu
       - name: Verify image and test in private mount namespace
@@ -71,4 +79,53 @@ jobs:
         with:
           name: andcode-ubuntu-development-prototype
           path: dist/ubuntu/
+          retention-days: 7
+
+  mmdebstrap:
+    if: github.event_name == 'workflow_dispatch' && inputs.evaluate_mmdebstrap
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build-only bootstrap tool
+        run: |
+          sudo apt-get -o APT::Update::Error-Mode=any update
+          sudo apt-get install -y --no-install-recommends mmdebstrap ubuntu-keyring e2fsprogs
+          bash -n scripts/build-ubuntu-mmdebstrap.sh
+          python3 scripts/ubuntu-rootfs-validator.test.py
+          python3 scripts/build-ubuntu-mmdebstrap.test.py
+      - name: Build isolated mmdebstrap rootfs and image
+        run: bash scripts/build-ubuntu-mmdebstrap.sh dist/ubuntu-mmdebstrap
+      - name: Check archive and image, then test a disposable image copy
+        run: |
+          cd dist/ubuntu-mmdebstrap
+          sha256sum -c andcode-ubuntu-rootfs.tar.gz.sha256
+          sha256sum -c andcode-ubuntu-arm64.img.gz.sha256
+          python3 "$GITHUB_WORKSPACE/scripts/validate-ubuntu-rootfs.py" andcode-ubuntu-rootfs.tar.gz
+          gzip -dc andcode-ubuntu-arm64.img.gz > "$RUNNER_TEMP/ubuntu-mmdebstrap.img"
+          sudo unshare --mount --propagation private bash "$GITHUB_WORKSPACE/scripts/ubuntu-rootfs-test.sh" "$RUNNER_TEMP/ubuntu-mmdebstrap.img"
+      - name: Audit candidate baseline ELF compatibility
+        run: |
+          mkdir "$RUNNER_TEMP/ubuntu-mmdebstrap-audit"
+          sudo mount -o loop,ro,nosuid,nodev "$RUNNER_TEMP/ubuntu-mmdebstrap.img" "$RUNNER_TEMP/ubuntu-mmdebstrap-audit"
+          trap 'sudo umount "$RUNNER_TEMP/ubuntu-mmdebstrap-audit"' EXIT
+          bash baseline/check-compat.sh --page-align "$RUNNER_TEMP/ubuntu-mmdebstrap-audit/usr/bin" "$RUNNER_TEMP/ubuntu-mmdebstrap-audit/usr/lib/aarch64-linux-gnu"
+      - name: Upload gated original candidate (not smoke-test copy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: andcode-ubuntu-mmdebstrap-prototype
+          path: dist/ubuntu-mmdebstrap/
+          retention-days: 7
+      - name: Preserve bootstrap diagnostics after failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: andcode-ubuntu-mmdebstrap-diagnostics
+          path: |
+            dist/ubuntu-mmdebstrap/*.txt
+            dist/ubuntu-mmdebstrap/*.tsv
+            dist/ubuntu-mmdebstrap/*.log
+            dist/ubuntu-mmdebstrap/mmdebstrap-copyright
+            dist/ubuntu-mmdebstrap/ubuntu-sources.list
+          if-no-files-found: warn
           retention-days: 7

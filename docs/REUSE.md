@@ -21,6 +21,21 @@
 
 ## 2. 候选清单
 
+### Build-only rootfs bootstrap candidate (2026-11-10)
+
+`mmdebstrap` is evaluated only on the native Ubuntu 24.04 arm64 CI runner;
+it is not bundled into the APK or required on Android. The upstream main
+script at `https://gitlab.mister-muffin.de/josch/mmdebstrap` was inspected on
+2026-11-10: its header grants the MIT/Expat license, copyright Johannes
+Schauer Marin Rodrigues. This verifies that script, not every helper or
+dependency in the distribution package. CI retains the installed package's
+copyright file and package/tool versions for the exact invocation. No upstream
+code is copied into this repository. The experiment uses signed Ubuntu noble,
+noble-updates and noble-security package indexes without disabling signature,
+expiry or TLS checks. Package/source versions and signed indexes are evidence,
+not a corresponding-source bundle or byte-reproducibility claim. Existing
+Docker builds and device instances remain unchanged until independent CI review.
+
 ### 2.1 交付包核心组件(宽松许可,随包分发)
 
 | 项目 | 仓库 | 许可证 | 角色(对应 DESIGN §4) | 复用方式 |
@@ -311,6 +326,12 @@ This closes only the previously explicit zlib non-system dependency gap if
 verified by CI; `-MMD` still omits system headers and does not prove complete
 compiler inputs or per-file licensing. Historical artifacts without those files
 remain unchanged and retain their recorded limitation.
+
+The media recipe will also enable FFmpeg make's `V=1` output, retaining the
+actual compiler invocations in the existing build log rather than deriving
+commands from DWARF paths or generic flags. This is command evidence only:
+response files, generated inputs, conditional preprocessing and system headers
+still require separate coverage before complete corresponding source is claimed.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.42 (设计稿) · 日期: 2026-11-10
+> Version: v0.4.43 (design draft) · Date: 2026-11-10
+> v0.4.43 change: add an isolated mmdebstrap CI candidate producing a validated
+> canonical rootfs archive and ext4 image from signed Ubuntu repositories.
+> Docker remains the default; no existing Android instance is modified.
+> Snapshot pinning, corresponding source and Android acceptance remain pending.
 > v0.4.42 变更(验证边界更新):真实应用域、显式代理+CA 下新会话连续两轮完整
 > 工具往返成功,旧会话仍 HTTP 400;未修改协议或删除历史,不能声称根因已修复。
 > 诊断 PID8198 已终止,默认 PID20163 保持 CA 关闭及原会话。OpenTUI 排除 GPL
@@ -635,6 +639,16 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
 ---
 
 ### 4.8 Ubuntu 开发环境双后端(实施中,非已交付能力)
+
+- Rootfs tool evaluation: `scripts/build-ubuntu-mmdebstrap.sh` delegates package
+  bootstrap/dependency resolution to mmdebstrap in native arm64 CI. It retains
+  tool versions/notices, signed indexes and binary/source package versions,
+  then emits a validated tar archive and a separate 4 GiB ext4 image from the
+  same configured tree. The optional CI experiment uses the existing Linux
+  apt/non-root/compatibility gates; Docker stays the default. The archive is
+  not an untrusted importer or a certified PRoot installation payload. Device
+  instances remain independent and unchanged. Live signed repositories are not
+  pinned snapshots; no byte reproducibility or complete source delivery is claimed.
 
 - 保留现有轻量 Bash;Ubuntu 24.04 arm64 来自同一官方镜像与软件源。chroot 使用
   独立 ext4 镜像,PRoot 使用独立可写实例,不共享 `/etc`、`/usr`、dpkg 数据库。

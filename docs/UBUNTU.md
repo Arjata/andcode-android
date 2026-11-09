@@ -4,6 +4,24 @@
 
 ## 当前状态
 
+### Rootfs tool experiment
+
+The optional `mmdebstrap` job in `ubuntu-development.yml` evaluates a mature
+bootstrap tool rather than reimplementing distribution package installation.
+Select `evaluate_mmdebstrap` when manually dispatching the workflow. The normal
+Docker image job is unchanged. The experiment installs the tool only on CI,
+uses the Ubuntu archive keyring and signed noble/updates/security indexes, and
+retains tool/package/source versions, index bytes, configuration and logs.
+
+`andcode-ubuntu-rootfs.tar.gz` and `andcode-ubuntu-arm64.img.gz` derive from the
+same configured tree. The former is a future PRoot packaging input, **not** an
+APK installer payload: Android link/metadata adaptation, trusted installation
+and application-domain acceptance remain pending. The image must pass the
+existing private-mount-namespace apt/non-root smoke and glibc/16K audit before
+upload. Failures retain diagnostics, not installable release output. No device
+instance is touched. Signed live repositories do not pin package versions;
+snapshot/version pinning and corresponding-source delivery remain separate work.
+
 这是 **root chroot + PRoot 开发原型**，不是已完成自包含交付的 Ubuntu 功能。
 轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
 不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。
