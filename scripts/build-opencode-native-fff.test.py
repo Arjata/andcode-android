@@ -40,7 +40,7 @@ class FffBuildTest(unittest.TestCase):
                 module.link_inputs('not a GNU map')
 
     def test_failure_never_replaces_input(self):
-        for failure in [None, 'elf', 'needed', 'exports', 'probe', 'timeout', 'marker']:
+        for failure in [None, 'elf', 'needed', 'runner-zlib', 'exports', 'probe', 'timeout', 'marker']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 result, target = root / 'rebuilt.so', root / 'installed.so'
@@ -49,8 +49,13 @@ class FffBuildTest(unittest.TestCase):
                                     for name in re.findall(r'^(fff_\w+):', module.PROBE, re.M))
                 if failure == 'exports':
                     exports = ''
+                needed = ['libc.so.6']
+                if failure == 'needed':
+                    needed.append('libunknown.so')
+                if failure == 'runner-zlib':
+                    needed.append('libz.so.1')
                 gate = {'side_effect': ValueError('bad ELF')} if failure == 'elf' else {
-                    'return_value': ({}, ['libunknown.so'] if failure == 'needed' else ['libc.so.6'])}
+                    'return_value': ({}, needed)}
                 probe = {'return_value': subprocess.CompletedProcess([], 0,
                          stdout='' if failure == 'marker' else module.MARKER, stderr='')}
                 if failure == 'probe':
