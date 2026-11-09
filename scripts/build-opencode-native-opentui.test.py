@@ -18,14 +18,17 @@ spec.loader.exec_module(m)
 class Tests(unittest.TestCase):
     CONFIG = ('#define FFMPEG_LICENSE "LGPL version 2.1 or later"\n'
               '#define CONFIG_GPL 0\n#define CONFIG_VERSION3 0\n#define CONFIG_NONFREE 0\n'
-              '#define CONFIG_NETWORK 0\n#define CONFIG_ZLIB 1\n')
+              '#define CONFIG_NETWORK 0\n#define CONFIG_ZLIB 1\n'
+              '#define HAVE_ARMV8 0\n#define HAVE_ARMV8_EXTERNAL 0\n')
 
     def test_ffmpeg_configuration_drift_rejected(self):
         self.assertEqual(m.ffmpeg_configuration(self.CONFIG)['CONFIG_GPL'], '0')
         for changed in [self.CONFIG.replace('CONFIG_GPL 0', 'CONFIG_GPL 1'),
                         self.CONFIG.replace('CONFIG_NONFREE 0', 'CONFIG_NONFREE 1'),
                         self.CONFIG.replace('CONFIG_NETWORK 0', 'CONFIG_NETWORK 1'),
-                        self.CONFIG.replace('CONFIG_ZLIB 1', 'CONFIG_ZLIB 0'),
+                         self.CONFIG.replace('CONFIG_ZLIB 1', 'CONFIG_ZLIB 0'),
+                         self.CONFIG.replace('HAVE_ARMV8 0', 'HAVE_ARMV8 1'),
+                         self.CONFIG.replace('HAVE_ARMV8_EXTERNAL 0', 'HAVE_ARMV8_EXTERNAL 1'),
                         self.CONFIG.replace('LGPL version 2.1', 'GPL version 3'),
                         self.CONFIG.replace('#define CONFIG_VERSION3 0\n', ''),
                         self.CONFIG + '#define CONFIG_GPL 0\n']:
@@ -106,6 +109,53 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             m.unpack_nested(data.getvalue(), Path(tmp))
             self.assertEqual((Path(tmp) / 'yoga/LICENSE').read_bytes(), b'MIT')
+
+    def test_ffmpeg_dependency_inputs_and_gpl_guard(self):
+        for mode in ['ok', 'gpl', 'gpl-wrapped', 'spdx', 'missing', 'escape', 'drift', 'target', 'empty']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                native = Path(tmp)
+                cache = native / '.cache/ffmpeg'
+                build = cache / 'build/aarch64-linux'
+                (build / 'libavutil').mkdir(parents=True)
+                (build / 'src').mkdir()
+                prefix = cache / 'prefix/aarch64-linux'
+                (prefix / 'objects/libavutil').mkdir(parents=True)
+                item = 'objects/libavutil/fixture.o'
+                (prefix / item).write_bytes(b'object')
+                (build / 'libavutil/fixture.o').write_bytes(b'drift' if mode == 'drift' else b'object')
+                text = 'GNU Lesser General Public License'
+                if mode == 'gpl': text = 'GNU General Public License'
+                if mode == 'gpl-wrapped': text = '/* GNU General Public\n * License */'
+                if mode == 'spdx': text = '// SPDX-License-Identifier: GPL-2.0-or-later'
+                (build / 'src/fixture.c').write_text(text)
+                outside = native / 'outside.h'
+                outside.write_bytes(b'outside')
+                dependency = outside.as_posix() if mode == 'escape' else 'src/fixture.c'
+                if mode != 'missing':
+                    target = 'wrong.o' if mode == 'target' else 'libavutil/fixture.o'
+                    (build / 'libavutil/fixture.d').write_text(target + ': ' + ('' if mode == 'empty' else dependency))
+                if mode == 'ok':
+                    report = m.ffmpeg_source_inputs(native, prefix, [item])
+                    self.assertEqual(report['objectsWithoutDependencyFiles'], [])
+                    self.assertEqual(report['files'][0]['sha256'], hashlib.sha256(text.encode()).hexdigest())
+                else:
+                    with self.assertRaises(ValueError):
+                        m.ffmpeg_source_inputs(native, prefix, [item])
+
+    def test_zlib_missing_depfiles_stay_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            native = Path(tmp)
+            cache = native / '.cache/ffmpeg'
+            build = cache / 'build/aarch64-linux/zlib'
+            build.mkdir(parents=True)
+            prefix = cache / 'prefix/aarch64-linux'
+            (prefix / 'objects/libz').mkdir(parents=True)
+            (build / 'fixture.o').write_bytes(b'zlib-object')
+            item = 'objects/libz/fixture.o'
+            (prefix / item).write_bytes(b'zlib-object')
+            report = m.ffmpeg_source_inputs(native, prefix, [item])
+            self.assertEqual(report['objectsWithoutDependencyFiles'], [item])
+            self.assertEqual(report['files'], [])
 
     def test_failure_keeps_original(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -275,7 +325,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'link', 'link-output']:
+        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'link', 'link-output']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -288,7 +338,8 @@ class Tests(unittest.TestCase):
                     '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;\n'
                     '    // Test step (native only)')
                 (native / 'scripts/build-ffmpeg.ts').write_text(
-                    '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")')
+                    '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")\n'
+                    '    "--disable-gpl",')
                 target = upstream / 'node_modules/.bun/@opentui+core-linux-arm64@0.8.1/node_modules/@opentui/core-linux-arm64/libopentui.so'
                 target.parent.mkdir(parents=True)
                 target.write_bytes(b'original')
@@ -305,13 +356,22 @@ class Tests(unittest.TestCase):
                     self.assertEqual(kwargs['cwd'], native)
                     if command[0] == 'bun':
                         prefix = native / '.cache/ffmpeg/prefix/aarch64-linux'
-                        (prefix / 'objects').mkdir(parents=True)
-                        (prefix / 'objects/fixture.o').write_bytes(b'object')
+                        (prefix / 'objects/libavutil').mkdir(parents=True)
+                        (prefix / 'objects/libavutil/fixture.o').write_bytes(b'object')
                         (prefix / 'objects.txt').write_text(
-                            '../escape.o\n' if failure == 'objects' else 'objects/fixture.o\n')
+                            '../escape.o\n' if failure == 'objects' else 'objects/libavutil/fixture.o\n')
+                        if failure == 'crc-object':
+                            (prefix / 'objects.txt').write_text('objects/libavutil/aarch64/crc.o\n')
                         (prefix.parent / 'escape.o').write_bytes(b'outside')
                         build = native / '.cache/ffmpeg/build/aarch64-linux'
                         (build / 'ffbuild').mkdir(parents=True)
+                        (build / 'libavutil').mkdir()
+                        (build / 'libavutil/fixture.o').write_bytes(b'object')
+                        (build / 'libavutil/fixture.c').write_text('GNU Lesser General Public License')
+                        if failure == 'source-license':
+                            (build / 'libavutil/fixture.c').write_text('GNU General Public License')
+                        (build / 'libavutil/fixture.d').write_text('libavutil/fixture.o: libavutil/fixture.c')
+                        self.assertIn('"--disable-armv8",', (native / 'scripts/build-ffmpeg.ts').read_text())
                         for name in ['config.h', 'ffbuild/config.mak', 'ffbuild/config.log']:
                             (build / name).write_text(self.CONFIG if name == 'config.h' else 'config fixture')
                         if failure == 'configuration':

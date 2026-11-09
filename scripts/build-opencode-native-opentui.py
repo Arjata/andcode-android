@@ -92,11 +92,67 @@ def ffmpeg_configuration(text):
         definitions[name] = value
     expected = {'FFMPEG_LICENSE': '"LGPL version 2.1 or later"',
                 'CONFIG_GPL': '0', 'CONFIG_VERSION3': '0', 'CONFIG_NONFREE': '0',
-                'CONFIG_NETWORK': '0', 'CONFIG_ZLIB': '1'}
+                'CONFIG_NETWORK': '0', 'CONFIG_ZLIB': '1',
+                'HAVE_ARMV8': '0', 'HAVE_ARMV8_EXTERNAL': '0'}
     for name, value in expected.items():
         if definitions.get(name) != value:
             raise ValueError('Unexpected FFmpeg configuration: ' + name)
     return expected
+
+
+def ffmpeg_source_inputs(native, prefix, objects):
+    """Bounded make-dependency evidence and GPL-only header guard, not license approval."""
+    cache = (native / '.cache/ffmpeg').resolve(strict=True)
+    build = cache / 'build/aarch64-linux'
+    files, mappings, missing = {}, [], []
+    for item in objects:
+        parts = PurePosixPath(item).parts
+        if len(parts) < 3 or parts[0] != 'objects' or '..' in parts:
+            raise ValueError('Unexpected FFmpeg object path')
+        library = parts[1]
+        relative = PurePosixPath(*parts[2:])
+        group = 'zlib' if library == 'libz' else library
+        original = build / group / str(relative)
+        if original.read_bytes() != (prefix / item).read_bytes():
+            raise ValueError('FFmpeg installed object differs from build object')
+        dep = original.with_suffix('.d')
+        if not dep.exists():
+            # Fixed zlib make recipe does not emit dependency files. This gap
+            # must remain visible; never infer complete source attribution.
+            if library != 'libz':
+                raise ValueError('Missing FFmpeg compiler dependency file')
+            missing.append(item)
+            continue
+        target, separator, body = dep.read_text(encoding='utf8').replace('\\\n', ' ').partition(':')
+        if not separator or target.strip() != group + '/' + relative.as_posix():
+            raise ValueError('Unexpected FFmpeg dependency target')
+        dependencies = []
+        for name in shlex.split(body):
+            path = Path(name)
+            if not path.is_absolute():
+                path = build / path
+            path = path.resolve(strict=True)
+            key = path.relative_to(cache).as_posix()
+            if not path.is_file():
+                raise ValueError('Special FFmpeg source input')
+            if key not in files:
+                content = path.read_bytes()
+                header = '\n'.join(content.decode('utf8', errors='replace').splitlines()[:100])
+                normalized = re.sub(r'\s+', ' ', re.sub(r'(?m)^\s*\*\s?', '', header))
+                if (('GNU General Public License' in normalized
+                     and 'GNU Lesser General Public License' not in normalized)
+                        or re.search(r'SPDX-License-Identifier:\s*GPL-', normalized)):
+                    raise ValueError('GPL-only declaration in FFmpeg compiler input: ' + key)
+                files[key] = {'path': key, 'bytes': len(content),
+                              'sha256': hashlib.sha256(content).hexdigest()}
+            dependencies.append(key)
+        if not dependencies:
+            raise ValueError('Empty FFmpeg dependency file')
+        mappings.append({'object': item, 'dependencyFile': dep.relative_to(cache).as_posix(),
+                         'dependencies': dependencies})
+    return {'objects': mappings, 'files': [files[key] for key in sorted(files)],
+            'objectsWithoutDependencyFiles': missing,
+            'scope': 'Retained make dependencies only; no system-header, zlib-header or complete per-file license approval'}
 
 
 def retain_link_inputs(text, native, output, env):
@@ -268,9 +324,14 @@ def build(upstream, stage):
     ffmpeg_script = native / 'scripts/build-ffmpeg.ts'
     original_script = ffmpeg_script.read_text(encoding='utf8')
     # aarch64 does not use NASM. Avoid downloading an unused x86 build tool.
-    ffmpeg_script.write_text(patch_once(original_script,
+    patched_script = patch_once(original_script,
         '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")',
-        '  // andcode aarch64-only experiment: no x86 NASM download'), encoding='utf8')
+        '  // andcode aarch64-only experiment: no x86 NASM download')
+    # Fixed FFmpeg crc.S declares GPL-2.0-or-later despite --disable-gpl.
+    # Disable its ARMV8-OBJS group, leaving the independently selected NEON group.
+    patched_script = patch_once(patched_script, '    "--disable-gpl",',
+                                '    "--disable-gpl",\n    "--disable-armv8",')
+    ffmpeg_script.write_text(patched_script, encoding='utf8')
     (output / 'original-build-ffmpeg.ts').write_text(original_script, encoding='utf8')
     downloads = native / '.cache/ffmpeg/downloads'
     downloads.mkdir(parents=True)
@@ -298,6 +359,8 @@ def build(upstream, stage):
     objects = (prefix / 'objects.txt').read_text().splitlines()
     object_rows = []
     for item in objects:
+        if item == 'objects/libavutil/aarch64/crc.o':
+            raise ValueError('GPL-declared FFmpeg CRC object must not be linked')
         path = (prefix / item).resolve(strict=True)
         path.relative_to(prefix)
         object_rows.append({'path': item, 'bytes': path.stat().st_size,
@@ -310,6 +373,7 @@ def build(upstream, stage):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
     configuration = ffmpeg_configuration((output / 'ffmpeg-config/config.h').read_text(encoding='utf8'))
+    source_inputs = ffmpeg_source_inputs(native, prefix, objects)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
     if Path(link['output']).read_bytes() != result.read_bytes():
@@ -327,6 +391,7 @@ def build(upstream, stage):
         'zigLibraryResources': zig_resources,
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
+        'ffmpegSourceInputs': source_inputs,
         'finalLink': link,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
                         'Explicit linker input copies do not prove selected archive members, per-file source attribution or toolchain corresponding source',
