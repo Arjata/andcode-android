@@ -226,6 +226,23 @@ archive extraction 诊断；输出不与原 ELF 逐字节相同(32969640 字节)
 或放松一致性要求。新门禁尚待真实 CI；其报告即使成功也只证明未修改输入的原始
 链接重放，不是修改 FFmpeg 后的可替换重链接或 LGPL/Android 分发批准。
 
+同一 linker 重放的真实源码 CI `42652931946` / 常规 CI `42652895593`
+(head `6dd5352`)随后成功。artifact `13692081137`，499726018 字节，ZIP
+SHA-256 `1f0759d782d19d79188f4b057659587115f8576714f5d6ac479fe3d039edf321`
+与 API 一致；29794 项文件清单闭合，446 个输入/345 个媒体对象/334→733 源码
+依赖/19503 项 Zig 资源逐项复核，CRC 2304 组再次通过。同一固定 Zig 重放输出
+与原始 ELF 逐字节一致，Bun ABI/maps 通过，map 与 archive extraction 报告摘要
+一致，记录抽取 25 个归档成员：libc++abi 15、libc++ 2、libunwind 4、
+libc_nonshared 3、compiler-rt 1。提取不等于每个成员所有节最终存活，也不代表
+成员源码归属已完整证明。原工件 OpenTUI 为 32969560 字节、SHA-256
+`a096fceb66780f25e47fe83849d9f9cfe6c93ee385e4ea02d382d10374fadb3c`；job
+`129283784357` 完整日志已保存，Linux PTY/TUI/无运行期 ELF 门禁通过，仍无
+修改版重链接或 Android 批准。此前本机核验器的 Zig 子命令参数偏移错误已修正，
+重新对比全部参数和实际 ELF 字节通过，未放宽工件门禁。
+本机另从保留的五个静态归档逐一读取上述 25 个成员，确认每个成员名唯一、内容
+为 ELF，并记录各自长度/摘要；此举将抽取记录绑定到实际 archive 字节，仍非
+编译参数/预处理输入与源码许可的完整映射，也没有把第三方 ELF 放入仓库。
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
