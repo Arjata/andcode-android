@@ -67,6 +67,8 @@
 | `ubuntu-development.yml` | 手动触发的镜像构建与 Linux 冒烟 workflow | `.github/workflows/` |
 | `andcode-ubuntu-install` | root 专用可信 CI 镜像安装器,摘要/空间/权限检查,不接收 ZIP | `runtime/ubuntu/andcode-ubuntu-install` |
 | `ubuntu-rootfs-validator.test.py` | rootfs 构建校验器的合成归档回归测试 | `scripts/` |
+| `compare-ubuntu-rootfs.py`, `compare-ubuntu-rootfs.test.py` | Build-only read-only canonical archive / original ext4 tree comparison and synthetic regressions; paths, types, modes, UID/GID, file bytes and links; excludes timestamps, ACLs and xattrs | `scripts/` |
+| `andcode-ubuntu-tree-review.json` | Canonical archive / original ext4 tree comparison result; no runtime or source approval | Experimental mmdebstrap artifact |
 | `UBUNTU.md` | 双后端状态、可信镜像安装流程与实机准入清单 | `docs/` |
 | `bootstrap-ubuntu-device.sh` | root 设备开发验证配方,固定 Ubuntu Base 摘要,不替代 CI 正式安装 | `scripts/` |
 | `loopback-proxy`(参数值) | 设备开发验证显式选择现有 `http://127.0.0.1:7890` 代理,仅该调用透传 http_proxy/https_proxy;不关闭 TLS 校验 | Ubuntu 引导/设备测试参数 |

@@ -41,7 +41,7 @@ versions and source-package/version pairs to index stanzas. Review JSON SHA-256:
 This does not independently verify PGP signatures, download the referenced
 binary/source packages or establish corresponding-source closure.
 
-The next candidate additionally emits `andcode-ubuntu-proot.tar.gz` through the
+The isolated candidate additionally emits `andcode-ubuntu-proot.tar.gz` through the
 existing `prepare-proot-gate.py` transformer. Only the trusted CI build passes
 the canonical archive's computed digest explicitly; the legacy two-argument
 invocation still requires the fixed official Ubuntu Base digest. Conversion
@@ -58,6 +58,27 @@ all five materialized hardlinks and each rewritten/unchanged symlink. Converted
 archive SHA-256: `1c98cd485db4ea94a5959fbc0925cbf05973309664de07128e757bf4bc5478cd`.
 This is host transformation evidence only; gzip metadata is not reproducibly
 fixed, and the converted archive has not been executed on Android.
+
+CI `42680411398` (commit `e197165`, mmdebstrap job `129373108570`) passed the
+canonical-to-PRoot conversion and the existing Linux gates. Artifact `13703550062`
+is a 532612659-byte ZIP, SHA-256
+`b601712c3c48e63a8fd52110dd0346feb47d9ec762b3ae13de828333c9f04107`.
+Independent review checked payload/API digests, all 15165 canonical/converted
+paths, unchanged regular-file bytes, all five materialized hardlinks, symlink
+rewrites and retained mode/ownership metadata (469579808 materialized bytes).
+It also repeated the six-index / 180 binary-source-version review; its JSON
+SHA-256 is `dbaa16b5716462328e3bc4cf281daaa384507c87bf613900b7e2be18a0ba5f52`.
+The ext4 header/size check remains distinct from tree equivalence or execution.
+No device installation or Android approval follows from these checks.
+
+The next gate uses `compare-ubuntu-rootfs.py` to compare the original ext4
+image (read-only mount) with the canonical archive. The smoke-test copy modified
+by apt/compilers is never used for this comparison. All paths, types, modes,
+UID/GID, regular-file digests and symbolic/hard links must match; only an empty
+root-owned mode-0700 ext4 `lost+found` may be omitted from the archive. Results
+are retained as `andcode-ubuntu-tree-review.json`. Timestamps, ACLs, xattrs and
+sparse allocation are outside this gate. Synthetic POSIX tests and actual
+image-tree acceptance must run in Linux CI; Windows does not validate them.
 
 这是 **root chroot + PRoot 开发原型**，不是已完成自包含交付的 Ubuntu 功能。
 轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
