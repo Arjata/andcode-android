@@ -126,11 +126,13 @@ def patch_build(text):
 
 def patch_zlib_dependencies(text):
     """Record non-system prerequisites during the actual fixed zlib compilation."""
-    return patch_once(text, '      `-I${zlibSource}`,\n      "-c",',
+    text = patch_once(text, '      `-I${zlibSource}`,\n      "-c",',
         '      `-I${zlibSource}`,\n'
         '      "-MMD", "-MF", join(build, `${file}.d`),\n'
         '      "-MT", `zlib/${file}.o`,\n'
         '      "-c",')
+    return patch_once(text, '  run("make", [`-j${Math.max(1, availableParallelism())}`], build)',
+        '  run("make", ["V=1", `-j${Math.max(1, availableParallelism())}`], build)')
 
 
 def unpack_nested(data, destination):

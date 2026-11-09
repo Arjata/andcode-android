@@ -161,10 +161,12 @@ class Tests(unittest.TestCase):
             self.assertEqual(report['files'], [])
 
     def test_zlib_dependency_patch_is_exact_and_rejects_repeat(self):
-        source = 'run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);'
+        source = ('run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);\n'
+                  '  run("make", [`-j${Math.max(1, availableParallelism())}`], build)')
         modified = m.patch_zlib_dependencies(source)
         self.assertIn('"-MMD", "-MF", join(build, `${file}.d`)', modified)
         self.assertIn('"-MT", `zlib/${file}.o`', modified)
+        self.assertIn('run("make", ["V=1",', modified)
         self.assertLess(modified.index('"-MMD"'), modified.index('"-c"'))
         for invalid in [modified, source + source, source.replace('"-c"', '"-S"')]:
             with self.assertRaises(ValueError): m.patch_zlib_dependencies(invalid)
@@ -665,7 +667,8 @@ class Tests(unittest.TestCase):
                     '    // Test step (native only)')
                 (native / 'scripts/build-ffmpeg.ts').write_text(
                      '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")\n'
-                    '    "--disable-gpl",\n      `-I${zlibSource}`,\n      "-c",')
+                    '    "--disable-gpl",\n      `-I${zlibSource}`,\n      "-c",\n'
+                    '  run("make", [`-j${Math.max(1, availableParallelism())}`], build)')
                 target = upstream / 'node_modules/.bun/@opentui+core-linux-arm64@0.8.1/node_modules/@opentui/core-linux-arm64/libopentui.so'
                 target.parent.mkdir(parents=True)
                 target.write_bytes(b'original')
