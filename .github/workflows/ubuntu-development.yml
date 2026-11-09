@@ -23,6 +23,8 @@ on:
       - scripts/ubuntu-rootfs-validator.test.py
       - scripts/compare-ubuntu-rootfs.py
       - scripts/compare-ubuntu-rootfs.test.py
+      - scripts/collect-ubuntu-sources.py
+      - scripts/collect-ubuntu-sources.test.py
       - scripts/ubuntu-rootfs-test.sh
       - runtime/ubuntu/**
       - scripts/bootstrap-ubuntu-device.sh
@@ -63,6 +65,7 @@ jobs:
           python3 scripts/compare-ubuntu-rootfs.test.py
           python3 scripts/prepare-proot-gate.test.py
           python3 scripts/build-ubuntu-mmdebstrap.test.py
+          python3 scripts/collect-ubuntu-sources.test.py
       - name: Build trusted development image
         run: bash scripts/build-ubuntu-rootfs.sh dist/ubuntu
       - name: Verify image and test in private mount namespace
@@ -98,6 +101,7 @@ jobs:
           python3 scripts/ubuntu-rootfs-validator.test.py
           sudo python3 scripts/compare-ubuntu-rootfs.test.py
           python3 scripts/build-ubuntu-mmdebstrap.test.py
+          python3 scripts/collect-ubuntu-sources.test.py
       - name: Build isolated mmdebstrap rootfs and image
         run: bash scripts/build-ubuntu-mmdebstrap.sh dist/ubuntu-mmdebstrap
       - name: Convert the trusted canonical archive for PRoot

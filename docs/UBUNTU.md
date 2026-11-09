@@ -105,6 +105,31 @@ the review retains each location and requires identical file hashes. Source
 archives were not downloaded, PGP signatures were not independently verified,
 and complete corresponding-source delivery remains unproven.
 
+The next isolated recipe adds authenticated `deb-src` entries for the same three
+snapshot suites and downloads each exact installed source-package/version using
+guest apt (`--download-only --only-source`). It neither extracts source archives
+nor executes source build rules. `andcode-ubuntu-source-inputs/` retains per-
+source `.dsc`/archive files, actual apt commands/logs and a SHA-256 inventory
+(`andcode-ubuntu-source-inputs.json`); these are copied out of a new temporary
+guest directory before the immutable rootfs is exported. Missing exact versions,
+apt failures, existing output or unexpected download paths fail the candidate.
+This new acquisition path awaits Linux CI and independent archive verification.
+It does not automatically close source completeness, patches/build-inputs,
+notices or redistribution obligations. Docker and all device instances remain
+unchanged. Larger source artifacts are evidence, not APK contents.
+
+The first fixed-snapshot run `42685341275` (commit `dc87389`, job `129390525686`)
+passed Linux smoke, conversion and original-image tree gates. Artifact
+`13704952467` is 532612248 bytes, ZIP SHA-256
+`e66ff0c7aaa92ce41e4096a611cd0d96e62f556d9a99184e93da8a2e57273759`.
+Independent ZIP/rootfs/PRoot review passed; it confirmed the recorded snapshot
+configuration and tree report, not an independent execution of ext4. All six
+retained binary indexes matched InRelease hash records and all 180 installed
+binary/source-version tuples matched those indexes (review JSON SHA-256
+`415ba7654ce2a23e03d001091fea205ff3578181ae100fc0828118f7fd8b5e49`).
+Materialized PRoot bytes are 469579853; path/link counts are unchanged. This
+artifact predates source acquisition and cannot be credited with that new gate.
+
 这是 **root chroot + PRoot 开发原型**，不是已完成自包含交付的 Ubuntu 功能。
 轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
 不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。

@@ -45,6 +45,7 @@ trap cleanup EXIT
 cp /usr/share/doc/mmdebstrap/copyright "$OUT/mmdebstrap-copyright"
 for suite in noble noble-updates noble-security; do
   printf 'deb [arch=arm64 signed-by=%s] %s %s main universe\n' "$KEY" "$MIRROR" "$suite"
+  printf 'deb-src [signed-by=%s] %s %s main universe\n' "$KEY" "$MIRROR" "$suite"
 done > "$OUT/ubuntu-sources.list"
 # Use root mode only in a private mount namespace on the disposable CI runner.
 sudo unshare --mount --propagation private mmdebstrap --mode=root --format=directory \
@@ -77,6 +78,14 @@ sudo chroot "$ROOT" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
   >> "$OUT/andcode-ubuntu-build.txt"
 sudo chroot "$ROOT" dpkg-query -W '-f=${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
   > "$OUT/andcode-ubuntu-packages.tsv"
+# Download exact source versions without unpacking or running source build rules.
+# This is a new disposable guest tree, not a device instance or release importer.
+sudo chroot "$ROOT" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+  /usr/bin/python3 - /tmp/andcode-ubuntu-source-inputs < "$REPO/scripts/collect-ubuntu-sources.py" \
+  2>&1 | tee "$OUT/andcode-ubuntu-source-acquisition.log"
+sudo cp -a "$ROOT/tmp/andcode-ubuntu-source-inputs" "$OUT/andcode-ubuntu-source-inputs"
+sudo chown -R "$(id -u):$(id -g)" "$OUT/andcode-ubuntu-source-inputs"
+sudo rm -rf --one-file-system -- "$ROOT/tmp/andcode-ubuntu-source-inputs"
 # Remove only build-created package indexes and device nodes in this new tree.
 sudo find "$ROOT/var/lib/apt/lists" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 sudo find "$ROOT/dev" -xdev \( -type b -o -type c -o -type p -o -type s \) -delete

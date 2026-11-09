@@ -37,6 +37,14 @@ expiry or TLS checks. Package/source versions and signed indexes are evidence,
 not a corresponding-source bundle or byte-reproducibility claim. Existing
 Docker builds and device instances remain unchanged until independent CI review.
 
+The next experimental recipe also retains exact installed source versions via
+authenticated `deb-src` indexes at the same official snapshot. It uses the
+guest's existing apt client in download-only/only-source mode: no new dependency
+or source code is copied into this repository. The resulting external CI source
+archives, `.dsc` files, logs and hash inventory are acquisition evidence only.
+Package patches, build recipes, generated inputs, notices and redistribution
+conditions must still be reviewed; no complete-source or license approval is implied.
+
 ### 2.1 交付包核心组件(宽松许可,随包分发)
 
 | 项目 | 仓库 | 许可证 | 角色(对应 DESIGN §4) | 复用方式 |

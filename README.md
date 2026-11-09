@@ -86,6 +86,8 @@ A new read-only original-image/tree comparison gate awaits Linux CI;
 trusted device installation remains pending.
 The next optional bootstrap pins guest packages to an explicit official HTTPS
 snapshot without disabling apt authentication; complete source delivery is pending.
+An additional experimental gate downloads exact installed source versions via
+authenticated apt and retains an external hash inventory; CI review is pending.
 
 许可证:**AGPL-3.0-only**(见 `LICENSE`)。
 

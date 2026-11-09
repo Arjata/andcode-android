@@ -140,6 +140,9 @@
 | `failed-fff-build-logs` | fff 实验构建失败时保留排序/编译日志的诊断工件,不含可分发批准 | CI artifacts |
 | `build-ubuntu-mmdebstrap.sh` | Build-only native arm64 mmdebstrap experiment; signed Ubuntu snapshot `20261110T000000Z`, independent output, no device installer | `scripts/` |
 | `build-ubuntu-mmdebstrap.test.py` | Native Linux rejection tests for recipe arguments, architecture and existing outputs; skipped on Windows | `scripts/` |
+| `collect-ubuntu-sources.py`, `collect-ubuntu-sources.test.py` | Build-only exact installed source-version acquisition through authenticated apt; no source extraction, compilation or license approval | `scripts/` |
+| `andcode-ubuntu-source-inputs/`, `andcode-ubuntu-source-inputs.json` | Experimental per-source downloaded .dsc/archive files and command logs, with a hash inventory; staged in a new guest `/tmp/andcode-ubuntu-source-inputs` directory and copied outside the image | Optional mmdebstrap CI artifact |
+| `andcode-ubuntu-source-acquisition.log` | Build-only source download progress/failure diagnostic; no source-delivery approval | Optional mmdebstrap CI artifact |
 | `andcode-ubuntu-rootfs.tar.gz` | Validated canonical rootfs archive from the mmdebstrap experiment; input for future PRoot packaging, not an APK importer | Experimental CI artifact |
 | `andcode-ubuntu-proot.tar.gz`, `andcode-ubuntu-proot.tar.gz.sha256` | Build-time trusted canonical rootfs conversion and digest; hardlinks materialized and absolute symlinks made guest-relative, no ELF patching or device installation | Experimental mmdebstrap artifact |
 | `andcode-ubuntu-rootfs.tar.gz.sha256`, `mmdebstrap.log`, `mmdebstrap-copyright`, `ubuntu-indexes/`, `ubuntu-sources.list` | Archive digest, bootstrap log, installed tool notice, retained signed indexes and exact source configuration | Experimental rootfs output |

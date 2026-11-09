@@ -19,10 +19,10 @@ class RecipeGuards(unittest.TestCase):
             result = subprocess.run(['bash', '-euc', script, 'fixture', str(key), tmp],
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-            expected = ''.join(f'deb [arch=arm64 signed-by={key}] '
-                               'https://snapshot.ubuntu.com/ubuntu/20261110T000000Z/ '
-                               f'{suite} main universe\n' for suite in
-                               ['noble', 'noble-updates', 'noble-security'])
+            mirror = 'https://snapshot.ubuntu.com/ubuntu/20261110T000000Z/'
+            expected = ''.join(f'deb [arch=arm64 signed-by={key}] {mirror} {suite} main universe\n'
+                               f'deb-src [signed-by={key}] {mirror} {suite} main universe\n'
+                               for suite in ['noble', 'noble-updates', 'noble-security'])
             self.assertEqual((Path(tmp) / 'ubuntu-sources.list').read_text(), expected)
         for bypass in ['Check-Valid-Until', 'check-valid-until=no', 'trusted=yes',
                        'AllowUnauthenticated', 'Verify-Peer=false']:
