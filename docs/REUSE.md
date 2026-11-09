@@ -355,6 +355,21 @@ verified by CI; `-MMD` still omits system headers and does not prove complete
 compiler inputs or per-file licensing. Historical artifacts without those files
 remain unchanged and retain their recorded limitation.
 
+Independent review of source CI `42674532077` (commit `5017bbe`, artifact
+`13701261405`) passed: ZIP 536633750 bytes, SHA-256
+`80b453f5c48f7f1b13e90298c1ea6d136d3bb65505fc766042219fdc16f56ad0`,
+closed 40284-file manifest. All 345 media objects now map to 755 retained
+non-system source/header files, including all eleven zlib objects; no dependency
+file is missing. The 446-input byte-identical original replay, 25 extraction
+records, modified single-object CRC relink (2304 cases / 6912 calls), 14 builtin
+snapshots, modified 119-package fff graph, six runtime declarations and Linux
+runtime gates remain intact. OpenTUI SHA-256 is
+`ad387ba0ed88dc3420e754b6f41e2cb0c6a70f28fa05f3a9824b9b8d916769fb`.
+Independent verification log SHA-256 is
+`6885fdc91c7d49e9e335c0a3c87edad96903ae3a9f09ff8739549ca31ac9b7fa`.
+This closes that run's recorded non-system zlib dependency gap, not system
+headers, complete source attribution, licensing, full relinking or Android.
+
 The media recipe will also enable FFmpeg make's `V=1` output, retaining the
 actual compiler invocations in the existing build log rather than deriving
 commands from DWARF paths or generic flags. This is command evidence only:
