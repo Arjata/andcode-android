@@ -338,6 +338,15 @@ it does not close that gap. Verification log SHA-256 is
 `11c022cef4abb9aca820aa432532ac295570c6faede1699ceaa254288979faff`.
 All redistribution, full relinking and Android approval fields remain false.
 
+The package notice collector now distinguishes npm-owned notices from the fixed
+fff rebuild's retained root `LICENSE` (source commit
+`459ebcdbdba094843fe5339a1a7f7dae4ced2d82`, SHA-256
+`f8264de82db188834a5711d7e348dc08c33db14f79bb587ccb42616fd694ee81`).
+It verifies the regular retained file and records a separate `sourceNotices`
+entry for a matching rebuild. This does not silently add a notice to the npm
+package, infer original ELF correspondence, or approve its transitive closure;
+`blocked-missing-package-notice` remains visible for the original package.
+
 The subsequent recipe will request compiler-generated `-MMD` dependencies for
 all eleven zlib objects with explicit `zlib/<name>.o` targets. New builds must
 retain these files and map their cache-local source/header bytes before staging.

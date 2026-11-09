@@ -11,6 +11,25 @@ EXPECTED = {
     '@ff-labs/fff-bin-linux-arm64-gnu': ('0.10.5', 'MIT'),
     'bun-pty': ('0.4.11', 'MIT'),
 }
+FFF_SOURCE_COMMIT = '459ebcdbdba094843fe5339a1a7f7dae4ced2d82'
+FFF_SOURCE_NOTICE_SHA256 = 'f8264de82db188834a5711d7e348dc08c33db14f79bb587ccb42616fd694ee81'
+
+
+def fff_source_notice(stage, build):
+    """Attribute the rebuilt tree's root notice without repairing npm metadata."""
+    if build['sourceCommit'] != FFF_SOURCE_COMMIT:
+        raise ValueError('Unexpected fff notice source commit')
+    relative = f'native-fff-build/source/fff-{FFF_SOURCE_COMMIT}/LICENSE'
+    path = stage / relative
+    if path.is_symlink() or not path.is_file():
+        raise ValueError('Missing regular fff source notice')
+    path.resolve(strict=True).relative_to(stage)
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != FFF_SOURCE_NOTICE_SHA256:
+        raise ValueError('Fixed fff source notice changed')
+    return {'path': relative, 'bytes': len(data), 'sha256': FFF_SOURCE_NOTICE_SHA256,
+            'sourceCommit': FFF_SOURCE_COMMIT, 'redistributionApproved': False,
+            'scope': 'Root notice of fixed-source rebuild only; excludes transitive components and original npm ELF attribution'}
 
 
 def collect(upstream, stage):
@@ -35,6 +54,7 @@ def collect(upstream, stage):
         if name not in EXPECTED or (version, license_id) != EXPECTED[name]:
             raise ValueError('Unexpected fixed native package: ' + name)
         origin = {'kind': 'frozen-npm-native-input'}
+        source_notices = []
         build_reports = {'bun-pty': 'native-pty-build-review.json',
                          '@opentui/core-linux-arm64': 'native-opentui-build-review.json',
                          '@ff-labs/fff-bin-linux-arm64-gnu': 'native-fff-build-review.json',
@@ -45,7 +65,9 @@ def collect(upstream, stage):
             if build['rebuiltSha256'] != digest or build.get('redistributionApproved') is not False:
                 raise ValueError('Rebuilt native provenance does not match imported bytes')
             origin = {'kind': 'fixed-source-ci-rebuild', 'report': build_report.name,
-                      'sourceCommit': build['sourceCommit'], 'originalNpmSha256': build['originalNpmSha256']}
+                       'sourceCommit': build['sourceCommit'], 'originalNpmSha256': build['originalNpmSha256']}
+            if name == '@ff-labs/fff-bin-linux-arm64-gnu':
+                source_notices.append(fff_source_notice(stage, build))
         slug = name.lstrip('@').replace('/', '--')
         evidence = stage / 'native-license-evidence' / slug
         evidence.mkdir(parents=True, exist_ok=False)
@@ -62,7 +84,8 @@ def collect(upstream, stage):
                 notices.append({'path': item.name, 'sha256': hashlib.sha256(data).hexdigest()})
         rows.append({'physical': physical, 'sha256': digest, 'package': name,
                      'binaryOrigin': origin,
-                     'version': version, 'declaredLicense': license_id, 'notices': notices,
+                      'version': version, 'declaredLicense': license_id, 'notices': notices,
+                      'sourceNotices': source_notices,
                      'status': 'blocked-transitive-review' if notices else 'blocked-missing-package-notice',
                      'obligations': ['Review exact native source and static dependencies',
                                      'Provide corresponding source and relinking materials where required',

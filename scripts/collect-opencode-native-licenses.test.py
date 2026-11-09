@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('license_evidence', Path(__file__).with_name('collect-opencode-native-licenses.py'))
 module = importlib.util.module_from_spec(spec)
@@ -66,16 +67,41 @@ class LicenseEvidenceTest(unittest.TestCase):
                 with self.subTest(index=index, digest=digest), tempfile.TemporaryDirectory() as work:
                     upstream, stage = self.fixture(Path(work))
                     (stage / report_name).write_text(json.dumps({
-                        'rebuiltSha256': digest, 'redistributionApproved': False,
-                        'sourceCommit': 'fixed-source', 'originalNpmSha256': 'original-npm'}))
+                         'rebuiltSha256': digest, 'redistributionApproved': False,
+                         'sourceCommit': module.FFF_SOURCE_COMMIT if index == 2 else 'fixed-source',
+                         'originalNpmSha256': 'original-npm'}))
+                    if index == 2:
+                        notice = stage / f'native-fff-build/source/fff-{module.FFF_SOURCE_COMMIT}/LICENSE'
+                        notice.parent.mkdir(parents=True)
+                        notice.write_bytes(b'fixture source notice')
                     if digest == '0' * 64:
                         with self.assertRaisesRegex(ValueError, 'provenance'):
                             module.collect(upstream, stage)
                     else:
-                        module.collect(upstream, stage)
+                        with patch.object(module, 'FFF_SOURCE_NOTICE_SHA256',
+                                          hashlib.sha256(b'fixture source notice').hexdigest()):
+                            module.collect(upstream, stage)
                         result = json.loads((stage / 'native-license-review.json').read_text())
                         self.assertEqual(result['packages'][index]['binaryOrigin']['kind'], 'fixed-source-ci-rebuild')
                         self.assertIs(result['redistributionApproved'], False)
+                        if index == 2:
+                            row = result['packages'][index]
+                            self.assertEqual(row['notices'], [])
+                            self.assertEqual(row['status'], 'blocked-missing-package-notice')
+                            self.assertEqual(len(row['sourceNotices']), 1)
+                            self.assertIs(row['sourceNotices'][0]['redistributionApproved'], False)
+
+    def test_fff_notice_missing_changed_or_wrong_commit_rejected(self):
+        for mode in ['missing', 'changed', 'commit']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                stage = Path(tmp)
+                if mode != 'missing':
+                    notice = stage / f'native-fff-build/source/fff-{module.FFF_SOURCE_COMMIT}/LICENSE'
+                    notice.parent.mkdir(parents=True)
+                    notice.write_bytes(b'changed')
+                with self.assertRaises(ValueError):
+                    module.fff_source_notice(stage, {
+                        'sourceCommit': 'wrong' if mode == 'commit' else module.FFF_SOURCE_COMMIT})
 
 
 if __name__ == '__main__':
