@@ -416,7 +416,16 @@ The next recipe adds `ffmpegCompileCommands` to the existing build report and
 requires one observed compiler invocation per retained media object. It binds
 source/object/wrapper digests to recorded command arguments, working directory
 and log line, rejecting absent, duplicate, unexpected-wrapper or source/dependency
-mismatches before staging. The new recipe still awaits trusted CI. Recorded
+mismatches before staging. Source CI `42681418653` (commit `4019179`, job
+`129376656791`) and independent full artifact review passed. Artifact
+`13702819455` is 536695750 bytes, ZIP SHA-256
+`94de3fd438c5be4adfadfc64ca422b274c3e017fc13ed70d95d7b7453a5b353b`.
+The independent verifier re-derived all 345 command/object bindings, checked all
+755 dependency files and retained the 446-input replay and single-CRC modified
+relink checks (2304 cases / 6912 calls). Verification log SHA-256 is
+`28a5b8690decfbde422c230b24c0191cee9d2b7b7e98cd4733144571bec8735f`.
+The rebuilt fff root notice is independently bound to its fixed source without
+overriding the npm package's blocked notice status. Recorded
 commands are evidence, never re-executed as input; they do not capture complete
 preprocessing, system headers, generated-input provenance, surviving sections or
 license obligations. All approval fields remain false.
@@ -437,6 +446,24 @@ WEBKIT_VERSION 为 `d6375c72affe0f70222cdcb45012b10f0bf3a9d5`，并区分预构�
 整份 WebKit、不执行构建、不声称 Bun 官方 ELF 与候选源码完全对应。Bun/JSC/
 tinycc/其它静态依赖的准确对应源码、全部通知、重链接工具链和 APK 替换路径继续
 blocked，尚待可信 CI 收集上述文件并复核。
+
+2026-11-10 independent Library-side artifact review: official WebKit release
+`420061461`, tag `autobuild-d6375c72affe0f70222cdcb45012b10f0bf3a9d5`,
+contains asset `663826053` (`bun-webkit-linux-arm64-lto.tar.gz`, 258728605
+bytes). Downloaded bytes match its GitHub Release API SHA-256
+`78d840c6afda98bebf6036f53f3227a7149514206bfdb60f384fb85a2e8dd212`.
+A read-only streaming inventory hashed all 2800 members and confirmed regular
+ar archives `libJavaScriptCore.a`, `libWTF.a`, `libbmalloc.a`, `libicutu.a`,
+`libicui18n.a`, `libicudata.a` and `libicuuc.a`. Inventory JSON SHA-256:
+`2970206ecea0b3c36570112ef8e2ac611413cc0c2ac567a36fcfc6f6bd56d818`.
+These are Library-side objects, not Bun application-side objects; this is not
+a complete relink kit or proof that the shipped Bun ELF used these exact inputs.
+Corresponding Library source, application-side materials, build/toolchain
+closure and practical modified-library relinking remain unproven. This artifact
+is retained outside the repository and is not an APK input. Upstream Android/
+Bionic targets are reference only and excluded by this project's glibc/no-NDK
+baseline. A build-configuration tinycc exclusion is not evidence of final ELF
+contents. All redistribution, relinking and Android approvals remain false.
 
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
