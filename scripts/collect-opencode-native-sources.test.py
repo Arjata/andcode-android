@@ -5,6 +5,8 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+import ssl
+import urllib.error
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('native_sources', Path(__file__).with_name('collect-opencode-native-sources.py'))
@@ -23,6 +25,27 @@ def archive(entries, mode='w:gz'):
 
 
 class SourceEvidenceTest(unittest.TestCase):
+    def test_transient_download_retried_without_skipping_digest(self):
+        data = archive([('repo/LICENSE', b'fixture')])
+        transient = urllib.error.HTTPError('https://example.invalid', 504, 'gateway', {}, None)
+        with patch.object(module.urllib.request, 'urlopen', side_effect=[transient, io.BytesIO(data)]) as request, \
+             patch.object(module.time, 'sleep'):
+            result = module.download_archive('https://example.invalid')
+            self.assertEqual(request.call_count, 2)
+            with self.assertRaisesRegex(ValueError, 'digest mismatch'):
+                module.inspect_archive(result, '0' * 64)
+
+    def test_download_retries_bounded_and_tls_not_retried(self):
+        tls = urllib.error.URLError(ssl.SSLCertVerificationError('untrusted'))
+        for error, attempts in [(TimeoutError('timeout'), 3), (tls, 1),
+                                (urllib.error.HTTPError('https://example.invalid', 404, 'missing', {}, None), 1)]:
+            with self.subTest(error=error), \
+                 patch.object(module.urllib.request, 'urlopen', side_effect=error) as request, \
+                 patch.object(module.time, 'sleep'):
+                with self.assertRaises(type(error)):
+                    module.download_archive('https://example.invalid')
+                self.assertEqual(request.call_count, attempts)
+
     def test_collection_keeps_redistribution_blocked(self):
         data = archive([('repo/LICENSE', b'license example')])
         sha = module.digest(data)

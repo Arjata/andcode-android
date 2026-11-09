@@ -6,7 +6,9 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 import tarfile
+import time
 import tomllib
+import urllib.error
 import urllib.request
 
 SOURCES = {
@@ -30,6 +32,24 @@ MEDIA_SOURCES = {
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def download_archive(url):
+    """Bounded transport retry only; archive trust checks always run afterwards."""
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=90) as response:
+                return response.read(LIMIT + 1)
+        except urllib.error.HTTPError as error:
+            if error.code not in {408, 429, 500, 502, 503, 504} or attempt == 2:
+                raise
+        except (TimeoutError, ConnectionError):
+            if attempt == 2:
+                raise
+        except urllib.error.URLError as error:
+            if not isinstance(error.reason, (TimeoutError, ConnectionError)) or attempt == 2:
+                raise
+        time.sleep(2 * (attempt + 1))
 
 
 def inspect_archive(data, expected, depth=0):
@@ -85,8 +105,7 @@ def collect(stage):
     rows = []
     for name, (repo, commit, expected) in SOURCES.items():
         url = f'https://codeload.github.com/{repo}/tar.gz/{commit}'
-        with urllib.request.urlopen(url, timeout=90) as response:
-            data = response.read(LIMIT + 1)
+        data = download_archive(url)
         review = inspect_archive(data, expected)
         filename = f'{name}-{commit}.tar.gz'
         (evidence / filename).write_bytes(data)
@@ -95,8 +114,7 @@ def collect(stage):
                      'status': 'blocked-build-correspondence-and-transitive-review'})
     media = []
     for filename, (url, expected) in MEDIA_SOURCES.items():
-        with urllib.request.urlopen(url, timeout=90) as response:
-            data = response.read(LIMIT + 1)
+        data = download_archive(url)
         review = inspect_archive(data, expected)
         (evidence / filename).write_bytes(data)
         media.append({'archive': filename, 'url': url, 'sha256': expected, 'evidence': review,
