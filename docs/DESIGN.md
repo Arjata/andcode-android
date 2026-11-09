@@ -1,6 +1,12 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.40 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.41 (设计稿) · 日期: 2026-11-09
+> v0.4.41 变更(OpenTUI 源码实验):固定独立 Zig 0.17.0 与既有 OpenTUI/FFmpeg/
+> zlib 源码,构建期强制视频分支及 16K 对齐,先做 ABI/导出/依赖门禁,后走完整
+> TUI staged maps 验证;不接入正式 APK,源码/重链接/许可与 Android 批准仍为 false。
+> 可选 CA 实机完成默认关闭/SAF/错误摘要拒绝/导入后关闭/启用及关闭重启环境验证;
+> 显式回环代理下关闭 CA 拒绝证书、开启后模型流式/中断/恢复成功,工具执行成功但
+> 结果回传后 provider HTTP 400,完整工具往返未通过。直连仍 DNS EAI_AGAIN。
 > v0.4.40 变更(可选 CA):Tier P 设置提供 SAF 单 PEM CA 导入/文件摘要核对与
 > 默认关闭的追加信任开关;仅新启动 OpenCode Web 后端设置 NODE_EXTRA_CA_CERTS,
 > 保留内置根/主机名校验,不改 Android 全局/WebView/独立终端/Ubuntu 信任。

@@ -36,6 +36,7 @@ def collect(upstream, stage):
             raise ValueError('Unexpected fixed native package: ' + name)
         origin = {'kind': 'frozen-npm-native-input'}
         build_reports = {'bun-pty': 'native-pty-build-review.json',
+                         '@opentui/core-linux-arm64': 'native-opentui-build-review.json',
                          '@ff-labs/fff-bin-linux-arm64-gnu': 'native-fff-build-review.json',
                          '@parcel/watcher-linux-arm64-glibc': 'native-watcher-build-review.json'}
         build_report = stage / build_reports[name] if name in build_reports else None

@@ -38,6 +38,14 @@
 | proot(Termux bionic 构建) | packages.termux.dev pool/main/p/proot | **GPL-2.0** | **Tier A/M 的 /etc 重定向正解**(真机 P0:LD_PRELOAD 无法拦截 glibc 内部 fopen("/etc/resolv.conf"),proot bind 实测打通 git https 全链路) | 独立程序聚合;proot + loader + libtalloc(LGPL-3.0)+ libandroid-shmem(**BSD-2-Clause**,termux/libandroid-shmem LICENSE 已核)随 bundle 分发,manifest 记录 |
 | ConnectBot | `connectbot/connectbot` (★3.6k, 活跃) | Apache-2.0 | Tier A/M 的推荐 SSH 客户端(**可选工具,非依赖**) | 仅文档推荐 |
 
+OpenTUI 诊断构建工具单独固定 Zig **0.17.0** 官方 arm64 Linux 归档
+`https://ziglang.org/download/0.17.0/zig-aarch64-linux-0.17.0.tar.xz`，SHA-256
+`9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8`，52877280 字节。
+2026-11-09 下载复核根 LICENSE 为 MIT(Expat)，Copyright Zig contributors，
+LICENSE SHA-256 `5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177`。
+仅作构建工具，不随 APK 分发；工具链内 LLVM/libc/libc++ 及静态输出输入仍须独立
+逐项审查，根 MIT 不覆盖整个输出。与 fff 的 Zig 0.16.0 分开路径使用，不升级后者。
+
 源码实验 CI 的 `collect-opencode-native-licenses.py` 对四个固定原生导入逐一核对
 安装源字节/包名/版本/声明许可，将包内顶层 LICENSE*/COPYING*/NOTICE* 与 package.json
 保存在诊断工件 `native-license-evidence/`，并生成 `native-license-review.json`。

@@ -40,6 +40,7 @@ jobs:
           python3 scripts/build-opencode-native-pty.test.py
           python3 scripts/build-opencode-native-watcher.test.py
           python3 scripts/build-opencode-native-fff.test.py
+          python3 scripts/build-opencode-native-opentui.test.py
       - name: Optional CA real TLS, bundled roots and hostname rejection
         timeout-minutes: 3
         run: python3 scripts/custom-ca-tls.test.py
@@ -64,6 +65,14 @@ jobs:
           tar -xJf work/zig/zig.tar.xz -C work/zig
           export PATH="$GITHUB_WORKSPACE/work/zig/zig-aarch64-linux-0.16.0:$PATH"
           python3 scripts/build-opencode-native-fff.py work/upstream work/native-prototype
+      - name: Fixed Zig 0.17 and OpenTUI FFmpeg source rebuild (diagnostic only)
+        run: |
+          mkdir -p work/zig-opentui
+          curl -fLSs --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 180 https://ziglang.org/download/0.17.0/zig-aarch64-linux-0.17.0.tar.xz -o work/zig-opentui/zig.tar.xz
+          echo '9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8  work/zig-opentui/zig.tar.xz' | sha256sum -c -
+          tar -xJf work/zig-opentui/zig.tar.xz -C work/zig-opentui
+          export PATH="$GITHUB_WORKSPACE/work/zig-opentui/zig-aarch64-linux-0.17.0:$PATH"
+          python3 scripts/build-opencode-native-opentui.py work/upstream work/native-prototype
       - name: Build experimental source V2 including Web assets
         env:
           OPENCODE_CHANNEL: beta
@@ -172,6 +181,13 @@ jobs:
           git -C work/upstream rev-parse HEAD > work/native-prototype/upstream-commit.txt
           echo 'DIAGNOSTIC ONLY: no compatibility, transitive license or Android acceptance approval.' > work/native-prototype/README.txt
           find work/native-prototype -type f -exec sha256sum {} + > work/prototype.sha256
+      - name: Preserve failed OpenTUI build logs (not an accepted diagnostic package)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-opentui-build-logs
+          if-no-files-found: ignore
+          path: work/native-prototype/native-opentui-build/command-*.log
       - uses: actions/upload-artifact@v4
         with:
           name: opencode-native-prototype-diagnostic

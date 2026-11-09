@@ -90,6 +90,8 @@
 | `native-watcher-build-inputs.json` | 编译器 -H 实际引用的常规头文件与显式源文件摘要/来源分类/声明线索;非逐文件许可批准 | 实验 stage/ |
 | `build-opencode-native-fff.py`、`build-opencode-native-fff.test.py` | 固定 fff 源码/lock/zlob feature 的 Linux arm64 诊断重建及失败不替换回归 | `scripts/` |
 | `native-fff-build`、`native-fff-build-review.json` | fff 固定源码/选中 crate 归档、Cargo 消息、GNU 链接 map、Bun 搜索/glob 探针与前后摘要;不批准分发 | 实验 stage/ |
+| `build-opencode-native-opentui.py`、`build-opencode-native-opentui.test.py` | 固定 OpenTUI/Zig 0.17.0/FFmpeg/zlib 的 Linux arm64 诊断重建,失败不替换 npm 输入 | `scripts/` |
+| `native-opentui-build`、`native-opentui-build-review.json` | OpenTUI 固定源码/补丁/构建命令/日志/FFmpeg 配置和对象摘要/前后 ELF 证据;不批准分发 | 实验 stage/ |
 | `ANDCODE_SERVE_PID` | Linux 源码实验 API 探针读取自有服务 maps 的 PID;不用于设备进程发现或终止 | 实验 CI |
 | `ncurses-build.txt`、`ncurses-upstream-copying` | Android libtinfo 固定源码摘要/构建配置/上游版权声明,随包 manifest 跟踪 | `etc/third-party/` |
 | `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |
