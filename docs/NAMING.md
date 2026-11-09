@@ -138,7 +138,7 @@
 | `original-crc.c`, `modified-crc.c`, `crc.patch`, `crc.o`, `crc.d`, `compile.log`, `link.log`, `source/`, `build/` | Original/transformed bytes, recorded diff, replacement object/dependencies, logs and isolated configured trees for the single-object relink diagnostic | `modified-crc-relink/` |
 | `andcode_crc_relink_calls` | Diagnostic-only exported counter accessor added to the modified CRC translation unit; not a product ABI | Experimental `modified-crc-relink/libopentui.so` |
 | `failed-fff-build-logs` | fff 实验构建失败时保留排序/编译日志的诊断工件,不含可分发批准 | CI artifacts |
-| `build-ubuntu-mmdebstrap.sh` | Build-only native arm64 mmdebstrap experiment; signed Ubuntu repositories, independent output, no device installer | `scripts/` |
+| `build-ubuntu-mmdebstrap.sh` | Build-only native arm64 mmdebstrap experiment; signed Ubuntu snapshot `20261110T000000Z`, independent output, no device installer | `scripts/` |
 | `build-ubuntu-mmdebstrap.test.py` | Native Linux rejection tests for recipe arguments, architecture and existing outputs; skipped on Windows | `scripts/` |
 | `andcode-ubuntu-rootfs.tar.gz` | Validated canonical rootfs archive from the mmdebstrap experiment; input for future PRoot packaging, not an APK importer | Experimental CI artifact |
 | `andcode-ubuntu-proot.tar.gz`, `andcode-ubuntu-proot.tar.gz.sha256` | Build-time trusted canonical rootfs conversion and digest; hardlinks materialized and absolute symlinks made guest-relative, no ELF patching or device installation | Experimental mmdebstrap artifact |

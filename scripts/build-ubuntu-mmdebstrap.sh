@@ -5,6 +5,8 @@ set -euo pipefail
 [ "$(uname -m)" = aarch64 ] || { echo 'arm64 runner required' >&2; exit 1; }
 OUT="$1"
 [ ! -e "$OUT" ] && [ ! -L "$OUT" ] || { echo 'output must be new' >&2; exit 1; }
+SNAPSHOT=20261110T000000Z
+MIRROR="https://snapshot.ubuntu.com/ubuntu/$SNAPSHOT/"
 command -v mmdebstrap >/dev/null
 KEY=/usr/share/keyrings/ubuntu-archive-keyring.gpg
 [ -f "$KEY" ] || { echo 'Ubuntu archive keyring required' >&2; exit 1; }
@@ -35,13 +37,14 @@ cleanup() {
 trap cleanup EXIT
 {
   printf 'builder=mmdebstrap\nrecipe-commit=%s\n' "$(git -C "$REPO" rev-parse HEAD)"
+  printf 'snapshot=%s\nmirror=%s\n' "$SNAPSHOT" "$MIRROR"
   printf 'scope=Linux experiment; source closure and Android acceptance pending\n'
   dpkg-query -W '-f=${binary:Package}\t${Version}\n' mmdebstrap ubuntu-keyring apt dpkg e2fsprogs
   sha256sum "$KEY"
 } > "$OUT/andcode-ubuntu-build.txt"
 cp /usr/share/doc/mmdebstrap/copyright "$OUT/mmdebstrap-copyright"
 for suite in noble noble-updates noble-security; do
-  printf 'deb [arch=arm64 signed-by=%s] https://ports.ubuntu.com/ubuntu-ports %s main universe\n' "$KEY" "$suite"
+  printf 'deb [arch=arm64 signed-by=%s] %s %s main universe\n' "$KEY" "$MIRROR" "$suite"
 done > "$OUT/ubuntu-sources.list"
 # Use root mode only in a private mount namespace on the disposable CI runner.
 sudo unshare --mount --propagation private mmdebstrap --mode=root --format=directory \

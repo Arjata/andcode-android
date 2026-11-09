@@ -84,6 +84,8 @@ The isolated candidate also converts that canonical tree to a PRoot archive
 without changing ELF bytes (trusted CI and independent archive review passed).
 A new read-only original-image/tree comparison gate awaits Linux CI;
 trusted device installation remains pending.
+The next optional bootstrap pins guest packages to an explicit official HTTPS
+snapshot without disabling apt authentication; complete source delivery is pending.
 
 许可证:**AGPL-3.0-only**(见 `LICENSE`)。
 

@@ -347,6 +347,15 @@ It verifies the regular retained file and records a separate `sourceNotices`
 entry for a matching rebuild. This does not silently add a notice to the npm
 package, infer original ELF correspondence, or approve its transitive closure;
 `blocked-missing-package-notice` remains visible for the original package.
+Source CI `42680417924` (commit `e197165`, artifact `13703238123`) and an
+independent archive review confirmed the exact 1074-byte source notice binding
+without altering that npm status. ZIP SHA-256:
+`61f33864a53381b1a909a0ebb11f7be968cfc48806b6e8b007aefb66bfe11205`.
+The 40284-file manifest, 345 media object / 755 non-system input mapping,
+retained verbose compiler output, original relink, modified CRC probe and Linux
+runtime gates also passed. The independent log SHA-256 is
+`b3de286dfe787fdf3cb282df63e2ad809a328badc1942da201a80baa1269837b`.
+No original npm correspondence, transitive license or Android approval follows.
 
 The subsequent recipe will request compiler-generated `-MMD` dependencies for
 all eleven zlib objects with explicit `zlib/<name>.o` targets. New builds must

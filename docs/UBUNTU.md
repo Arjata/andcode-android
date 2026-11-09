@@ -19,8 +19,14 @@ APK installer payload: Android link/metadata adaptation, trusted installation
 and application-domain acceptance remain pending. The image must pass the
 existing private-mount-namespace apt/non-root smoke and glibc/16K audit before
 upload. Failures retain diagnostics, not installable release output. No device
-instance is touched. Signed live repositories do not pin package versions;
-snapshot/version pinning and corresponding-source delivery remain separate work.
+instance is touched. Earlier signed live repository runs did not pin package
+versions. The next candidate uses official HTTPS snapshot `20261110T000000Z`
+for all guest suites via explicit signed-by sources, records snapshot/mirror
+identity and retains apt authentication/expiry checks. It never falls back to
+live repositories when the snapshot is unavailable. Build-host tool versions
+remain recorded, not snapshot-pinned; byte reproducibility and corresponding-
+source delivery are not established. Source-index availability and complete
+source-package collection are separate from freezing binary package selection.
 
 CI `42674527942` (commit `5017bbe`, mmdebstrap job `129352236231`) passed the
 native arm64 bootstrap, archive validation, apt/non-root/PTY namespace smoke and

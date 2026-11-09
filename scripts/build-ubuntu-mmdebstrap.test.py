@@ -9,6 +9,25 @@ import unittest
 
 @unittest.skipUnless(sys.platform == 'linux', 'Native Linux CI only; no local Bash validation')
 class RecipeGuards(unittest.TestCase):
+    def test_fixed_snapshot_sources_are_explicit_and_no_security_bypass(self):
+        recipe = Path(__file__).with_name('build-ubuntu-mmdebstrap.sh').read_text()
+        source_config = recipe[recipe.index('SNAPSHOT='):recipe.index('command -v mmdebstrap')]
+        sources = recipe[recipe.index('for suite in noble'):recipe.index('# Use root mode')]
+        with tempfile.TemporaryDirectory() as tmp:
+            key = Path(tmp) / 'ubuntu.gpg'
+            script = source_config + '\nKEY="$1"\nOUT="$2"\n' + sources
+            result = subprocess.run(['bash', '-euc', script, 'fixture', str(key), tmp],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            expected = ''.join(f'deb [arch=arm64 signed-by={key}] '
+                               'https://snapshot.ubuntu.com/ubuntu/20261110T000000Z/ '
+                               f'{suite} main universe\n' for suite in
+                               ['noble', 'noble-updates', 'noble-security'])
+            self.assertEqual((Path(tmp) / 'ubuntu-sources.list').read_text(), expected)
+        for bypass in ['Check-Valid-Until', 'check-valid-until=no', 'trusted=yes',
+                       'AllowUnauthenticated', 'Verify-Peer=false']:
+            self.assertNotIn(bypass, recipe)
+
     def test_cleanup_mount_inspection_fails_closed(self):
         recipe = Path(__file__).with_name('build-ubuntu-mmdebstrap.sh').read_text()
         cleanup = recipe[recipe.index('cleanup() {'):recipe.index('trap cleanup EXIT')]
