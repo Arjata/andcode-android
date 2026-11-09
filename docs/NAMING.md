@@ -131,6 +131,7 @@
 | `runtime-declarations/` | 固定 Bun/WebKit 提交的声明与构建脚本原字节,逐文件摘要校验;只作来源候选,不是完整对应源码或正式 notices | `native-source-evidence/` |
 | `sort-test`、`sort-test.log` | 自有标准库稳定排序适配层的独立 Rust 测试 ELF 与编译/运行日志;仅 Linux 源码实验,不进入 APK | `native-fff-build/` |
 | `ffmpeg-notice-candidates.json` | 从实际编译依赖全文中保留声明候选注释的字节范围、原文与摘要;不是正式 notices 或完整许可判定 | `native-opentui-build/` |
+| `zig-generated-sources/` | 构建后固定 Zig global/local cache 中 `b/<hash>/builtin.zig` 的原字节及逐项摘要;仅生成输入快照,不证明完整编译闭包 | `native-opentui-build/` |
 | `failed-fff-build-logs` | fff 实验构建失败时保留排序/编译日志的诊断工件,不含可分发批准 | CI artifacts |
 | `probe-opencode-native.py` | Linux CI 实验 API 准入:普通/持久 PTY、shell,口令只在内存使用不输出 | `scripts/` |
 | `probe-opencode-native-tui.py` | Linux CI 独立 PTY 启动源码实验 TUI,要求实际映射预置 OpenTUI 并渲染;仅终止自有进程组 | `scripts/` |

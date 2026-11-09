@@ -262,6 +262,61 @@ class Tests(unittest.TestCase):
                     m.retain_link_inputs(text, native, output, env)
                 self.assertFalse((output / 'link-inputs').exists())
 
+    def test_generated_builtin_snapshots_keep_separate_cache_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / 'output'
+            output.mkdir()
+            env = {}
+            for label, key in [('global', 'ZIG_GLOBAL_CACHE_DIR'), ('local', 'ZIG_LOCAL_CACHE_DIR')]:
+                cache = root / label
+                path = cache / 'b' / ('a' * 32) / 'builtin.zig'
+                path.parent.mkdir(parents=True)
+                path.write_bytes(('// generated fixture ' + label + '\n').encode())
+                env[key] = str(cache)
+            report = m.retain_zig_generated_sources(output, env)
+            self.assertEqual(len(report['files']), 2)
+            for row in report['files']:
+                payload = (output / row['retainedPath']).read_bytes()
+                self.assertEqual(payload, Path(row['path']).read_bytes())
+                self.assertEqual(len(payload), row['bytes'])
+                self.assertEqual(hashlib.sha256(payload).hexdigest(), row['sha256'])
+                self.assertIn('/' + row['scope'] + '/b/', row['retainedPath'])
+            self.assertIs(report['sourceAttributionApproved'], False)
+            self.assertIs(report['redistributionApproved'], False)
+            with self.assertRaises(FileExistsError):
+                m.retain_zig_generated_sources(output, env)
+
+    def test_generated_builtin_snapshots_reject_unsafe_or_missing_inputs(self):
+        for mode in ['empty', 'path', 'elf', 'utf8', 'large', 'cache-link',
+                     'directory-link', 'entry-link', 'file-link', 'count']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                output = root / 'output'
+                output.mkdir()
+                cache = root / 'cache'
+                entry = cache / 'b' / ('unexpected' if mode == 'path' else 'a' * 32)
+                entry.mkdir(parents=True)
+                path = entry / 'builtin.zig'
+                payload = b'// fixture builtin\n'
+                if mode == 'elf':payload = b'\x7fELFfake'
+                if mode == 'utf8':payload = b'\xff'
+                if mode == 'large':payload = b' ' * (4 * 1024 * 1024 + 1)
+                if mode != 'empty':path.write_bytes(payload)
+                env = {'ZIG_GLOBAL_CACHE_DIR': str(cache), 'ZIG_LOCAL_CACHE_DIR': str(cache)}
+                links = {'cache-link': cache, 'directory-link': cache / 'b',
+                         'entry-link': entry, 'file-link': path}
+                original_is_symlink = Path.is_symlink
+                original_iterdir = Path.iterdir
+                def linked(p):
+                    return p == links.get(mode) or original_is_symlink(p)
+                def entries(p):
+                    return iter([entry] * 10001) if mode == 'count' and p == cache / 'b' else original_iterdir(p)
+                with patch.object(Path, 'is_symlink', linked), patch.object(Path, 'iterdir', entries):
+                    with self.assertRaises((ValueError, UnicodeDecodeError)):
+                        m.retain_zig_generated_sources(output, env)
+                self.assertFalse((output / 'zig-generated-sources').exists())
+
     def test_notice_candidates_keep_late_exact_comments_and_outside_lines(self):
         content = (b'/* ordinary comment */\n' + b'\n' * 110
                    + '/* Copyright \u00a9 Fixture\n Permission granted\n */\n'.encode()
@@ -455,7 +510,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output', 'replay']:
+        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'crc-probe', 'link', 'link-output', 'replay', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -520,6 +575,9 @@ class Tests(unittest.TestCase):
                         cache = Path(env['ZIG_LOCAL_CACHE_DIR'])
                         cache.mkdir()
                         Path(env['ZIG_GLOBAL_CACHE_DIR']).mkdir()
+                        builtin = cache / 'b' / ('a' * 32) / 'builtin.zig'
+                        builtin.parent.mkdir(parents=True)
+                        if failure != 'generated':builtin.write_bytes(b'// fixture builtin\n')
                         linked = cache / 'libopentui.so'
                         linked.write_bytes(b'drift' if failure == 'link-output' else b'rebuilt')
                         obj = cache / 'fixture.o'
@@ -565,6 +623,8 @@ class Tests(unittest.TestCase):
                         self.assertEqual(report['rebuiltSha256'], hashlib.sha256(b'rebuilt').hexdigest())
                         self.assertEqual(report['finalLink']['inputs'][0]['sha256'],
                                          hashlib.sha256(b'linked object').hexdigest())
+                        self.assertEqual(len(report['zigGeneratedSources']['files']), 1)
+                        self.assertIs(report['zigGeneratedSources']['sourceAttributionApproved'], False)
                         self.assertEqual(target.read_bytes(), b'rebuilt')
 
 

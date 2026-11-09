@@ -398,6 +398,62 @@ def retain_zig_resources(archive_path, output):
             'scope': 'Pinned tool archive lib/ resources and root notices, not complete toolchain corresponding source'}
 
 
+def retain_zig_generated_sources(output, env):
+    """Snapshot generated builtin inputs, not a claim about complete compiler inputs."""
+    pending, expanded = [], 0
+    for label, key in [('global', 'ZIG_GLOBAL_CACHE_DIR'), ('local', 'ZIG_LOCAL_CACHE_DIR')]:
+        root = Path(env[key])
+        if root.is_symlink():
+            raise ValueError('Zig generated source cache link')
+        root = root.resolve(strict=True)
+        directory = root / 'b'
+        if directory.is_symlink():
+            raise ValueError('Zig generated source directory link')
+        if not directory.exists():
+            continue
+        children = sorted(directory.iterdir())
+        if len(children) > 10000:
+            raise ValueError('Zig generated source cache entry bound exceeded')
+        for child in children:
+            if child.is_symlink():
+                raise ValueError('Zig generated source entry link')
+            if not child.is_dir():
+                continue
+            path = child / 'builtin.zig'
+            if path.is_symlink():
+                raise ValueError('Zig generated source file link')
+            if not path.exists():
+                continue
+            if not re.fullmatch(r'[a-f0-9]{32}', child.name) or not path.is_file():
+                raise ValueError('Unexpected Zig generated source path')
+            path.resolve(strict=True).relative_to(root)
+            if path.stat().st_size > 4 * 1024 * 1024:
+                raise ValueError('Zig generated source file exceeds bound')
+            content = path.read_bytes()
+            expanded += len(content)
+            if (not content or len(content) > 4 * 1024 * 1024
+                    or expanded > 32 * 1024 * 1024 or len(pending) >= 256):
+                raise ValueError('Zig generated source snapshot exceeds bounds')
+            if content.startswith(b'\x7fELF'):
+                raise ValueError('ELF in Zig generated sources')
+            content.decode('utf8')
+            relative = Path('zig-generated-sources') / label / 'b' / child.name / 'builtin.zig'
+            pending.append((path, relative, content, label))
+    if not pending:
+        raise ValueError('No Zig generated builtin sources found')
+    destination = output / 'zig-generated-sources'
+    destination.mkdir(exist_ok=False)
+    rows = []
+    for path, relative, content, label in pending:
+        retained = output / relative
+        retained.parent.mkdir(parents=True, exist_ok=True)
+        retained.write_bytes(content)
+        rows.append({'path': str(path), 'scope': label, 'retainedPath': relative.as_posix(),
+                     'bytes': len(content), 'sha256': hashlib.sha256(content).hexdigest()})
+    return {'files': rows, 'sourceAttributionApproved': False, 'redistributionApproved': False,
+            'scope': 'Post-build generated builtin snapshots only; no complete compiler-input or source-to-object proof'}
+
+
 def replay_link_inputs(link, zig, result, output, env):
     """Replay with the same fixed linker; byte equality binds map to original output."""
     directory = output / 'link-replay'
@@ -567,6 +623,7 @@ def build(upstream, stage):
     if Path(link['output']).read_bytes() != result.read_bytes():
         raise ValueError('Installed OpenTUI differs from final-link output')
     replay = replay_link_inputs(link, zig, result, output, env)
+    generated_sources = retain_zig_generated_sources(output, env)
     shutil.copyfile(result, output / 'libopentui.so')
     needed = validate(result, target, output, env)
     (stage / 'native-opentui-build-review.json').write_text(json.dumps({
@@ -578,6 +635,7 @@ def build(upstream, stage):
         'installedInput': str(target.relative_to(upstream)), 'needed': needed, 'commands': commands,
         'zigVersion': '0.17.0', 'zigArchiveSha256': ZIG_SHA256,
         'zigLibraryResources': zig_resources,
+        'zigGeneratedSources': generated_sources,
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
         'ffmpegSourceInputs': source_inputs,
