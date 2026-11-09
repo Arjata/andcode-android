@@ -45,6 +45,13 @@ OpenTUI 诊断构建工具单独固定 Zig **0.17.0** 官方 arm64 Linux 归档
 LICENSE SHA-256 `5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177`。
 仅作构建工具，不随 APK 分发；工具链内 LLVM/libc/libc++ 及静态输出输入仍须独立
 逐项审查，根 MIT 不覆盖整个输出。与 fff 的 Zig 0.16.0 分开路径使用，不升级后者。
+首轮 OpenTUI CI `42621241263`(提交 `b0f1aba`)完成 glibc FFmpeg 构建，但上游
+在配置未执行的 musl 测试/benchmark 目标时触发 `require-video` 缺失而失败，
+未替换 npm 输入、未产生通过的诊断包。后续仅对显式 library-target 增加
+`andcode-library-only` 配置早退，保留所选库 `require-video=true` 及 16K 门禁；
+不构建/收录 musl FFmpeg，不降低准入条件。该提交常规 CI `42621206258` 的
+app-data-tests/build-bundle 已成功，APK 作业在 NDK 下载 ZIP 损坏处失败，未执行
+Gradle 构建，不据此声称 APK 通过。
 
 源码实验 CI 的 `collect-opencode-native-licenses.py` 对四个固定原生导入逐一核对
 安装源字节/包名/版本/声明许可，将包内顶层 LICENSE*/COPYING*/NOTICE* 与 package.json
@@ -209,6 +216,16 @@ GNU LOAD 报告 26 项中 19 项链接后可用并记录摘要，6 项对象/归
 误归为临时路径；后续解析器已单列 linker-generated，不修改既有工件或其摘要。
 19 项摘要仅是 CI 记录，本机未持有这些原始链接输入，不冒称已逐字节重核其内容；
 仍缺逐文件许可、工具链/静态依赖对应源码及准确链接归属，未部署 Android。
+
+2026-11-09 glidesort 补充核验：`glidesort-0.1.2.crate` 的 `.cargo_vcs_info.json`
+固定 `orlp/glidesort@c4df9518ec23a424a867b3d50967f0aaafe3c0fd`。对应 codeload
+归档 SHA-256 `f7b01ecb077689763d80ce6897b700b594a228d018f2734d95fe69098ff6fa1b`，
+本机复核 crate 的 16 份源文件/README/原始 manifest 与提交逐字节一致；只排除
+Cargo 自动生成的 `Cargo.toml`、`Cargo.lock` 与 `.cargo_vcs_info.json`。
+该提交归档没有 LICENSE/COPYING 文件，GitHub 当前仓库根同样未提供独立原文，
+API license=null；`Cargo.toml` 的 `MIT OR Apache-2.0` 声明和 README 的署名不替代
+实际版权/许可通知。未伪造 MIT 作者年份、未从其他项目借许可文本；此项保持
+blocked，待上游补齐或换用经审查的实现，不能仅因源码匹配批准分发。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

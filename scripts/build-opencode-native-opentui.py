@@ -35,16 +35,32 @@ def patch_once(text, anchor, replacement):
     return text.replace(anchor, replacement)
 
 
+def patch_build(text):
+    text = patch_once(text,
+        '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;',
+        '    shared.link_z_max_page_size = 16384;\n'
+        '    shared.verbose_link = true;\n'
+        '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;')
+    return patch_once(text, '    // Test step (native only)',
+        '    // andcode: do not configure unrelated musl test/bench artifacts.\n'
+        '    if (b.option(bool, "andcode-library-only", "Configure explicit library target only") orelse false) {\n'
+        '        if (target_option == null) @panic("andcode-library-only requires library-target");\n'
+        '        return;\n'
+        '    }\n\n'
+        '    // Test step (native only)')
+
+
 def unpack_nested(data, destination):
     """Fixed nested sources only: reject links, traversal, duplicates and huge input."""
     seen, expanded = set(), 0
     with tarfile.open(fileobj=io.BytesIO(data)) as archive:
         for member in archive:
             path = PurePosixPath(member.name)
+            normalized = path.as_posix()
             if (path.is_absolute() or '..' in path.parts or '\\' in member.name
-                    or not path.parts or member.name in seen):
+                    or not path.parts or normalized in seen):
                 raise ValueError('Unsafe nested Zig source path')
-            seen.add(member.name)
+            seen.add(normalized)
             expanded += member.size
             if len(seen) > 10000 or expanded > 128 * 1024 * 1024:
                 raise ValueError('Nested Zig sources exceed bounds')
@@ -111,11 +127,7 @@ def build(upstream, stage):
     unpack_nested(nested.read_bytes(), native / 'zig-deps')
     build_file = native / 'build.zig'
     original_build = build_file.read_text(encoding='utf8')
-    build_file.write_text(patch_once(original_build,
-        '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;',
-        '    shared.link_z_max_page_size = 16384;\n'
-        '    shared.verbose_link = true;\n'
-        '    if (target.result.os.tag == .linux and optimize != .debug) shared.build_id = .sha1;'), encoding='utf8')
+    build_file.write_text(patch_build(original_build), encoding='utf8')
     (output / 'original-build.zig').write_text(original_build, encoding='utf8')
     ffmpeg_script = native / 'scripts/build-ffmpeg.ts'
     original_script = ffmpeg_script.read_text(encoding='utf8')
@@ -136,7 +148,7 @@ def build(upstream, stage):
     env['ZIG_LOCAL_CACHE_DIR'] = str(stage.parent / 'opentui-zig-local-cache')
     commands = [['bun', 'scripts/build-ffmpeg.ts', '--target=aarch64-linux'],
                 [str(zig), 'build', '-Doptimize=ReleaseFast', '-Dlibrary-target=aarch64-linux-gnu.2.17',
-                 '-Drequire-video=true', '-j2', '--summary', 'all']]
+                 '-Drequire-video=true', '-Dandcode-library-only=true', '-j2', '--summary', 'all']]
     for index, command in enumerate(commands):
         logpath = output / f'command-{index}.log'
         try:
