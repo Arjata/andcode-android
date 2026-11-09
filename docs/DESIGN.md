@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.41 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.42 (设计稿) · 日期: 2026-11-10
+> v0.4.42 变更(验证边界更新):真实应用域、显式代理+CA 下新会话连续两轮完整
+> 工具往返成功,旧会话仍 HTTP 400;未修改协议或删除历史,不能声称根因已修复。
+> 诊断 PID8198 已终止,默认 PID20163 保持 CA 关闭及原会话。OpenTUI 排除 GPL
+> 声明 CRC 对象后 Linux CI 与 2304 组 CRC 对照通过,许可/重链接/Android 仍未批准。
 > v0.4.41 变更(OpenTUI 源码实验):固定独立 Zig 0.17.0 与既有 OpenTUI/FFmpeg/
 > zlib 源码,构建期强制视频分支及 16K 对齐,先做 ABI/导出/依赖门禁,后走完整
 > TUI staged maps 验证;不接入正式 APK,源码/重链接/许可与 Android 批准仍为 false。
@@ -549,7 +553,7 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   - 设置保存到 `andcode-settings`:终端字号(10–28 sp)、终端/Web 亮屏开关、
     导出是否包含 .git。onResume 应用显示设置,不重启会话,Web 内终端字号不受影响;
     API key 与提供商仍由上游 Web UI 管理,本页不新增凭据存储。
-- **可选后端 CA(v0.4.40–v0.4.41)**:设置通过 SAF 导入单份 PEM,用户输入来自独立
+- **可选后端 CA(v0.4.40–v0.4.42)**:设置通过 SAF 导入单份 PEM,用户输入来自独立
   可信渠道的文件 SHA-256;64 KiB 上限,验证单证书/CA 签发用途/有效期,拒绝私钥、
   证书集合和链接。私有副本以内容摘要命名,每次启用启动前重新核对摘要及证书条件。
   导入不自动启用,产品默认关闭;只为新 OpenCode Web 后端及继承环境的子进程设置
@@ -568,7 +572,21 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     HTTP 400(`provider.invalid-request/openai_error`);完整工具往返未通过,根因待查。
     验收后停止诊断后端、恢复设置 CA 关闭,手动重启的默认后端 PID20163 无
     `NODE_EXTRA_CA_CERTS` 或 TLS bypass。保留 CA 导入副本及所有测试会话,未删除
-    用户数据。更多设备/IME/网络及完整 provider 工具往返仍待 P0/P3 实机验证。
+    用户数据。
+  - 2026-11-10 授权设备 `8c8da214` 恢复连接后,默认 PID20163、模型及 CA 关闭
+    环境保持不变。通过该后端 shell 启动独立诊断 PID8198,再次核对真实
+    `untrusted_app`、UID10348、Seccomp=2,显式代理+既有 CA 下新会话
+    `ses_e3ef3e479ffeeWTmyr2HK8a566` 连续两轮执行限定 `printf`、回传结果并
+    得到最终标记;每轮 SSE 两个步骤完成,均有 tool.success/execution.succeeded,
+    无 provider 错误。旧会话 `ses_e3fa8bb82ffeqj5z8cksogpUPH` 新请求仍在
+    调用工具前 HTTP 400。故完整工具往返仅在上述新会话/网络条件下通过,历史
+    回放根因未闭环,不把重试成功当协议修复或默认直连已恢复。
+  - 经显式代理使用已有合成验收消息重建的 HTTP API 格式对照未执行任何工具,不保存凭据或
+    原始消息;空/NULL 内容及 reasoning 字段最小对照均能成功,历史消息对照
+    也存在 200/400 波动。它不是捕获的精确 OpenCode 请求,不能据此删除字段或
+    静默修改旧会话。结束后 PID8198 已终止、诊断转发已移除;PID20163 可用且
+    无 CA/TLS bypass,保留 CA 文件、全部会话、项目与 Ubuntu 实例。其它设备、
+    网络、IME及旧会话恢复仍待 P0/P3 实机验证。
 - UI:主页仪表盘 + 终端 + 桌面 Web + 项目 + 设置;sshd 管理/phantom-killer
   引导等扩展设置仍待实现,不把规划当作已经交付。
 
