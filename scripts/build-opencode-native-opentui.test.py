@@ -2,6 +2,7 @@ import importlib.util
 import hashlib
 import io
 import json
+import shlex
 from pathlib import Path
 import subprocess
 import tarfile
@@ -124,6 +125,74 @@ class Tests(unittest.TestCase):
                     m.validate(result, target, out, {})
             self.assertEqual(target.read_bytes(), b'original')
 
+    def link_fixture(self, root):
+        native, output = root / 'source', root / 'output'
+        native.mkdir(); output.mkdir()
+        global_cache, local_cache = root / 'global', root / 'local'
+        global_cache.mkdir(); local_cache.mkdir()
+        env = {'ZIG_GLOBAL_CACHE_DIR': str(global_cache), 'ZIG_LOCAL_CACHE_DIR': str(local_cache)}
+        paths = [native / 'fixture.o', global_cache / 'libc++.a', local_cache / 'libc.so.6']
+        for index, path in enumerate(paths):
+            path.write_bytes(f'input-{index}'.encode())
+        result = local_cache / 'libopentui.so'
+        result.write_bytes(b'linked')
+        arguments = ['ld.lld', '-shared', '-z', 'max-page-size=16384', '-o', str(result),
+                     '-soname', 'libopentui.so', *map(str, paths)]
+        return native, output, env, arguments, paths
+
+    def test_retains_ordered_link_inputs_and_toolchain_libraries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            native, output, env, args, paths = self.link_fixture(Path(tmp))
+            report = m.retain_link_inputs('diagnostics\n  ' + shlex.join(args) + '\n', native, output, env)
+            self.assertEqual(report['command'], args)
+            self.assertEqual([r['path'] for r in report['inputs']], list(map(str, paths)))
+            self.assertEqual([r['scope'] for r in report['inputs']],
+                             ['opentui-source-build', 'zig-global-cache', 'zig-local-cache'])
+            for row, path in zip(report['inputs'], paths):
+                retained = output / row['retainedPath']
+                self.assertEqual(retained.read_bytes(), path.read_bytes())
+                self.assertEqual(row['sha256'], hashlib.sha256(path.read_bytes()).hexdigest())
+                self.assertEqual(row['bytes'], path.stat().st_size)
+
+    def test_link_command_drift_and_unsafe_inputs_fail_closed(self):
+        for mode in ['missing', 'multiple', 'response', 'relative', 'option', 'escape',
+                     'bad-output', 'no-output', 'missing-file', 'bad-value']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                native, output, env, args, paths = self.link_fixture(root)
+                if mode == 'response': args.append('@hidden.rsp')
+                if mode == 'relative': args.append('relative.o')
+                if mode == 'option': args.append('--whole-archive')
+                if mode == 'escape':
+                    outside = root / 'outside.a'
+                    outside.write_bytes(b'outside')
+                    args.append(str(outside))
+                if mode == 'bad-output': args[5] = str(paths[0])
+                if mode == 'no-output': del args[4:6]
+                if mode == 'missing-file': args.append(str(native / 'missing.a'))
+                if mode == 'bad-value': args[3] = 'max-page-size=4096'
+                text = shlex.join(args)
+                if mode == 'missing': text = ''
+                if mode == 'multiple': text += '\n' + text
+                with self.assertRaises((ValueError, FileNotFoundError)):
+                    m.retain_link_inputs(text, native, output, env)
+                self.assertFalse((output / 'link-inputs').exists())
+
+    def test_link_input_symlink_escape_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            native, output, env, args, paths = self.link_fixture(root)
+            outside = root / 'outside.a'
+            outside.write_bytes(b'outside')
+            link = native / 'link.a'
+            try:
+                link.symlink_to(outside)
+            except OSError as error:
+                self.skipTest('Host cannot create symlinks: ' + str(error))
+            args.append(str(link))
+            with self.assertRaises(ValueError):
+                m.retain_link_inputs(shlex.join(args), native, output, env)
+
     def test_exports_probe_and_success_gate(self):
         symbols = '\n'.join('1 GLOBAL FUNC ot_' + s for s in [
             'context_abi_version', 'context_create', 'context_destroy', 'video_open'])
@@ -145,7 +214,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration']:
+        for failure in [None, 'build', 'objects', 'configuration', 'link', 'link-output']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -195,6 +264,15 @@ class Tests(unittest.TestCase):
                         result = native / 'lib/aarch64-linux/libopentui.so'
                         result.parent.mkdir(parents=True)
                         result.write_bytes(b'rebuilt')
+                        cache = Path(env['ZIG_LOCAL_CACHE_DIR'])
+                        cache.mkdir()
+                        Path(env['ZIG_GLOBAL_CACHE_DIR']).mkdir()
+                        linked = cache / 'libopentui.so'
+                        linked.write_bytes(b'drift' if failure == 'link-output' else b'rebuilt')
+                        obj = cache / 'fixture.o'
+                        obj.write_bytes(b'linked object')
+                        args = ['ld.lld', '-shared', '-o', str(linked), str(obj)]
+                        kwargs['stdout'].write('unexpected linker' if failure == 'link' else shlex.join(args))
                     return subprocess.CompletedProcess(command, 0)
 
                 def validate(result, target, output, env):
@@ -227,6 +305,8 @@ class Tests(unittest.TestCase):
                             self.assertIs(report[key], False)
                         self.assertEqual(report['ffmpegObjects'][0]['sha256'], hashlib.sha256(b'object').hexdigest())
                         self.assertEqual(report['rebuiltSha256'], hashlib.sha256(b'rebuilt').hexdigest())
+                        self.assertEqual(report['finalLink']['inputs'][0]['sha256'],
+                                         hashlib.sha256(b'linked object').hexdigest())
                         self.assertEqual(target.read_bytes(), b'rebuilt')
 
 

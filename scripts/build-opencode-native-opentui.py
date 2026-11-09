@@ -7,6 +7,7 @@ import os
 from pathlib import Path, PurePosixPath
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -96,6 +97,69 @@ def ffmpeg_configuration(text):
         if definitions.get(name) != value:
             raise ValueError('Unexpected FFmpeg configuration: ' + name)
     return expected
+
+
+def retain_link_inputs(text, native, output, env):
+    """Retain fixed Zig's explicit final-link inputs, not archive-member attribution."""
+    commands = [line.strip() for line in text.splitlines() if line.strip().startswith('ld.lld ')]
+    if len(commands) != 1:
+        raise ValueError('Expected one explicit OpenTUI ld.lld command')
+    arguments = shlex.split(commands[0])
+    roots = [('opentui-source-build', native.resolve(strict=True)),
+             ('zig-global-cache', Path(env['ZIG_GLOBAL_CACHE_DIR']).resolve(strict=True)),
+             ('zig-local-cache', Path(env['ZIG_LOCAL_CACHE_DIR']).resolve(strict=True))]
+    no_value = {'--error-limit=0', '-O3', '--build-id=sha1', '--image-base=0',
+                '--gc-sections', '--eh-frame-hdr', '-znow', '-shared',
+                '--no-undefined-version', '--as-needed', '-L/'}
+    with_value = {'-mllvm': '-float-abi=hard', '-z': 'max-page-size=16384',
+                  '-m': 'aarch64linux', '-soname': 'libopentui.so'}
+    inputs, linked_output = [], None
+    index = 1
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument in no_value:
+            index += 1
+            continue
+        if argument in with_value:
+            if index + 1 >= len(arguments) or arguments[index + 1] != with_value[argument]:
+                raise ValueError('Unexpected OpenTUI linker option value: ' + argument)
+            index += 2
+            continue
+        if argument == '-o':
+            if linked_output is not None or index + 1 >= len(arguments):
+                raise ValueError('Unexpected OpenTUI linker output')
+            linked_output = Path(arguments[index + 1])
+            if not linked_output.is_absolute() or linked_output.name != 'libopentui.so':
+                raise ValueError('Unexpected OpenTUI linker output')
+            linked_output.resolve(strict=True).relative_to(roots[2][1])
+            index += 2
+            continue
+        path = Path(argument)
+        if not path.is_absolute() or not re.fullmatch(r'[A-Za-z0-9_+.-]+', path.name):
+            raise ValueError('Unrecognized OpenTUI linker input or option: ' + argument)
+        resolved = path.resolve(strict=True)
+        scope = next(((name, root) for name, root in roots if resolved.is_relative_to(root)), None)
+        if scope is None or not resolved.is_file():
+            raise ValueError('OpenTUI linker input escaped allowed build roots')
+        if not (path.suffix in ('.o', '.a') or re.fullmatch(r'.+\.so(?:\.\d+)*', path.name)):
+            raise ValueError('Unexpected OpenTUI linker input type')
+        inputs.append((index, argument, resolved, scope))
+        index += 1
+    if linked_output is None or not inputs:
+        raise ValueError('Missing OpenTUI final-link output or inputs')
+    directory = output / 'link-inputs'
+    directory.mkdir(exist_ok=False)
+    rows = []
+    for index, argument, resolved, (scope, root) in inputs:
+        retained = directory / f'{index:04d}-{resolved.name}'
+        shutil.copyfile(resolved, retained)
+        with retained.open('rb') as source:
+            digest = hashlib.file_digest(source, 'sha256').hexdigest()
+        rows.append({'argumentIndex': index, 'path': argument, 'scope': scope,
+                     'scopeRelativePath': resolved.relative_to(root).as_posix(),
+                     'retainedPath': retained.relative_to(output).as_posix(),
+                     'bytes': retained.stat().st_size, 'sha256': digest})
+    return {'command': arguments, 'output': str(linked_output), 'inputs': rows}
 
 
 def validate(result, target, output, env):
@@ -199,7 +263,10 @@ def build(upstream, stage):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
     configuration = ffmpeg_configuration((output / 'ffmpeg-config/config.h').read_text(encoding='utf8'))
+    link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
+    if Path(link['output']).read_bytes() != result.read_bytes():
+        raise ValueError('Installed OpenTUI differs from final-link output')
     shutil.copyfile(result, output / 'libopentui.so')
     needed = validate(result, target, output, env)
     (stage / 'native-opentui-build-review.json').write_text(json.dumps({
@@ -212,8 +279,9 @@ def build(upstream, stage):
         'zigVersion': '0.17.0', 'zigArchiveSha256': ZIG_SHA256,
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
         'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
+        'finalLink': link,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
-                        'No complete linker input attribution or toolchain corresponding source',
+                        'Explicit linker input copies do not prove selected archive members, per-file source attribution or toolchain corresponding source',
                         'Per-file notices, Bun/JSC obligations and Android remain under review']
     }, indent=2) + '\n', encoding='utf8')
     print('Fixed-source OpenTUI ABI passed; redistribution remains BLOCKED')

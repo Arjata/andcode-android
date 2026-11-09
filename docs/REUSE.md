@@ -79,6 +79,19 @@ head 为 `1a43a9e9baea98e934ca4ca16c21d275ff408d32`。诊断 artifact
 `manifest-opencode-native.py` 按上传器解引用视图生成清单，拒绝越界/循环链接及
 特殊文件。是否闭合须下载下一轮工件重新核对。
 
+清单修复提交 `1d3d37ee1ed5a410400dc80e117d77df6c385024` 的源码实验
+`42628073140` 与常规 CI `42628022675` 均成功；artifact `13680841250` 的
+443040684 字节 ZIP SHA-256
+`a2f448c01a7a268b0827310a1bd00bbe2c6db637830cb64c20cf08222152a1bd` 已与 API
+及本机完整下载匹配。29345 项文件与摘要清单集合完全相同，逐项 SHA-256 全通过，
+清单缺口为 0。四个原生 ELF 的导入清单/来源报告/重建摘要、9 个 Ubuntu 动态库
+及 14 项递归闭包报告一致；bun-pty 37 个、fff 116 个 registry crate 归档与 lock
+checksum 匹配。347 个 FFmpeg/zlib 对象及上述安全配置重验通过。
+这一轮 OpenTUI ELF SHA-256 为
+`daa2f6fc84cbedd079db842b3afb53a562420695a0ef9c1d4ae8195881b5ad97`，大小仍
+32974432；不同构建输出摘要不同，未声称位级可重现。Linux API/PTY/TUI 与隔离
+目录无运行期 ELF 门禁已核对真实日志；所有许可与 Android 批准继续为 false。
+
 本轮重建 OpenTUI ELF 32974432 字节，SHA-256
 `312aa75db50cd70dc92fedc458ad20db5e9a5e7b68a4a2f1b021d1f090be6b0d`，构建输出与
 Bun 预置副本一致；NEEDED 为 libc/libm/libpthread/libdl，ELF glibc≤2.39/16K 门禁
@@ -96,6 +109,16 @@ config.h 运行修正后的检查器通过 LGPL2.1、GPL/version3/nonfree/networ
 该事实不证明其它内嵌 dr_* 实现或生成数据已逐文件闭环。Zig build.zig 明确设置
 Yoga `link_libcpp=true`，工具链 C++ 运行库对应源码/通知也不能漏算；这些均未
 新增依赖或取码入库，仍需按实际编译/链接输入做完整通知与义务审查。
+
+上述成功工件的 Zig verbose-link 日志仅有一条最终 `ld.lld` 命令，显式引用
+448 个输入，含 libc++abi/libc++/libunwind/libc_nonshared/libcompiler_rt 五份
+静态库以及 Zig 生成的 glibc 链接桩。后续构建器按参数顺序保留这条命令的输入
+副本与原路径/构建来源/长度/SHA-256，要求仅位于固定 OpenTUI 构建树或两个
+专用 Zig cache；拒绝缺失文件、响应文件、相对路径、未知选项、越界链接及
+链接输出与安装结果不一致，失败不替换实验 npm 输入。链接桩副本只说明构建期
+输入，不是 Ubuntu 运行库。保留静态库也不等同选中成员/逐节归属/完整对应源码，
+更不等同 LGPL 可替换重链接已验收；这些限制继续保留。
+本机仅完成命令形状重放与合成回归，新增链接输入保留须由下一轮真实 CI 验证。
 
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
