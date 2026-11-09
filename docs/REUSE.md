@@ -89,6 +89,21 @@ Linux CI 才是 arm64 Linux 候选基线；仍需准确二进制对应、逐文�
 所有 registry 归档通过 lock 摘要检查；按文件名未发现 serial、glidesort、heed、
 heed-traits、heed-types、zlob 的独立声明文件。此项只表示声明文件名扫描缺口，
 不等于代码没有许可证；须逐文件/准确上游补充来源审查，不能按 Cargo metadata 放行。
+同日读取固定 crate 原文：`libgit2-sys 0.18.7+1.9.6/libgit2/COPYING` 明确为
+**GPL-2.0 + unlimited linking exception**(不是 crate 顶层 MIT/Apache)；
+`lmdb-master-sys 0.2.5/lmdb/libraries/liblmdb/LICENSE` 为 **OpenLDAP Public
+License 2.8**，另有 COPYRIGHT。归档仅在外部临时审查目录/CI 诊断工件，不复制
+GPL-2.0 源码入本仓库；fff 中的静态组合、例外适用范围、对应源码与声明义务
+仍须单独确认，不能把 linking exception 当作无需许可审查或自动正式分发的许可。
+对 `.cargo_vcs_info.json` 固定提交进一步核对，heed/heed-traits/heed-types 和 zlob
+仓库根 LICENSE 均为 MIT，可作归档缺失声明的补充候选(逐提交 SHA-256 由收集器
+固定并保留原文)；glidesort 对应提交根目录未找到声明文件，serial 无随包 VCS
+定位信息，二者仍待补齐。补充来源不证明二进制对应，也不覆盖所有内嵌代码。
+CI `42544621101` 的 arm64 Linux 候选树为 bun-pty 38/37 registry、fff 120/116
+registry(与 Windows host 预审相差 1 项)；registry 源码摘要全部复核，报告仍为
+blocked。该轮 upload-artifact 默认漏传展开候选源码的 dotfiles，导致全文件
+manifest 不闭合，不能作为完整诊断包；已显式保留隔离 stage 内固定源码的 dotfiles，
+待后续成功 run 重新核验完整 manifest。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和

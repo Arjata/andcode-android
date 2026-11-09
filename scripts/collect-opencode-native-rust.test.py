@@ -1,6 +1,7 @@
 import importlib.util
 import hashlib
 import io
+import json
 from pathlib import Path
 import tarfile
 import tempfile
@@ -53,6 +54,17 @@ class CandidateGraphTest(unittest.TestCase):
                     root = module.unpack_candidate(src, checksum, Path(tmp) / 'out')
                     self.assertEqual((root / 'Cargo.toml').read_bytes(), b'x')
                     self.assertFalse((root / 'link').exists())
+
+    def test_supplement_commit_must_match_crate(self):
+        data = io.BytesIO()
+        with tarfile.open(fileobj=data, mode='w:gz') as archive:
+            content = json.dumps({'git': {'sha1': 'a' * 40}}).encode()
+            member = tarfile.TarInfo('crate/.cargo_vcs_info.json')
+            member.size = len(content)
+            archive.addfile(member, io.BytesIO(content))
+        module.validate_vcs(data.getvalue(), 'a' * 40)
+        with self.assertRaisesRegex(ValueError, 'does not match'):
+            module.validate_vcs(data.getvalue(), 'b' * 40)
 
 
 if __name__ == '__main__':

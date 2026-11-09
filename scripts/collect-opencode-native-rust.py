@@ -20,6 +20,22 @@ CANDIDATES = {
     'bun-pty': ('rust-pty/Cargo.toml', 'rust-pty/Cargo.lock', []),
     'fff': ('Cargo.toml', 'Cargo.lock', ['-p', 'fff-c', '--no-default-features', '--features', 'zlob']),
 }
+REVIEW_TOPICS = {
+    'libgit2-sys': 'Embedded libgit2 COPYING is GPL-2.0 with linking exception; audit actual static inputs and source obligations',
+    'lmdb-master-sys': 'Embedded LMDB LICENSE is OpenLDAP Public License 2.8, not wrapper crate Apache-2.0',
+    'option-ext': 'MPL-2.0 per-file obligations require review',
+    'zlob': 'Embedded Zig sources/build and missing separate notice filename require review',
+}
+SUPPLEMENTAL_NOTICES = {
+    ('heed', '0.22.0'): ('Kerollmops/heed', 'bc9cf18f6c3543fd492920c9c84bdebb4cdfb057',
+                         '6d4e3db586416994db32596f0a256eaeee6c3f79e783bf6ac0fab3cc2e36759b'),
+    ('heed-traits', '0.20.0'): ('Kerollmops/heed', '9de8469341cafcd5f239317fff85db955103fcd9',
+                                'c4ea684839984235efcebff570a4d253dcc456789edbd4fdf3e96ca15004e730'),
+    ('heed-types', '0.21.0'): ('Kerollmops/heed', '178c53261595880bb89554bc7f1b55dcda45ae50',
+                               'c4ea684839984235efcebff570a4d253dcc456789edbd4fdf3e96ca15004e730'),
+    ('zlob', '1.6.3'): ('dmtrKovalenko/zlob', '4bc4da2cbc823d3911b4a1436448687c398977dd',
+                        'b58a537ce812184628abbf3283377f7d2447ef8c9940699f72a73d4edd9633b3'),
+}
 
 
 def selected_packages(tree, lock):
@@ -58,6 +74,16 @@ def unpack_candidate(archive, expected, destination):
     return destination / roots.pop()
 
 
+def validate_vcs(data, commit):
+    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+        matches = [m for m in archive if m.isfile() and m.name.endswith('/.cargo_vcs_info.json')]
+        if len(matches) != 1 or matches[0].size > 65536:
+            raise ValueError('Missing or ambiguous crate VCS evidence')
+        info = json.loads(archive.extractfile(matches[0]).read())
+        if info.get('git', {}).get('sha1') != commit:
+            raise ValueError('Supplemental notice commit does not match crate VCS evidence')
+
+
 def collect(stage):
     stage = Path(stage).resolve(strict=True)
     evidence = stage / 'native-rust-evidence'
@@ -81,6 +107,8 @@ def collect(stage):
         for package in selected_packages(tree, tomllib.loads(original.decode())):
             row = dict(package)
             row['status'] = 'blocked-binary-correspondence-and-per-file-review'
+            if package['name'] in REVIEW_TOPICS:
+                row['reviewTopic'] = REVIEW_TOPICS[package['name']]
             if package.get('source'):
                 if package['source'] != 'registry+https://github.com/rust-lang/crates.io-index':
                     raise ValueError('Unsupported non-crates.io dependency source')
@@ -98,6 +126,20 @@ def collect(stage):
                 row['evidence'] = sources.inspect_archive(data, checksum)
                 if not row['evidence']['noticeFilesByName']:
                     row['status'] = 'blocked-no-notice-filename-found'
+                supplement = SUPPLEMENTAL_NOTICES.get((package['name'], package['version']))
+                if supplement:
+                    repo, commit, expected_notice = supplement
+                    validate_vcs(data, commit)
+                    url = f'https://raw.githubusercontent.com/{repo}/{commit}/LICENSE'
+                    with urllib.request.urlopen(url, timeout=90) as response:
+                        notice = response.read(1024 * 1024 + 1)
+                    if len(notice) > 1024 * 1024 or sources.digest(notice) != expected_notice:
+                        raise ValueError('Supplemental notice size or checksum mismatch')
+                    notice_name = filename + '.upstream-LICENSE'
+                    (evidence / notice_name).write_bytes(notice)
+                    row['supplementalNotice'] = {'url': url, 'commit': commit,
+                                                 'sha256': expected_notice, 'file': notice_name,
+                                                 'status': 'candidate-not-binary-or-per-file-approval'}
                 archive.write_bytes(data)
                 row['archive'] = filename
             packages.append(row)

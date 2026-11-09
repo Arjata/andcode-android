@@ -120,6 +120,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: opencode-native-prototype-diagnostic
+          # Only the isolated stage of fixed upstream sources/evidence is uploaded.
+          # Preserve dotfiles so prototype.sha256 remains a complete byte manifest.
+          include-hidden-files: true
           path: |
             work/native-prototype/
             work/prototype.sha256
