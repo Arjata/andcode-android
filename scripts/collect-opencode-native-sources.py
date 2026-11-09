@@ -28,6 +28,20 @@ MEDIA_SOURCES = {
     'zlib-1.3.2.tar.gz': ('https://zlib.net/fossils/zlib-1.3.2.tar.gz',
                         'bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16'),
 }
+BUN_COMMIT = '38afee6c84fcf48c0edb2466aa4b27d287a59c30'
+WEBKIT_COMMIT = 'd6375c72affe0f70222cdcb45012b10f0bf3a9d5'
+RUNTIME_DECLARATIONS = {
+    'bun': ('oven-sh/bun', BUN_COMMIT, {
+        'LICENSE.md': '362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd',
+        'scripts/build/deps/webkit.ts': 'e801ac2b2c0b83767a10e4bf673addda60ff1c4e64d1246c0e442ce22b3c5059',
+        'package.json': '68f7347c90102f4d394f9188fde96afc882cdb8871321d3ed13678002eaa3b35',
+    }),
+    'webkit': ('oven-sh/WebKit', WEBKIT_COMMIT, {
+        'Source/JavaScriptCore/COPYING.LIB': '5094ecb9c9dcd0eadc34f3c11511d9b5535063032bc150164ecd1a5d5a445547',
+        'Source/JavaScriptCore/CMakeLists.txt': 'f9899a7939def67e3cde4e500e96ea13cfc877737e85ee792ee760a5253beb19',
+        'CMakeLists.txt': '95f5a87e9572f7efca4dc4b456c8180b5a03dd13295b1ca8440af4feeddc237e',
+    }),
+}
 
 
 def digest(data):
@@ -119,15 +133,46 @@ def collect(stage):
         (evidence / filename).write_bytes(data)
         media.append({'archive': filename, 'url': url, 'sha256': expected, 'evidence': review,
                       'status': 'blocked-actual-binary-correspondence-and-relinking'})
+    runtime = collect_runtime_declarations(evidence)
     (stage / 'native-source-review.json').write_text(json.dumps({
         'redistributionApproved': False,
-        'scope': 'Four candidate source repositories linked by exact npm version gitHead; excludes Bun/JS/Web closure',
+        'scope': 'Four candidate source repositories plus selected Bun/WebKit declarations; excludes complete Bun/JS/Web closure',
         'limitations': ['Archive digest is pinned, not proof of binary correspondence',
                         'Notice filename search is not exhaustive per-source copyright review',
                         'Lockfiles include inactive targets/features; no target closure claim',
                         'LGPL corresponding-source, relinking and replacement obligations remain open'],
-        'sources': rows, 'opentuiStaticMediaSources': media}, indent=2) + '\n', encoding='utf8')
+        'sources': rows, 'opentuiStaticMediaSources': media,
+        'runtimeDeclarations': runtime}, indent=2) + '\n', encoding='utf8')
     print('Four pinned candidate source archives and FFmpeg/zlib collected; redistribution remains BLOCKED')
+
+
+def collect_runtime_declarations(evidence):
+    """Selected fixed-source bytes only, deliberately not full corresponding source."""
+    directory = evidence / 'runtime-declarations'
+    directory.mkdir(exist_ok=False)
+    rows = []
+    for name, (repo, commit, files) in RUNTIME_DECLARATIONS.items():
+        for relative, expected in files.items():
+            path = PurePosixPath(relative)
+            if path.is_absolute() or '..' in path.parts or '\\' in relative:
+                raise ValueError('Unsafe runtime declaration path')
+            url = f'https://raw.githubusercontent.com/{repo}/{commit}/{relative}'
+            data = download_archive(url)
+            if len(data) > 1024 * 1024 or digest(data) != expected:
+                raise ValueError('Runtime declaration size or digest mismatch')
+            if name == 'bun' and relative == 'scripts/build/deps/webkit.ts':
+                pins = re.findall(rb'^export const WEBKIT_VERSION = "([0-9a-f]{40})";', data, re.M)
+                if pins != [WEBKIT_COMMIT.encode()]:
+                    raise ValueError('Fixed Bun WebKit source pin changed')
+            dest = directory / name / relative
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            rows.append({'component': name, 'repository': repo, 'commit': commit,
+                         'path': relative, 'url': url, 'bytes': len(data), 'sha256': expected,
+                         'retainedPath': dest.relative_to(evidence).as_posix()})
+    return {'files': rows, 'redistributionApproved': False, 'correspondingSourceComplete': False,
+            'relinkingApproved': False,
+            'scope': 'Selected pinned declarations and build files, not complete source or binary correspondence'}
 
 
 if __name__ == '__main__':

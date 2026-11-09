@@ -217,6 +217,23 @@ archive extraction 诊断；输出不与原 ELF 逐字节相同(32969640 字节)
 或放松一致性要求。新门禁尚待真实 CI；其报告即使成功也只证明未修改输入的原始
 链接重放，不是修改 FFmpeg 后的可替换重链接或 LGPL/Android 分发批准。
 
+2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
+`oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
+SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
+其说明明确 JavaScriptCore/WebKit 静态链接及修改后重链接义务，另列 tinycc
+LGPL-2.1 等依赖，不能只按顶层 MIT 归类。固定
+`scripts/build/deps/webkit.ts`(SHA-256
+`e801ac2b2c0b83767a10e4bf673addda60ff1c4e64d1246c0e442ce22b3c5059`)中的
+WEBKIT_VERSION 为 `d6375c72affe0f70222cdcb45012b10f0bf3a9d5`，并区分预构建
+下载与本地源码构建。该 WebKit 提交 `Source/JavaScriptCore/COPYING.LIB` 原文
+为 GNU Library GPL v2，SHA-256
+`5094ecb9c9dcd0eadc34f3c11511d9b5535063032bc150164ecd1a5d5a445547`；具体源文件
+的 LGPL/BSD 等条件仍须逐项核对，不能由这份文本推出整树统一许可证。
+来源收集器只保留固定提交的选定声明、版本 pin 与构建文件并拒绝摘要漂移；不下载
+整份 WebKit、不执行构建、不声称 Bun 官方 ELF 与候选源码完全对应。Bun/JSC/
+tinycc/其它静态依赖的准确对应源码、全部通知、重链接工具链和 APK 替换路径继续
+blocked，尚待可信 CI 收集上述文件并复核。
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。

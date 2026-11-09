@@ -52,6 +52,7 @@ class SourceEvidenceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as work:
             with patch.object(module, 'SOURCES', {'fixture': ('example/repo', 'a' * 40, sha)}), \
                  patch.object(module, 'MEDIA_SOURCES', {'media.tar.gz': ('https://example.invalid/media', sha)}), \
+                 patch.object(module, 'RUNTIME_DECLARATIONS', {}), \
                  patch.object(module.urllib.request, 'urlopen', side_effect=lambda *a, **k: io.BytesIO(data)):
                 module.collect(work)
             report = json.loads((Path(work) / 'native-source-review.json').read_text())
@@ -59,6 +60,34 @@ class SourceEvidenceTest(unittest.TestCase):
             self.assertTrue(report['sources'][0]['status'].startswith('blocked-'))
             self.assertTrue(report['opentuiStaticMediaSources'][0]['status'].startswith('blocked-'))
             self.assertEqual((Path(work) / 'native-source-evidence/media.tar.gz').read_bytes(), data)
+
+    def test_runtime_declarations_are_pinned_and_never_approved(self):
+        content = ('export const WEBKIT_VERSION = "' + module.WEBKIT_COMMIT + '";\n').encode()
+        files = {'scripts/build/deps/webkit.ts': module.digest(content)}
+        with tempfile.TemporaryDirectory() as work, \
+                patch.object(module, 'RUNTIME_DECLARATIONS', {'bun': ('oven-sh/bun', module.BUN_COMMIT, files)}), \
+                patch.object(module, 'download_archive', return_value=content) as download:
+            root = Path(work)
+            report = module.collect_runtime_declarations(root)
+            self.assertFalse(report['redistributionApproved'])
+            self.assertFalse(report['correspondingSourceComplete'])
+            self.assertFalse(report['relinkingApproved'])
+            row = report['files'][0]
+            self.assertEqual((root / row['retainedPath']).read_bytes(), content)
+            self.assertEqual(row['sha256'], module.digest(content))
+            self.assertIn(module.BUN_COMMIT, download.call_args.args[0])
+
+    def test_runtime_declaration_drift_paths_and_wrong_pin_rejected(self):
+        for mode in ['digest', 'pin', 'large', 'unsafe']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as work:
+                content = b'export const WEBKIT_VERSION = "' + b'0' * 40 + b'";\n'
+                if mode == 'large': content = b'x' * (1024 * 1024 + 1)
+                path = '../escape' if mode == 'unsafe' else 'scripts/build/deps/webkit.ts'
+                expected = '0' * 64 if mode == 'digest' else module.digest(content)
+                with patch.object(module, 'RUNTIME_DECLARATIONS', {'bun': ('oven-sh/bun', module.BUN_COMMIT, {path: expected})}), \
+                        patch.object(module, 'download_archive', return_value=content):
+                    with self.assertRaises(ValueError):module.collect_runtime_declarations(Path(work))
+                self.assertFalse((Path(work) / 'runtime-declarations/bun/scripts/build/deps/webkit.ts').exists())
 
     def test_notices_build_inputs_and_nested_sources(self):
         nested = archive([('yoga/LICENSE', b'MIT example')])

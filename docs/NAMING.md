@@ -128,6 +128,7 @@
 | `audit-opencode-native.py`、`audit-opencode-native.test.py` | 实验工件 ELF/依赖/对齐/摘要审计与回归,拒绝残留 Bun 内嵌 ELF 或 musl 闭包 | `scripts/` |
 | `collect-opencode-native-licenses.py`、`collect-opencode-native-licenses.test.py` | 固定安装树原生扩展的包版本/许可/包内声明快照,缺声明明确记录为 blocked,不构成发布许可批准 | `scripts/` |
 | `native-license-review.json`、`native-license-evidence/` | 实验工件中四个原生扩展的人工审查待办与包内声明副本,不进入正式 APK | 源码实验工件 |
+| `runtime-declarations/` | 固定 Bun/WebKit 提交的声明与构建脚本原字节,逐文件摘要校验;只作来源候选,不是完整对应源码或正式 notices | `native-source-evidence/` |
 | `probe-opencode-native.py` | Linux CI 实验 API 准入:普通/持久 PTY、shell,口令只在内存使用不输出 | `scripts/` |
 | `probe-opencode-native-tui.py` | Linux CI 独立 PTY 启动源码实验 TUI,要求实际映射预置 OpenTUI 并渲染;仅终止自有进程组 | `scripts/` |
 | `opencode-native-prototype.yml` | 手动执行的原生扩展预置源码构建实验;失败/未审计工件不得接入 APK | `.github/workflows/` |
