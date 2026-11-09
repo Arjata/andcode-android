@@ -159,6 +159,18 @@ GPL 声明代码；既有成功工件保持 blocked，不更改第三方原文�
 拒绝替换实验输入。它是保守门禁，不是完整逐文件许可判定；系统头、zlib 头、
 宏条件选择、归档成员/最终存活节与其它源码义务仍需人工及实际构建验证。
 
+首轮排除提交 `190b518` 的常规 CI `42641908404` 成功，源码 CI `42642081860`
+在最终链接失败；已核对 job `129245514248` 完整日志和失败工件
+`13687470347`(ZIP SHA-256
+`701c5d8cd0509acf7dd58e024ef9b36de425712f37650a91fb14630269852186`)。
+上游 `aarch64/crc.h` 以 HAVE_ARM_CRC 和 HAVE_PMULL/HAVE_EOR3 独立选择
+`ff_crc32_aarch64`、`ff_crc_neon_pmull`、`ff_crc_le_neon_pmull`，不会随
+ARMV8-OBJS 自动关闭，故仅排除汇编对象会留下三个未定义引用。后续配方同步
+增加 `--disable-arm-crc`/`--disable-pmull`，并要求生成的 HAVE_ARM_CRC 和
+HAVE_PMULL 均为 0，使 CRC 回退通用 C 路径，不修改第三方许可或补写同名实现；
+独立 NEON 配置不关闭。新配方尚待真实 arm64 CI 与工件复核，不能以合成回归
+声称链接、媒体或 Android 已通过。
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。

@@ -19,7 +19,8 @@ class Tests(unittest.TestCase):
     CONFIG = ('#define FFMPEG_LICENSE "LGPL version 2.1 or later"\n'
               '#define CONFIG_GPL 0\n#define CONFIG_VERSION3 0\n#define CONFIG_NONFREE 0\n'
               '#define CONFIG_NETWORK 0\n#define CONFIG_ZLIB 1\n'
-              '#define HAVE_ARMV8 0\n#define HAVE_ARMV8_EXTERNAL 0\n')
+              '#define HAVE_ARMV8 0\n#define HAVE_ARMV8_EXTERNAL 0\n'
+              '#define HAVE_ARM_CRC 0\n#define HAVE_PMULL 0\n')
 
     def test_ffmpeg_configuration_drift_rejected(self):
         self.assertEqual(m.ffmpeg_configuration(self.CONFIG)['CONFIG_GPL'], '0')
@@ -29,6 +30,8 @@ class Tests(unittest.TestCase):
                          self.CONFIG.replace('CONFIG_ZLIB 1', 'CONFIG_ZLIB 0'),
                          self.CONFIG.replace('HAVE_ARMV8 0', 'HAVE_ARMV8 1'),
                          self.CONFIG.replace('HAVE_ARMV8_EXTERNAL 0', 'HAVE_ARMV8_EXTERNAL 1'),
+                         self.CONFIG.replace('HAVE_ARM_CRC 0', 'HAVE_ARM_CRC 1'),
+                         self.CONFIG.replace('HAVE_PMULL 0', 'HAVE_PMULL 1'),
                         self.CONFIG.replace('LGPL version 2.1', 'GPL version 3'),
                         self.CONFIG.replace('#define CONFIG_VERSION3 0\n', ''),
                         self.CONFIG + '#define CONFIG_GPL 0\n']:
@@ -372,6 +375,8 @@ class Tests(unittest.TestCase):
                             (build / 'libavutil/fixture.c').write_text('GNU General Public License')
                         (build / 'libavutil/fixture.d').write_text('libavutil/fixture.o: libavutil/fixture.c')
                         self.assertIn('"--disable-armv8",', (native / 'scripts/build-ffmpeg.ts').read_text())
+                        self.assertIn('"--disable-arm-crc",', (native / 'scripts/build-ffmpeg.ts').read_text())
+                        self.assertIn('"--disable-pmull",', (native / 'scripts/build-ffmpeg.ts').read_text())
                         for name in ['config.h', 'ffbuild/config.mak', 'ffbuild/config.log']:
                             (build / name).write_text(self.CONFIG if name == 'config.h' else 'config fixture')
                         if failure == 'configuration':

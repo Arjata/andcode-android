@@ -93,7 +93,8 @@ def ffmpeg_configuration(text):
     expected = {'FFMPEG_LICENSE': '"LGPL version 2.1 or later"',
                 'CONFIG_GPL': '0', 'CONFIG_VERSION3': '0', 'CONFIG_NONFREE': '0',
                 'CONFIG_NETWORK': '0', 'CONFIG_ZLIB': '1',
-                'HAVE_ARMV8': '0', 'HAVE_ARMV8_EXTERNAL': '0'}
+                'HAVE_ARMV8': '0', 'HAVE_ARMV8_EXTERNAL': '0',
+                'HAVE_ARM_CRC': '0', 'HAVE_PMULL': '0'}
     for name, value in expected.items():
         if definitions.get(name) != value:
             raise ValueError('Unexpected FFmpeg configuration: ' + name)
@@ -328,9 +329,12 @@ def build(upstream, stage):
         '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")',
         '  // andcode aarch64-only experiment: no x86 NASM download')
     # Fixed FFmpeg crc.S declares GPL-2.0-or-later despite --disable-gpl.
-    # Disable its ARMV8-OBJS group, leaving the independently selected NEON group.
+    # Disable its ARMV8-OBJS group and the independently tested CRC header
+    # dispatch features; otherwise crc.c still references the excluded symbols.
+    # The independently selected NEON group remains enabled.
     patched_script = patch_once(patched_script, '    "--disable-gpl",',
-                                '    "--disable-gpl",\n    "--disable-armv8",')
+                                '    "--disable-gpl",\n    "--disable-armv8",\n'
+                                '    "--disable-arm-crc",\n    "--disable-pmull",')
     ffmpeg_script.write_text(patched_script, encoding='utf8')
     (output / 'original-build-ffmpeg.ts').write_text(original_script, encoding='utf8')
     downloads = native / '.cache/ffmpeg/downloads'
