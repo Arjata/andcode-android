@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -73,6 +74,22 @@ def unpack_nested(data, destination):
             output = destination.joinpath(*path.parts)
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(archive.extractfile(member).read())
+
+
+def ffmpeg_configuration(text):
+    """Reject license/configuration drift, not a replacement for per-file review."""
+    definitions = {}
+    for name, value in re.findall(r'^#define\s+(\w+)\s+([^\r\n]+)', text, re.M):
+        if name in definitions:
+            raise ValueError('Duplicate FFmpeg configuration macro: ' + name)
+        definitions[name] = value.strip()
+    expected = {'FFMPEG_LICENSE': '"LGPL version 2.1 or later"',
+                'CONFIG_GPL': '0', 'CONFIG_VERSION3': '0', 'CONFIG_NONFREE': '0',
+                'CONFIG_NETWORK': '0', 'CONFIG_ZLIB': '1'}
+    for name, value in expected.items():
+        if definitions.get(name) != value:
+            raise ValueError('Unexpected FFmpeg configuration: ' + name)
+    return expected
 
 
 def validate(result, target, output, env):
@@ -175,6 +192,7 @@ def build(upstream, stage):
         dest = output / 'ffmpeg-config' / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
+    configuration = ffmpeg_configuration((output / 'ffmpeg-config/config.h').read_text(encoding='utf8'))
     result = native / 'lib/aarch64-linux/libopentui.so'
     shutil.copyfile(result, output / 'libopentui.so')
     needed = validate(result, target, output, env)
@@ -187,7 +205,7 @@ def build(upstream, stage):
         'installedInput': str(target.relative_to(upstream)), 'needed': needed, 'commands': commands,
         'zigVersion': '0.17.0', 'zigArchiveSha256': ZIG_SHA256,
         'nestedZigArchiveSha256': hashlib.sha256(nested.read_bytes()).hexdigest(),
-        'ffmpegObjects': object_rows, 'abiGate': MARKER,
+        'ffmpegObjects': object_rows, 'ffmpegConfiguration': configuration, 'abiGate': MARKER,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
                         'No complete linker input attribution or toolchain corresponding source',
                         'Per-file notices, Bun/JSC obligations and Android remain under review']

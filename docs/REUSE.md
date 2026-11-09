@@ -52,6 +52,10 @@ LICENSE SHA-256 `5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff17
 不构建/收录 musl FFmpeg，不降低准入条件。该提交常规 CI `42621206258` 的
 app-data-tests/build-bundle 已成功，APK 作业在 NDK 下载 ZIP 损坏处失败，未执行
 Gradle 构建，不据此声称 APK 通过。
+构建后额外校验生成的 FFmpeg `config.h`:许可字符串须为 LGPL version 2.1 or
+later，GPL/version3/nonfree/network 必须关闭、zlib 必须启用；缺宏、重复宏或配置
+漂移均拒绝替换实验输入。该配置检查只防配方漂移，不替代 C/汇编逐文件许可、
+专利/地区使用限制或 LGPL 对应源码/重链接材料审查。
 
 源码实验 CI 的 `collect-opencode-native-licenses.py` 对四个固定原生导入逐一核对
 安装源字节/包名/版本/声明许可，将包内顶层 LICENSE*/COPYING*/NOTICE* 与 package.json

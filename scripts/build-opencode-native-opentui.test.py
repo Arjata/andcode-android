@@ -15,6 +15,22 @@ spec.loader.exec_module(m)
 
 
 class Tests(unittest.TestCase):
+    CONFIG = ('#define FFMPEG_LICENSE "LGPL version 2.1 or later"\n'
+              '#define CONFIG_GPL 0\n#define CONFIG_VERSION3 0\n#define CONFIG_NONFREE 0\n'
+              '#define CONFIG_NETWORK 0\n#define CONFIG_ZLIB 1\n')
+
+    def test_ffmpeg_configuration_drift_rejected(self):
+        self.assertEqual(m.ffmpeg_configuration(self.CONFIG)['CONFIG_GPL'], '0')
+        for changed in [self.CONFIG.replace('CONFIG_GPL 0', 'CONFIG_GPL 1'),
+                        self.CONFIG.replace('CONFIG_NONFREE 0', 'CONFIG_NONFREE 1'),
+                        self.CONFIG.replace('CONFIG_NETWORK 0', 'CONFIG_NETWORK 1'),
+                        self.CONFIG.replace('CONFIG_ZLIB 1', 'CONFIG_ZLIB 0'),
+                        self.CONFIG.replace('LGPL version 2.1', 'GPL version 3'),
+                        self.CONFIG.replace('#define CONFIG_VERSION3 0\n', ''),
+                        self.CONFIG + '#define CONFIG_GPL 0\n']:
+            with self.subTest(configuration=changed), self.assertRaises(ValueError):
+                m.ffmpeg_configuration(changed)
+
     def test_exact_anchor(self):
         self.assertEqual(m.patch_once('before anchor after', 'anchor', 'patched'), 'before patched after')
         for text in ['missing', 'anchor anchor']:
@@ -116,7 +132,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects']:
+        for failure in [None, 'build', 'objects', 'configuration']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -154,7 +170,9 @@ class Tests(unittest.TestCase):
                         build = native / '.cache/ffmpeg/build/aarch64-linux'
                         (build / 'ffbuild').mkdir(parents=True)
                         for name in ['config.h', 'ffbuild/config.mak', 'ffbuild/config.log']:
-                            (build / name).write_text('config fixture')
+                            (build / name).write_text(self.CONFIG if name == 'config.h' else 'config fixture')
+                        if failure == 'configuration':
+                            (build / 'config.h').write_text(self.CONFIG.replace('CONFIG_GPL 0', 'CONFIG_GPL 1'))
                     else:
                         self.assertIn('-Drequire-video=true', command)
                         self.assertIn('-Dandcode-library-only=true', command)

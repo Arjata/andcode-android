@@ -549,6 +549,26 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   - 设置保存到 `andcode-settings`:终端字号(10–28 sp)、终端/Web 亮屏开关、
     导出是否包含 .git。onResume 应用显示设置,不重启会话,Web 内终端字号不受影响;
     API key 与提供商仍由上游 Web UI 管理,本页不新增凭据存储。
+- **可选后端 CA(v0.4.40–v0.4.41)**:设置通过 SAF 导入单份 PEM,用户输入来自独立
+  可信渠道的文件 SHA-256;64 KiB 上限,验证单证书/CA 签发用途/有效期,拒绝私钥、
+  证书集合和链接。私有副本以内容摘要命名,每次启用启动前重新核对摘要及证书条件。
+  导入不自动启用,产品默认关闭;只为新 OpenCode Web 后端及继承环境的子进程设置
+  `NODE_EXTRA_CA_CERTS`,保留 Bun 内置根与主机名校验。关闭时清除继承的 CA/TLS/Bun
+  覆盖参数,不修改系统/WebView/独立终端/Ubuntu 信任。导入、开关、清除选择不自动
+  停止已有后端;手动停/启生效,清除选择也保留旧副本供仍在运行的进程读取。
+  - 2026-11-09 同签名覆盖安装保留数据后,真实应用域 `untrusted_app`、UID10348、
+    Seccomp=2、SELinux Enforcing 下确认默认关闭、错误摘要拒绝、正确 SAF 导入后
+    仍关闭;显式启用并手动重启后新后端有 CA 环境变量且没有 TLS bypass。
+  - 默认直连模型请求仍 `getaddrinfo EAI_AGAIN one.ai.api.service.arjata`,属于 DNS
+    阶段,不是证书验证结论。隔离诊断后端显式使用 `127.0.0.1:7890` 时,关闭 CA
+    得到 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`,启用后 `arjata/gpt-oss-120b` 返回预期
+    文本,并观察到 SSE 增量文本、中断事件和同会话恢复成功。不把代理成功冒称直连
+    成功,也不把诊断代理写成产品默认值。
+  - 模型调用的无副作用 shell 命令返回预期标记,但工具结果回传后的 provider 请求
+    HTTP 400(`provider.invalid-request/openai_error`);完整工具往返未通过,根因待查。
+    验收后停止诊断后端、恢复设置 CA 关闭,手动重启的默认后端 PID20163 无
+    `NODE_EXTRA_CA_CERTS` 或 TLS bypass。保留 CA 导入副本及所有测试会话,未删除
+    用户数据。更多设备/IME/网络及完整 provider 工具往返仍待 P0/P3 实机验证。
 - UI:主页仪表盘 + 终端 + 桌面 Web + 项目 + 设置;sshd 管理/phantom-killer
   引导等扩展设置仍待实现,不把规划当作已经交付。
 
