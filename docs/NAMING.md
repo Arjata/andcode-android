@@ -82,6 +82,7 @@
 | `runtime`、`native-runtime-review.json` | 源码实验运行库目录与包版本/源码包/摘要/依赖证据;仅诊断工件,非许可批准 | 实验 stage/ |
 | `collect-opencode-native-rust.py`、`collect-opencode-native-rust.test.py` | 按候选发布 target/feature 查询 Cargo normal/build 图,收集 lock 摘要校验的 registry 归档;不执行构建脚本或批准分发 | `scripts/` |
 | `native-rust-evidence`、`native-rust-review.json` | 候选 Rust 依赖树、固定 crate 源码/声明索引和工具版本;不是 npm ELF 实际链接证明 | 实验 stage/ |
+| `serial-rs-<commit>.tar.gz` | serial 0.4.0 缺随包声明时的固定上游来源,必须验证 crate 全部普通文件与 serial/ 子目录对应 | `native-rust-evidence/` |
 | `build-opencode-native-pty.py`、`build-opencode-native-pty.test.py` | CI 从固定 bun-pty 源码及 lock 重建 arm64 glibc PTY,校验后仅替换实验 npm 输入 | `scripts/` |
 | `native-pty-build`、`native-pty-build-review.json` | 实验 PTY 源码/构建日志/命令/工具版本/前后 ELF 摘要;不批准分发或 Android 准入 | 实验 stage/ |
 | `ANDCODE_SERVE_PID` | Linux 源码实验 API 探针读取自有服务 maps 的 PID;不用于设备进程发现或终止 | 实验 CI |

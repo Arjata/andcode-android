@@ -34,6 +34,14 @@ def collect(upstream, stage):
         name, version, license_id = metadata['name'], metadata['version'], metadata.get('license')
         if name not in EXPECTED or (version, license_id) != EXPECTED[name]:
             raise ValueError('Unexpected fixed native package: ' + name)
+        origin = {'kind': 'frozen-npm-native-input'}
+        build_report = stage / 'native-pty-build-review.json'
+        if name == 'bun-pty' and build_report.exists():
+            build = json.loads(build_report.read_text(encoding='utf8'))
+            if build['rebuiltSha256'] != digest or build.get('redistributionApproved') is not False:
+                raise ValueError('Rebuilt PTY provenance does not match imported bytes')
+            origin = {'kind': 'fixed-source-ci-rebuild', 'report': build_report.name,
+                      'sourceCommit': build['sourceCommit'], 'originalNpmSha256': build['originalNpmSha256']}
         slug = name.lstrip('@').replace('/', '--')
         evidence = stage / 'native-license-evidence' / slug
         evidence.mkdir(parents=True, exist_ok=False)
@@ -49,6 +57,7 @@ def collect(upstream, stage):
                 (evidence / item.name).write_bytes(data)
                 notices.append({'path': item.name, 'sha256': hashlib.sha256(data).hexdigest()})
         rows.append({'physical': physical, 'sha256': digest, 'package': name,
+                     'binaryOrigin': origin,
                      'version': version, 'declaredLicense': license_id, 'notices': notices,
                      'status': 'blocked-transitive-review' if notices else 'blocked-missing-package-notice',
                      'obligations': ['Review exact native source and static dependencies',

@@ -58,6 +58,22 @@ class LicenseEvidenceTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.collect(upstream, stage)
 
+    def test_rebuilt_origin_must_match_imported_elf(self):
+        for digest in [hashlib.sha256(b'3').hexdigest(), '0' * 64]:
+            with self.subTest(digest=digest), tempfile.TemporaryDirectory() as work:
+                upstream, stage = self.fixture(Path(work))
+                (stage / 'native-pty-build-review.json').write_text(json.dumps({
+                    'rebuiltSha256': digest, 'redistributionApproved': False,
+                    'sourceCommit': 'fixed-source', 'originalNpmSha256': 'original-npm'}))
+                if digest == '0' * 64:
+                    with self.assertRaisesRegex(ValueError, 'provenance'):
+                        module.collect(upstream, stage)
+                else:
+                    module.collect(upstream, stage)
+                    result = json.loads((stage / 'native-license-review.json').read_text())
+                    self.assertEqual(result['packages'][3]['binaryOrigin']['kind'], 'fixed-source-ci-rebuild')
+                    self.assertIs(result['redistributionApproved'], False)
+
 
 if __name__ == '__main__':
     unittest.main()

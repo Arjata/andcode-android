@@ -67,6 +67,24 @@ class CandidateGraphTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'does not match'):
             module.validate_vcs(data.getvalue(), 'b' * 40)
 
+    def test_serial_supplement_requires_every_crate_file(self):
+        def archive(entries):
+            data = io.BytesIO()
+            with tarfile.open(fileobj=data, mode='w:gz') as out:
+                for name, content in entries:
+                    member = tarfile.TarInfo(name)
+                    member.size = len(content)
+                    out.addfile(member, io.BytesIO(content))
+            return data.getvalue()
+        repository = archive([('repo/LICENSE', b'MIT fixture'), ('repo/serial/src/lib.rs', b'code')])
+        expected = ('commit', hashlib.sha256(repository).hexdigest(), hashlib.sha256(b'MIT fixture').hexdigest())
+        with patch.object(module, 'SERIAL_SOURCE', expected):
+            crate = archive([('serial/src/lib.rs', b'code')])
+            self.assertEqual(module.match_serial_source(crate, repository), (b'MIT fixture', ['src/lib.rs']))
+            for entries in [[('serial/src/lib.rs', b'changed')], [('serial/missing', b'code')], []]:
+                with self.subTest(entries=entries), self.assertRaisesRegex(ValueError, 'differ'):
+                    module.match_serial_source(archive(entries), repository)
+
     def test_collection_stays_blocked_with_pinned_registry_sources(self):
         def archive(entries):
             data = io.BytesIO()
@@ -77,7 +95,9 @@ class CandidateGraphTest(unittest.TestCase):
                     out.addfile(member, io.BytesIO(content))
             return data.getvalue()
 
-        crate = archive([('dep-1/LICENSE', b'example notice')])
+        crate = archive([('dep-1/LICENSE', b'example notice'),
+                         ('dep-1/.cargo_vcs_info.json', json.dumps({'git': {'sha1': 'a' * 40}}).encode())])
+        notice = b'supplemental notice fixture'
         sha = hashlib.sha256(crate).hexdigest()
         lock = ('[[package]]\nname="root"\nversion="1"\n'
                 '[[package]]\nname="dep"\nversion="1"\n'
@@ -90,8 +110,9 @@ class CandidateGraphTest(unittest.TestCase):
             (stage / 'native-source-evidence/fixture-commit.tar.gz').write_bytes(candidate)
             with patch.object(module, 'CANDIDATES', {'fixture': ('Cargo.toml', 'Cargo.lock', [])}), \
                  patch.object(module.sources, 'SOURCES', {'fixture': ('repo', 'commit', hashlib.sha256(candidate).hexdigest())}), \
+                 patch.object(module, 'SUPPLEMENTAL_NOTICES', {('dep', '1'): ('repo', 'a' * 40, hashlib.sha256(notice).hexdigest())}), \
                  patch.object(module.subprocess, 'check_output', side_effect=['root v1|MIT|\ndep v1|MIT|\n', 'cargo fixture', 'rustc fixture']), \
-                 patch.object(module.urllib.request, 'urlopen', return_value=io.BytesIO(crate)):
+                 patch.object(module.urllib.request, 'urlopen', side_effect=[io.BytesIO(crate), io.BytesIO(notice)]):
                 module.collect(stage)
             report = json.loads((stage / 'native-rust-review.json').read_text())
             self.assertEqual(report['candidates'][0]['sourceCommit'], 'commit')
@@ -99,6 +120,7 @@ class CandidateGraphTest(unittest.TestCase):
             self.assertIs(report['binaryCorrespondenceProven'], False)
             dependency = report['candidates'][0]['packages'][0]
             self.assertEqual(dependency['checksum'], sha)
+            self.assertEqual(dependency['supplementalNotice']['commit'], 'a' * 40)
             self.assertTrue(dependency['status'].startswith('blocked-'))
             self.assertEqual((stage / 'native-rust-evidence/dep-1.crate').read_bytes(), crate)
 

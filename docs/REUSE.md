@@ -98,7 +98,14 @@ GPL-2.0 源码入本仓库；fff 中的静态组合、例外适用范围、对�
 对 `.cargo_vcs_info.json` 固定提交进一步核对，heed/heed-traits/heed-types 和 zlob
 仓库根 LICENSE 均为 MIT，可作归档缺失声明的补充候选(逐提交 SHA-256 由收集器
 固定并保留原文)；glidesort 对应提交根目录未找到声明文件，serial 无随包 VCS
-定位信息，二者仍待补齐。补充来源不证明二进制对应，也不覆盖所有内嵌代码。
+定位信息(后续按全 crate 文件匹配补证，见下文)。补充来源不证明二进制对应，也不覆盖所有内嵌代码。
+后续核对 serial-rs `v0.4.0` annotated tag 指向
+`7ed6540c2789b7c7365cd7a89fcb7bac7c567de8`，固定源码归档 SHA-256
+`c8ff1c33d84c0b8a6ee461bcf00d60ec14639856dcd21a14ce29ec5d215b1797`；
+serial 0.4.0 crate 全部 6 个普通文件与该提交 `serial/` 子目录同名文件逐字节相同。
+该提交根 MIT LICENSE SHA-256
+`871afd9d691846de71e0b83812ba9c7ff00bc7b3ad102dedcaa109f2246d52ad` 可据此作为
+精确 crate 的补充声明，收集器重新验证全部文件与摘要；不代表 PTY ELF 整体批准。
 crate 证据索引同时记录 `build.rs` 和 `.cargo_vcs_info.json` 摘要，便于复核
 实际原生构建分支及补充声明提交；收集器从不执行这些构建脚本。
 CI `42544621101` 的 arm64 Linux 候选树为 bun-pty 38/37 registry、fff 120/116
@@ -116,6 +123,15 @@ PT_LOAD≥16K；记录源码/lock/工具/命令/输出摘要，将重建 ELF 替
 唯一固定 glibc 输入，再由 Bun 插件重新计算物理名。它不是原 npm ELF 可重现证明；
 Cargo offline 不隔离第三方 build.rs 的网络/主机访问，Rust sysroot/工具链与 serial
 声明缺口仍须审查。仅诊断构建，不接入正式 bundle/APK，不因此批准分发。
+CI `42574333144`(提交 `13c271b`)固定源码重建、16K/glibc/导出、运行库闭包、
+普通/持久 PTY 与 TUI/无 ELF 释放均通过。下载 ZIP SHA-256
+`4f0af54875ac816333562592dcbc4276fe2ab1eb90c473b06d1802c162ab733a` 与 API
+一致，640 项摘要完整核验；重建 bun-pty ELF SHA-256
+`2f4cbc71ce4b4edb6762dccc584f974ad363076e0c2ad8691732b08c47d2b903`，529104
+字节，仅 NEEDED libc/libgcc_s。固定源码、构建 ELF、Bun 预置副本摘要一致且
+普通 PTY 已检查实际 maps；其它三库仍为 npm ELF，Android **待 P0/P3 实机验证**。
+报告现区分 npm 固定输入与源码重建来源；候选主源码 commit 不再被补充声明
+commit 覆盖，相关回归同时验证两个不同 commit 均保留。
 
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
