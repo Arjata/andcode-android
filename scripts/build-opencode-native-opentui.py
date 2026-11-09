@@ -131,6 +131,11 @@ def patch_zlib_dependencies(text):
         '      "-MMD", "-MF", join(build, `${file}.d`),\n'
         '      "-MT", `zlib/${file}.o`,\n'
         '      "-c",')
+    text = patch_once(text,
+        '  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })',
+        '  console.log("ANDCODE_MEDIA_COMMAND " + JSON.stringify({ command, args, cwd }))\n'
+        '  const result = spawnSync(command, args, { cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024, stdio: ["ignore", "pipe", "inherit"] })\n'
+        '  if (result.stdout) process.stdout.write(result.stdout)')
     return patch_once(text, '  run("make", [`-j${Math.max(1, availableParallelism())}`], build)',
         '  run("make", ["V=1", `-j${Math.max(1, availableParallelism())}`], build)')
 
@@ -156,6 +161,17 @@ def unpack_nested(data, destination):
             output = destination.joinpath(*path.parts)
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(archive.extractfile(member).read())
+
+
+def verify_media_command_log(text):
+    """Require actual captured compiler output, not merely verbose-mode arguments."""
+    commands = [json.loads(line.removeprefix('ANDCODE_MEDIA_COMMAND '))
+                for line in text.splitlines() if line.startswith('ANDCODE_MEDIA_COMMAND ')]
+    if (not any(row['command'] == 'make' and 'V=1' in row['args'] for row in commands)
+            or not any(re.search(r'(?:^|\s)-c(?:\s|$)', line)
+                       and re.search(r'(?:^|\s)-o\s+libavutil/crc\.o(?:\s|$)', line)
+                       for line in text.splitlines())):
+        raise ValueError('Actual verbose FFmpeg compiler output was not retained')
 
 
 def ffmpeg_configuration(text):
@@ -758,6 +774,7 @@ def build(upstream, stage):
             print(logpath.read_text(encoding='utf8')[-14000:], file=sys.stderr)
             raise
     prefix = native / '.cache/ffmpeg/prefix/aarch64-linux'
+    verify_media_command_log((output / 'command-0.log').read_text(encoding='utf8'))
     objects = (prefix / 'objects.txt').read_text().splitlines()
     object_rows = []
     for item in objects:

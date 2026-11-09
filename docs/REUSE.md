@@ -314,10 +314,29 @@ existing configured FFmpeg make rule, substitutes exactly one retained linker
 argument, and links with the same fixed Zig tool. The modified library must differ
 from the baseline, retain the expected ABI/dependencies, and execute the CRC
 reference cases through its exported functions with the counter checked. All
-other retained inputs must remain unchanged. This is a pending single-object
+other retained inputs must remain unchanged. This is a single-object
 replacement experiment, not complete FFmpeg relinking, corresponding-source
 delivery, Bun/JSC compliance or Android approval. It never replaces the staged
 baseline library or the official APK payload.
+
+Independent review of source CI `42669933882` (commit `fd4f1cf`, job
+`129343485963`) passed on 2026-11-10. Artifact `13698572857` contains 536622025
+bytes; ZIP SHA-256 `2abe7e9d916c4ea17cee0ea184705656594532c2dd78bddc2a6440019a789236`
+matches GitHub API metadata. The manifest set is closed at 40273 files, including
+the isolated modification tree. All 446 retained link inputs and 25 extracted
+archive members were rechecked; original same-Zig replay remained byte-identical.
+Exactly one CRC object was substituted, while the staged baseline stayed unchanged.
+The modified library passed ABI/dependency checks and 2304 CRC cases with 6912
+instrumented calls. Baseline OpenTUI SHA-256 is
+`ce992bf35c98b577033d0af0eb448f5e13ea0e63cd1fa9c82aed41671ca8af3e`.
+The 14 generated builtin snapshots (41148 bytes), 119 modified fff packages
+without glidesort, six Bun/WebKit declaration files and Linux runtime gates
+also passed independent rechecking. The media dependency evidence still covers
+334 FFmpeg objects and 733 files, with eleven zlib objects explicitly missing
+dependency files. This artifact predates the zlib dependency recipe update;
+it does not close that gap. Verification log SHA-256 is
+`11c022cef4abb9aca820aa432532ac295570c6faede1699ceaa254288979faff`.
+All redistribution, full relinking and Android approval fields remain false.
 
 The subsequent recipe will request compiler-generated `-MMD` dependencies for
 all eleven zlib objects with explicit `zlib/<name>.o` targets. New builds must
@@ -332,6 +351,12 @@ actual compiler invocations in the existing build log rather than deriving
 commands from DWARF paths or generic flags. This is command evidence only:
 response files, generated inputs, conditional preprocessing and system headers
 still require separate coverage before complete corresponding source is claimed.
+The pinned helper captures subprocess stdout, so `V=1` alone discards that
+evidence. The updated transformation explicitly records command/arguments/cwd
+as JSON and forwards captured stdout before checking the child exit status.
+New builds reject logs without the actual verbose CRC compiler invocation.
+This forwarding fix still awaits trusted CI; earlier recipes are not credited
+with retaining the discarded compiler output.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

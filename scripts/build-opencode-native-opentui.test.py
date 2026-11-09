@@ -162,11 +162,17 @@ class Tests(unittest.TestCase):
 
     def test_zlib_dependency_patch_is_exact_and_rejects_repeat(self):
         source = ('run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);\n'
+                  '  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })\n'
+                  '  if (result.status !== 0) throw new Error("failed")\n'
                   '  run("make", [`-j${Math.max(1, availableParallelism())}`], build)')
         modified = m.patch_zlib_dependencies(source)
         self.assertIn('"-MMD", "-MF", join(build, `${file}.d`)', modified)
         self.assertIn('"-MT", `zlib/${file}.o`', modified)
         self.assertIn('run("make", ["V=1",', modified)
+        self.assertIn('JSON.stringify({ command, args, cwd })', modified)
+        self.assertIn('maxBuffer: 16 * 1024 * 1024', modified)
+        self.assertLess(modified.index('process.stdout.write(result.stdout)'),
+                        modified.index('if (result.status !== 0)'))
         self.assertLess(modified.index('"-MMD"'), modified.index('"-c"'))
         for invalid in [modified, source + source, source.replace('"-c"', '"-S"')]:
             with self.assertRaises(ValueError): m.patch_zlib_dependencies(invalid)
@@ -192,6 +198,19 @@ class Tests(unittest.TestCase):
             self.assertEqual(report['objects'][0]['dependencies'],
                              ['sources/zlib-1.3.2/' + name for name in ['fixture.c', 'zlib.h']])
             self.assertEqual(len(report['files']), 2)
+
+    def test_media_log_requires_actual_compiler_stdout(self):
+        command = 'ANDCODE_MEDIA_COMMAND ' + json.dumps(
+            {'command': 'make', 'args': ['V=1', '-j2'], 'cwd': '/fixture/build'}) + '\n'
+        output = 'cc -I. -c -o libavutil/crc.o src/libavutil/crc.c\n'
+        m.verify_media_command_log(command + output)
+        m.verify_media_command_log(command + 'cc -c src/libavutil/crc.c -o libavutil/crc.o\n')
+        for invalid in [command, output, command + 'CC libavutil/crc.o\n',
+                        command + output.replace('libavutil/crc.o', 'libavutil/crc.o.fake'),
+                        command.replace('V=1', 'V=0') + output,
+                        command + output.replace(' -c ', ' -S ')]:
+            with self.subTest(log=invalid), self.assertRaises(ValueError):
+                m.verify_media_command_log(invalid)
 
     def test_crc_probe_requires_compilation_execution_and_marker(self):
         for mode in ['ok', 'compile-failed', 'run-failed', 'no-marker']:
@@ -653,7 +672,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'media-log', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -667,7 +686,8 @@ class Tests(unittest.TestCase):
                     '    // Test step (native only)')
                 (native / 'scripts/build-ffmpeg.ts').write_text(
                      '  await download(NASM_URL, nasmArchive, NASM_SHA256, "NASM")\n'
-                    '    "--disable-gpl",\n      `-I${zlibSource}`,\n      "-c",\n'
+                     '    "--disable-gpl",\n      `-I${zlibSource}`,\n      "-c",\n'
+                     '  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })\n'
                     '  run("make", [`-j${Math.max(1, availableParallelism())}`], build)')
                 target = upstream / 'node_modules/.bun/@opentui+core-linux-arm64@0.8.1/node_modules/@opentui/core-linux-arm64/libopentui.so'
                 target.parent.mkdir(parents=True)
@@ -684,6 +704,10 @@ class Tests(unittest.TestCase):
                     self.assertTrue(env['ZIG_LOCAL_CACHE_DIR'].endswith('opentui-zig-local-cache'))
                     self.assertEqual(kwargs['cwd'], native)
                     if command[0] == 'bun':
+                        if failure != 'media-log':
+                            kwargs['stdout'].write('ANDCODE_MEDIA_COMMAND ' + json.dumps(
+                                {'command': 'make', 'args': ['V=1', '-j2'], 'cwd': str(native)})
+                                + '\ncc -c -o libavutil/crc.o src/libavutil/crc.c\n')
                         prefix = native / '.cache/ffmpeg/prefix/aarch64-linux'
                         (prefix / 'objects/libavutil').mkdir(parents=True)
                         (prefix / 'objects/libavutil/fixture.o').write_bytes(b'object')
