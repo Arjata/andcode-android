@@ -59,10 +59,11 @@ class LicenseEvidenceTest(unittest.TestCase):
                 module.collect(upstream, stage)
 
     def test_rebuilt_origin_must_match_imported_elf(self):
-        for digest in [hashlib.sha256(b'3').hexdigest(), '0' * 64]:
-            with self.subTest(digest=digest), tempfile.TemporaryDirectory() as work:
+        for index, report_name in [(3, 'native-pty-build-review.json'), (1, 'native-watcher-build-review.json')]:
+          for digest in [hashlib.sha256(str(index).encode()).hexdigest(), '0' * 64]:
+            with self.subTest(index=index, digest=digest), tempfile.TemporaryDirectory() as work:
                 upstream, stage = self.fixture(Path(work))
-                (stage / 'native-pty-build-review.json').write_text(json.dumps({
+                (stage / report_name).write_text(json.dumps({
                     'rebuiltSha256': digest, 'redistributionApproved': False,
                     'sourceCommit': 'fixed-source', 'originalNpmSha256': 'original-npm'}))
                 if digest == '0' * 64:
@@ -71,7 +72,7 @@ class LicenseEvidenceTest(unittest.TestCase):
                 else:
                     module.collect(upstream, stage)
                     result = json.loads((stage / 'native-license-review.json').read_text())
-                    self.assertEqual(result['packages'][3]['binaryOrigin']['kind'], 'fixed-source-ci-rebuild')
+                    self.assertEqual(result['packages'][index]['binaryOrigin']['kind'], 'fixed-source-ci-rebuild')
                     self.assertIs(result['redistributionApproved'], False)
 
 

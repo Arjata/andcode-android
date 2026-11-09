@@ -85,6 +85,8 @@
 | `serial-rs-<commit>.tar.gz` | serial 0.4.0 缺随包声明时的固定上游来源,必须验证 crate 全部普通文件与 serial/ 子目录对应 | `native-rust-evidence/` |
 | `build-opencode-native-pty.py`、`build-opencode-native-pty.test.py` | CI 从固定 bun-pty 源码及 lock 重建 arm64 glibc PTY,校验后仅替换实验 npm 输入 | `scripts/` |
 | `native-pty-build`、`native-pty-build-review.json` | 实验 PTY 源码/构建日志/命令/工具版本/前后 ELF 摘要;不批准分发或 Android 准入 | 实验 stage/ |
+| `build-opencode-native-watcher.py`、`build-opencode-native-watcher.test.py` | 固定 Parcel watcher Linux 源码及 N-API 头重建,验证真实文件事件后仅替换实验 npm 输入 | `scripts/` |
+| `native-watcher-build`、`native-watcher-build-review.json` | watcher 固定源码/头文件归档/编译命令/事件探针与新旧 ELF 摘要;仅 CI 诊断 | 实验 stage/ |
 | `ANDCODE_SERVE_PID` | Linux 源码实验 API 探针读取自有服务 maps 的 PID;不用于设备进程发现或终止 | 实验 CI |
 | `ncurses-build.txt`、`ncurses-upstream-copying` | Android libtinfo 固定源码摘要/构建配置/上游版权声明,随包 manifest 跟踪 | `etc/third-party/` |
 | `proot-app-gate.sh` | 应用终端内手动触发的最小 PRoot/ptrace 准入,输出域/uid/seccomp/退出码;不代表 Ubuntu 完整支持 | `scripts/` |

@@ -1,6 +1,10 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> 版本: v0.4.37 (设计稿) · 日期: 2026-11-09
+> 版本: v0.4.38 (设计稿) · 日期: 2026-11-09
+> v0.4.38 变更(实验 watcher 来源):固定 Parcel watcher 源码、node-addon-api 及
+> Node N-API 头文件归档,显式编译 Linux 源文件列表;16K/glibc/导出检查及 Bun
+> 真实 inotify 创建事件/取消订阅后才替换实验输入。报告区分 npm 与重建来源,
+> 失败不替换,正式 APK 不变,许可与 Android 准入仍未批准。
 > v0.4.37 变更(实验原生来源):固定 bun-pty 源码/lock 在 arm64 Linux CI 离线
 > 构建(先 fetch),16K/glibc/导出门禁后仅替换实验 npm glibc 输入;Bun 再按新摘要
 > 预置,普通 PTY 必须实际映射该副本。保留构建输入/命令/工具/输出,不证明原 npm

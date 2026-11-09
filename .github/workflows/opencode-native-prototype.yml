@@ -34,6 +34,7 @@ jobs:
           python3 scripts/collect-opencode-native-runtime.test.py
           python3 scripts/collect-opencode-native-rust.test.py
           python3 scripts/build-opencode-native-pty.test.py
+          python3 scripts/build-opencode-native-watcher.test.py
       - name: Frozen upstream dependencies and explicit import paths
         run: |
           cd work/upstream
@@ -44,6 +45,9 @@ jobs:
         run: |
           mkdir -p work/native-prototype
           python3 scripts/build-opencode-native-pty.py work/upstream work/native-prototype
+      - name: Fixed-source watcher rebuild and real file event
+        run: |
+          python3 scripts/build-opencode-native-watcher.py work/upstream work/native-prototype
       - name: Build experimental source V2 including Web assets
         env:
           OPENCODE_CHANNEL: beta

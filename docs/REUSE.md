@@ -133,6 +133,17 @@ CI `42574333144`(提交 `13c271b`)固定源码重建、16K/glibc/导出、运行
 报告现区分 npm 固定输入与源码重建来源；候选主源码 commit 不再被补充声明
 commit 覆盖，相关回归同时验证两个不同 commit 均保留。
 
+2026-11-09 watcher 源码重建实验新增固定头文件：`node-addon-api 7.1.1`
+(与固定上游 bun.lock 一致，registry SHA-512 同锁文件)，归档 SHA-256
+`b10455d15a977c0cd17a1cb0eb679e03d939f8ef8d4302eb33e1f78dacc71f82`，同日读取
+随包 LICENSE.md 为 MIT、Copyright 2017 Node.js API collaborators；Node 24.6.0
+官方 headers 归档 SHA-256 `6b891cced2a8ee08fef06b8cb36a890bd6d1dd8aca575e2a392bb78f0970b819`
+与 nodejs.org 官方 SHASUMS256.txt 一致。头文件包含 Node MIT/其它声明，随归档
+保留，不能把整份头文件闭包简化为一种许可。以固定 binding.gyp Linux 分支明确
+源文件列表和 NAPI_VERSION=3 编译，不执行 npm 安装脚本；需验证原生导出及 Bun
+真实 subscribe/write/unsubscribe 文件事件后，才替换实验输入。仍仅诊断，不批准
+准确原 npm 二进制对应、内嵌源码逐文件许可或 Android 准入。
+
 2026-11-09 实验动态库基线：CI 使用 Docker Official `ubuntu:24.04` 安装官方
 `libstdc++6`/`libgcc-s1`，记录实际 image ID、dpkg 二进制/源码包版本、库摘要和
 包内 copyright。同日读取现有 Ubuntu 24.04 实例 gcc-14 包 copyright，确认

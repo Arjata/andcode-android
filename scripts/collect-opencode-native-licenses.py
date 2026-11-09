@@ -35,11 +35,13 @@ def collect(upstream, stage):
         if name not in EXPECTED or (version, license_id) != EXPECTED[name]:
             raise ValueError('Unexpected fixed native package: ' + name)
         origin = {'kind': 'frozen-npm-native-input'}
-        build_report = stage / 'native-pty-build-review.json'
-        if name == 'bun-pty' and build_report.exists():
+        build_reports = {'bun-pty': 'native-pty-build-review.json',
+                         '@parcel/watcher-linux-arm64-glibc': 'native-watcher-build-review.json'}
+        build_report = stage / build_reports[name] if name in build_reports else None
+        if build_report is not None and build_report.exists():
             build = json.loads(build_report.read_text(encoding='utf8'))
             if build['rebuiltSha256'] != digest or build.get('redistributionApproved') is not False:
-                raise ValueError('Rebuilt PTY provenance does not match imported bytes')
+                raise ValueError('Rebuilt native provenance does not match imported bytes')
             origin = {'kind': 'fixed-source-ci-rebuild', 'report': build_report.name,
                       'sourceCommit': build['sourceCommit'], 'originalNpmSha256': build['originalNpmSha256']}
         slug = name.lstrip('@').replace('/', '--')
