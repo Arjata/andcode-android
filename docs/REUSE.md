@@ -10,7 +10,8 @@
 
 | 结论 | 说明 |
 |---|---|
-| ✅ 直接复用(并入/随包分发) | opencode(MIT)、bun(MIT)、dropbear(MIT,实测 LICENSE 原文)、jackpal 终端库(Apache-2.0)、termux-exec(Apache-2.0)——构成交付包核心,保留声明即可 |
+| ✅ Permissive components, subject to their actual dependency closure | opencode (MIT), dropbear (MIT), jackpal terminal library (Apache-2.0), termux-exec (Apache-2.0). Preserve applicable notices and audit bundled dependencies separately; a permissive root license does not approve the complete artifact. |
+| ⚠️ Bun runtime: redistribution review blocked | Bun's root license is MIT, but its statically linked JavaScriptCore/WebKit and other dependencies require separate source, notices and modified-library relinking review. Do not treat the root MIT notice as sufficient approval. |
 | ⚠️ 独立程序聚合(不并源码) | busybox(GPL-2.0,静态单文件)、proot(GPL-2.0,兜底方案)——作为独立可执行文件随包分发,仍须落实适用 GPL 对应源码交付义务;上游 URL 不是合规批准;**禁止把其源码复制进本仓库** |
 | 🔧 仅构建期使用(不随包分发) | patchelf(GPL-3.0,CI 内做 soname 重写)、termux-elf-cleaner(GPL-3.0,按需)——工具本身不进产物,无分发义务 |
 | ⚠️ 参考实现 | termux-pacman/glibc-packages(MIT)——shim 与 sysroot 的对照基线;**Happ1ness-dev/bun-termux(MIT,★85,活跃)——Bun 无 proot 的最佳先行者**;termux-exec(Apache-2.0)——LD_PRELOAD 拦截参照 |
@@ -43,7 +44,7 @@ Docker builds and device instances remain unchanged until independent CI review.
 | opencode | `sst/opencode` (★224.8k, 活跃) | MIT | 移植目标本体;官方发布含 linux-arm64 (glibc) 产物 | 直接运行其产物;需要时打补丁(补丁归本项目 AGPL) |
 | opencode V2.2.6 | `anomalyco/opencode`, tag `v2.2.6` | MIT(2026-11-09 核对该 tag LICENSE) | 与旧版分开的 Web/serve 固定载荷 | 官方 linux-arm64 归档固定 SHA-256 `f2d27600c367e45057d6a16f6a5c2aa8d77b41a9b10d4bc3d849c2f88870e944`;CI 预置为 oc2.bin,不在设备下载 |
 | opencode-pty | `anomalyco/opencode`, `packages/process-daemon`, tag `process-daemon-v0.4.0` (`5e6ee370634842e0efa99ad103c4d767581b47f0`) | MIT(2026-11-08 核对该版本 Cargo.toml/license 与 npm 包 LICENSE) | V2 Web 终端 daemon,协议 7;独立预置副本而非应用数据目录运行期释放 | 开发部署使用官方 aarch64-unknown-linux-gnu 资产,改写 PT_INTERP;`OPENCODE_PTY_BIN`/`OPENCODE_PTY_SOCKET_DIR` 为该版本上游已有配置,无需改源码;正式打包须登记生成 manifest 与 notices(尚待 CI 集成) |
-| bun | `oven-sh/bun` (★96.6k, 活跃) | MIT(静态链接 LGPL-2 JavaScriptCore,按 LGPL 附声明与源码指引) | opencode 运行时;自建产物时的编译基座 | 仅从基线内使用/构建 |
+| bun | `oven-sh/bun` | MIT root; pinned JSC `COPYING.LIB` is GNU Library GPL v2; tinycc is LGPL-2.1. Per-file and actual static-input conditions require separate review. | OpenCode runtime and build tool | Source declarations and URLs alone do not satisfy or approve corresponding-source/relinking obligations; runtime redistribution remains blocked pending closure. |
 | V2 源码预置扩展实验 | `anomalyco/opencode` v2.2.6 提交 `dc2ffcf8bf26f9e669b6aa22b95f50e12be15e06` | MIT;2026-11-09 核对该 tag LICENSE | 手动 CI 从固定源码及 frozen lockfile 构建,不替代当前官方载荷 | Bun 1.4.4 arm64 归档固定 SHA-256 `baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e`;保留上游 LICENSE/lockfile,未完成传递原生库合规/兼容审计前仅作实验 |
 | V2 内嵌原生扩展(实验拆分) | OpenTUI 0.8.1、Parcel watcher 2.5.1、bun-pty 0.4.11、fff-bun 0.10.5 | **OpenTUI 原生包为 MIT AND LGPL-2.1-or-later,不是仅 MIT**;其余 npm metadata 为 MIT。2026-11-09 对固定版本 tarball 校验 registry SHA-512 后检查包内许可证:watcher/bun-pty 附 MIT;fff 平台包未附 LICENSE,不能仅凭 metadata 批准分发 | 将文件导入改为 nativeLibraryDir 显式加载,不伪装临时文件、不让 Bun 运行期释放 ELF | 不取第三方代码入库;OpenTUI 还附 LICENSE-FFMPEG/GHOSTTY/LCMS2/LIBWEBP/STB/WUFFS/ZLIB,需分别追踪源码/构建与重链接义务;传递 Rust/C/C++ notices 和对应源码尚未审查,不得称正式可分发闭包 |
 | dropbear | `mkj/dropbear` (★2.5k, 活跃) | **MIT**(已核实 LICENSE 原文: Matt Johnston, MIT 风格授权) | 三种形态共用的内置 sshd(§4.7 交互入口) | 在基线内构建静态/动态版,随 bundle 分发 |

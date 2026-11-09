@@ -34,6 +34,13 @@ signature/expiry enforcement belongs to CI apt. Host review does not establish
 image-tree equivalence or execute the image. Docker remains the default; no
 device instance changed and no Android or distribution approval is granted.
 
+Further host review matched the SHA-256/size of all six retained `Packages`
+indexes against their InRelease records, then matched all 180 installed binary
+versions and source-package/version pairs to index stanzas. Review JSON SHA-256:
+`69465f98c3abe862c662e4aa8b0c4b0d466dc241f8335dc9b0dad99cec9a3f10`.
+This does not independently verify PGP signatures, download the referenced
+binary/source packages or establish corresponding-source closure.
+
 The next candidate additionally emits `andcode-ubuntu-proot.tar.gz` through the
 existing `prepare-proot-gate.py` transformer. Only the trusted CI build passes
 the canonical archive's computed digest explicitly; the legacy two-argument
