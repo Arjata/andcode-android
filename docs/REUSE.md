@@ -1091,6 +1091,31 @@ complete corresponding source or release/Android approval. The later
 `021f0f5` executable-header guards and lookup-manifest checks still require their
 own artifact review. APK/device inputs remain unchanged and all approvals false.
 
+The hardened `021f0f5` artifact now has its own independent acceptance for run
+`42797400784`. Artifact `13755642301` is 689541422 bytes; its API/downloaded
+ZIP SHA-256 is
+`f34536f0edda14953e26ea8f03781ca69e02ebfa2b5d9cca031c3641ac55fb8c`.
+All nine gates pass over the same closed 65765-file manifest, including swscale
+regeneration (`swscaleMacrosOutputMatched`), the hardened executable
+type/version/machine checks and the lookup-manifest-protected fresh TUI
+(replacement SHA-256
+`68cd119f09f8b340b30099e99d22b51b622060fefd8cdf9712c701b5a6f08bec`, 365
+rendered bytes, no runtime ELF). The sampled-variant TUI additionally rendered
+4428 bytes with replacement SHA-256
+`11304c120d3925809e52cc66e0449d72e1e52083796b5a2af76027a5d975cfab`; render
+volume varies per build and is only a liveness binding, not decoder coverage.
+Fifteen zlib, fourteen relink, fourteen fresh-TUI and 23 source-evidence
+self-consistent mutation rejections pass. One parent gate execution was first
+run from the wrong working directory and failed on a missing helper script; the
+failure log is retained as
+`run-42797400784-verify-opentui-artifact-parent.wrong-cwd-failure.log` and the
+gate was re-run unchanged from the repository root. Nine-gate hardened parent
+acceptance index SHA-256:
+`23a3d605afc5936848d9acbb46ec4b0d48be46f5bfdb4e4dfbba788a8409a2ac`;
+job `129765972263` log SHA-256:
+`74537bd3f4047253be5e76675a2ae7862ce0cdfa7511c773bcbd22bcc86f9bbb`.
+These remain Linux CI results with all approval flags false.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
