@@ -25,7 +25,7 @@ class SourceCollectionTests(unittest.TestCase):
         data = b'synthetic archive; not extracted'
         (directory / 'a_1.0-1.dsc').write_text(
             'Format: 3.0 (quilt)\nSource: a\nVersion: 1:1.0-1\nChecksums-Sha256:\n '
-            + hashlib.sha256(data).hexdigest() + ' ' + str(len(data)) + ' a_1.0.orig.tar.xz\n', encoding='utf-8')
+            + hashlib.sha256(data).hexdigest() + ' ' + str(len(data)) + ' a_1.0.orig.tar.xz\n', encoding='utf-8', newline='\n')
         (directory / 'a_1.0.orig.tar.xz').write_bytes(data)
         return subprocess.CompletedProcess(command, 0, b'apt synthetic output')
 
@@ -71,6 +71,16 @@ class SourceCollectionTests(unittest.TestCase):
             self.assertEqual((output / '0000-a/apt-source.log').read_bytes(), b'failed')
             self.assertFalse((output / 'andcode-ubuntu-source-inputs.json').exists())
 
+    def test_apt_timeout_preserves_partial_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / 'new'
+            def timeout(command, **kwargs):
+                raise subprocess.TimeoutExpired(command, 600, output=b'partial download output')
+            with self.assertRaisesRegex(RuntimeError, 'timed out: a=1:1.0-1'):
+                collection.collect(output, INSTALLED, timeout)
+            self.assertEqual((output / '0000-a/apt-source.log').read_bytes(), b'partial download output')
+            self.assertFalse((output / 'andcode-ubuntu-source-inputs.json').exists())
+
     def test_missing_dsc_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             def incomplete(command, **kwargs):
@@ -88,7 +98,7 @@ class SourceCollectionTests(unittest.TestCase):
                 collection.collect(Path(tmp) / 'new', INSTALLED, collision)
 
     def test_dsc_identity_and_hash_rejection(self):
-        for mode in ['source', 'version', 'hash', 'extra', 'missing']:
+        for mode in ['source', 'version', 'hash', 'extra', 'missing', 'duplicate', 'negative', 'zero', 'unsafe']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 def corrupt(command, **kwargs):
                     result = self.runner(command, **kwargs)
@@ -102,6 +112,13 @@ class SourceCollectionTests(unittest.TestCase):
                         (kwargs['cwd'] / 'a_1.0.orig.tar.xz').write_bytes(b'corrupt')
                     elif mode == 'extra':
                         (kwargs['cwd'] / 'extra.tar.xz').write_bytes(b'extra')
+                    elif mode == 'duplicate':
+                        path.write_bytes((text + 'Source: a\n').encode())
+                    elif mode in ('negative', 'zero'):
+                        path.write_bytes(text.replace(' ' + str(len(b'synthetic archive; not extracted')) + ' ',
+                                                      ' -1 ' if mode == 'negative' else ' 0 ').encode())
+                    elif mode == 'unsafe':
+                        path.write_bytes(text.replace('a_1.0.orig.tar.xz', '../archive.tar.xz').encode())
                     else:
                         path.write_text(text.split('Checksums-Sha256:')[0])
                     return result
@@ -116,10 +133,31 @@ class SourceCollectionTests(unittest.TestCase):
                 text = path.read_text()
                 path.write_text('-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n'
                                 + text + '\n-----BEGIN PGP SIGNATURE-----\nsynthetic signature\n'
-                                '-----END PGP SIGNATURE-----\n', encoding='utf-8')
+                                '-----END PGP SIGNATURE-----\n', encoding='utf-8', newline='\n')
                 return result
             report = collection.collect(Path(tmp) / 'new', INSTALLED, signed)
             self.assertEqual(len(report['sources']), 1)
+
+    def test_malformed_clearsigned_dsc_rejected(self):
+        for mode in ['headers', 'missing-begin', 'missing-end', 'extra-trailer', 'crlf', 'nul']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                def malformed(command, **kwargs):
+                    result = self.runner(command, **kwargs)
+                    path = kwargs['cwd'] / 'a_1.0-1.dsc'
+                    body = path.read_bytes()
+                    text = (b'-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n' + body
+                            + b'\n-----BEGIN PGP SIGNATURE-----\nsynthetic signature\n'
+                            b'-----END PGP SIGNATURE-----\n')
+                    if mode == 'headers': text = text.replace(b'\nHash: SHA512', b'')
+                    elif mode == 'missing-begin': text = text.replace(b'-----BEGIN PGP SIGNATURE-----\n', b'')
+                    elif mode == 'missing-end': text = text.replace(b'-----END PGP SIGNATURE-----\n', b'')
+                    elif mode == 'extra-trailer': text += b'unexpected\n'
+                    elif mode == 'crlf': text = text.replace(b'\n', b'\r\n')
+                    else: text += b'\x00'
+                    path.write_bytes(text)
+                    return result
+                with self.assertRaisesRegex(ValueError, 'source control'):
+                    collection.collect(Path(tmp) / 'new', INSTALLED, malformed)
 
     def test_unexpected_directory_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

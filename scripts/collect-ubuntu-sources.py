@@ -34,10 +34,22 @@ def verify_dsc(directory, files, name, version):
     path = directory / Path(dsc['path']).name
     if path.stat().st_size > 1024**2:
         raise ValueError('Source control file exceeds limit')
-    text = path.read_text(encoding='utf-8')
+    text = path.read_bytes().decode('utf-8')
+    if '\r' in text or '\x00' in text:
+        raise ValueError('Invalid source control framing')
     if text.startswith('-----BEGIN PGP SIGNED MESSAGE-----\n'):
-        text = text.split('\n\n', 1)[1].split('\n-----BEGIN PGP SIGNATURE-----', 1)[0]
+        headers, separator, body = text.partition('\n\n')
+        if (not separator or not re.fullmatch(
+                r'-----BEGIN PGP SIGNED MESSAGE-----\nHash: [A-Za-z0-9, -]+', headers)):
+            raise ValueError('Invalid source control signed headers')
+        text, separator, signature = body.partition('\n-----BEGIN PGP SIGNATURE-----\n')
+        if (not separator or signature.count('-----END PGP SIGNATURE-----') != 1
+                or not signature.rstrip().endswith('-----END PGP SIGNATURE-----')):
+            raise ValueError('Invalid source control signature framing')
+        # Framing only: authenticated apt, not this parser, verifies repository data.
         text = '\n'.join(line[2:] if line.startswith('- ') else line for line in text.splitlines())
+    elif '-----BEGIN PGP' in text or '-----END PGP' in text:
+        raise ValueError('Invalid source control framing')
     fields, last = {}, None
     for line in text.splitlines():
         if not line:
@@ -61,7 +73,7 @@ def verify_dsc(directory, files, name, version):
         sha, size, filename = line.split()
         if (not re.fullmatch('[0-9a-f]{64}', sha)
                 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.+:~_\-]*', filename)
-                or filename in expected):
+                or filename in expected or not size.isdecimal() or int(size) <= 0):
             raise ValueError('Invalid source control checksum')
         expected[filename] = (sha, int(size))
     actual = {Path(row['path']).name: (row['sha256'], row['bytes'])
@@ -86,11 +98,18 @@ def collect(output, installed, runner=subprocess.run):
                    '--yes', '--download-only', '--only-source', 'source', '--', name + '=' + version]
         # apt may drop to _apt; a fresh root-owned directory remains non-writable
         # to _apt and apt reports its root download fallback. No sandbox override.
-        completed = runner(command, cwd=directory, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, timeout=600, check=False,
-                           env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C',
-                                'DEBIAN_FRONTEND': 'noninteractive'})
         log = directory / 'apt-source.log'
+        try:
+            completed = runner(command, cwd=directory, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, timeout=600, check=False,
+                               env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C',
+                                    'DEBIAN_FRONTEND': 'noninteractive'})
+        except subprocess.TimeoutExpired as error:
+            partial = error.stdout or b''
+            with log.open('xb') as stream:
+                stream.write(partial)
+            print(partial.decode('utf-8', errors='replace')[-16384:], flush=True)
+            raise RuntimeError('Exact source acquisition timed out: ' + name + '=' + version) from error
         if log.exists() or log.is_symlink():
             raise ValueError('Unexpected source log collision')
         log.write_bytes(completed.stdout)

@@ -430,6 +430,23 @@ commands are evidence, never re-executed as input; they do not capture complete
 preprocessing, system headers, generated-input provenance, surviving sections or
 license obligations. All approval fields remain false.
 
+The external per-file media notice report for run `42676981376` has also passed
+independent byte/relationship/quotation binding checks: all 755 file digests,
+345 object mappings and 751 quoted comment blocks match the retained source
+bytes and line ranges. Raw dependency lists contain 8719 references but 8717
+unique file/object pairs; repeated `.d` entries for two headers are deduplicated
+only in the report, without changing build evidence. Report JSON SHA-256 is
+`94f40064ffe7d9adecebf87f3da1d5d6842b67ac7ec85f9abc15d4edd4527cf0`;
+parent binding-review JSON SHA-256 is
+`3511cc722234bd43932cd1426ffbe8398689e7a37ab34857210e19ef6c8682f6`.
+Manual classifications remain review candidates, not independently approved
+license decisions: 711 LGPL-header candidates, 28 permissive candidates and
+16 inputs with no explicit in-file grant. The ISC-style grant in `faandct.c`
+and its IJG provenance reference do not by themselves establish that derived
+material has no IJG obligations. Three other files contain actual IJG terms.
+Generated-input provenance, complete notices and distribution approval remain
+open; the external reports are not an APK notice payload.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
@@ -458,6 +475,16 @@ ar archives `libJavaScriptCore.a`, `libWTF.a`, `libbmalloc.a`, `libicutu.a`,
 `2970206ecea0b3c36570112ef8e2ac611413cc0c2ac567a36fcfc6f6bd56d818`.
 These are Library-side objects, not Bun application-side objects; this is not
 a complete relink kit or proof that the shipped Bun ELF used these exact inputs.
+Read-only ar inspection additionally found 1023 LLVM-bitcode members and one
+ELF64 AArch64 ICU-data object (plus archive metadata), inventory SHA-256
+`4ef8fcae3aebaf04f65b4e541119055d360b159f6ee6b8fdf60ab1260fa62753`.
+Bitcode magic does not establish its target or producer compatibility. The
+archive also contains `compile_commands.json` (727 entries, SHA-256
+`532cd68b4955056d5bfcfd2a193bd13d143aeb22e786679813558b983eae9e63`),
+declaring Clang 23, `aarch64-unknown-linux-gnu` and `/opt/sysroot-aarch64`.
+This is archive-contained metadata, not independently observed compiler output
+or a complete source/object mapping; it must not be conflated with the media
+build's retained actual-command evidence.
 Corresponding Library source, application-side materials, build/toolchain
 closure and practical modified-library relinking remain unproven. This artifact
 is retained outside the repository and is not an APK input. Upstream Android/

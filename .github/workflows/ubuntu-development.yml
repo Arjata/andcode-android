@@ -150,5 +150,6 @@ jobs:
             dist/ubuntu-mmdebstrap/*.log
             dist/ubuntu-mmdebstrap/mmdebstrap-copyright
             dist/ubuntu-mmdebstrap/ubuntu-sources.list
+            dist/ubuntu-mmdebstrap/andcode-ubuntu-source-inputs/**/apt-source.log
           if-no-files-found: warn
           retention-days: 7

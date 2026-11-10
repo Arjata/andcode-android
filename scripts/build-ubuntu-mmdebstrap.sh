@@ -80,11 +80,16 @@ sudo chroot "$ROOT" dpkg-query -W '-f=${binary:Package}\t${Version}\t${source:Pa
   > "$OUT/andcode-ubuntu-packages.tsv"
 # Download exact source versions without unpacking or running source build rules.
 # This is a new disposable guest tree, not a device instance or release importer.
+source_status=0
 sudo chroot "$ROOT" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin \
   /usr/bin/python3 - /tmp/andcode-ubuntu-source-inputs < "$REPO/scripts/collect-ubuntu-sources.py" \
-  2>&1 | tee "$OUT/andcode-ubuntu-source-acquisition.log"
-sudo cp -a "$ROOT/tmp/andcode-ubuntu-source-inputs" "$OUT/andcode-ubuntu-source-inputs"
-sudo chown -R "$(id -u):$(id -g)" "$OUT/andcode-ubuntu-source-inputs"
+  2>&1 | tee "$OUT/andcode-ubuntu-source-acquisition.log" || source_status=$?
+# Copy partial evidence before cleanup even when apt or .dsc validation failed.
+if [ -d "$ROOT/tmp/andcode-ubuntu-source-inputs" ]; then
+  sudo cp -a "$ROOT/tmp/andcode-ubuntu-source-inputs" "$OUT/andcode-ubuntu-source-inputs"
+  sudo chown -R "$(id -u):$(id -g)" "$OUT/andcode-ubuntu-source-inputs"
+fi
+[ "$source_status" -eq 0 ] || exit "$source_status"
 sudo rm -rf --one-file-system -- "$ROOT/tmp/andcode-ubuntu-source-inputs"
 # Remove only build-created package indexes and device nodes in this new tree.
 sudo find "$ROOT/var/lib/apt/lists" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +

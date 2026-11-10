@@ -111,7 +111,17 @@ guest apt (`--download-only --only-source`). It neither extracts source archives
 nor executes source build rules. `andcode-ubuntu-source-inputs/` retains per-
 source `.dsc`/archive files, actual apt commands/logs and a SHA-256 inventory
 (`andcode-ubuntu-source-inputs.json`); these are copied out of a new temporary
-guest directory before the immutable rootfs is exported. Missing exact versions,
+guest directory before the immutable rootfs is exported. The collector rejects
+malformed cleartext-signature framing rather than silently stripping it; this
+is not an independent PGP signature verifier. A timed-out apt download retains
+and reports its partial output, without emitting a successful source inventory.
+The build recipe copies partial source evidence outside the disposable guest
+before failing; the failure-only diagnostic artifact includes per-package apt
+logs, not an approved source payload or rootfs. A failed source pipeline cannot
+continue to image construction or successful candidate upload.
+These additional guards passed 12 synthetic Python tests on Windows; Linux
+recipe execution and real source downloads remain separate CI requirements.
+Missing exact versions,
 apt failures, existing output or unexpected download paths fail the candidate.
 This new acquisition path awaits Linux CI and independent archive verification.
 It does not automatically close source completeness, patches/build-inputs,

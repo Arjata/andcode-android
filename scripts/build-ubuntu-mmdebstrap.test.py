@@ -9,6 +9,34 @@ import unittest
 
 @unittest.skipUnless(sys.platform == 'linux', 'Native Linux CI only; no local Bash validation')
 class RecipeGuards(unittest.TestCase):
+    def test_failed_source_pipeline_preserves_partial_logs_and_status(self):
+        recipe = Path(__file__).with_name('build-ubuntu-mmdebstrap.sh').read_text()
+        block = recipe[recipe.index('source_status=0'):recipe.index('# Remove only build-created')]
+        for status in [0, 23]:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as tmp:
+                root, out, repo = (Path(tmp) / name for name in ['root', 'out', 'repo'])
+                for directory in [root / 'tmp/andcode-ubuntu-source-inputs/0000-a', out, repo / 'scripts']:
+                    directory.mkdir(parents=True)
+                (repo / 'scripts/collect-ubuntu-sources.py').write_bytes(b'fixture')
+                (root / 'tmp/andcode-ubuntu-source-inputs/0000-a/apt-source.log').write_bytes(b'partial')
+                script = '''set -euo pipefail
+sudo() {
+  case "$1" in
+    chroot) cat >/dev/null; printf 'download output\\n'; return "$SOURCE_STATUS" ;;
+    cp) shift; cp "$@" ;;
+    chown) return 0 ;;
+    rm) return 0 ;;
+    *) return 99 ;;
+  esac
+}
+''' + block + '\n'
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
+                                        env=dict(os.environ, ROOT=str(root), OUT=str(out), REPO=str(repo),
+                                                 SOURCE_STATUS=str(status)), timeout=10)
+                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertEqual((out / 'andcode-ubuntu-source-inputs/0000-a/apt-source.log').read_bytes(), b'partial')
+                self.assertEqual((out / 'andcode-ubuntu-source-acquisition.log').read_text(), 'download output\n')
+
     def test_fixed_snapshot_sources_are_explicit_and_no_security_bypass(self):
         recipe = Path(__file__).with_name('build-ubuntu-mmdebstrap.sh').read_text()
         source_config = recipe[recipe.index('SNAPSHOT='):recipe.index('command -v mmdebstrap')]
