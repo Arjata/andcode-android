@@ -27,6 +27,8 @@ def relink(output, env):
             'relinkingApproved', 'fullCorrespondingSourceApproved']):
         raise ValueError('Unexpected source-rule approval')
     protected = {source_review: digest(source_review), baseline_review: digest(baseline_review)}
+    baseline_library = output / 'libopentui.so'
+    protected[baseline_library] = digest(baseline_library)
     directory = output / 'modified-media-source-relink'
     directory.mkdir(exist_ok=False)
     zig = Path(shutil.which('zig') or '').resolve(strict=True)
@@ -87,6 +89,9 @@ def relink(output, env):
         return done.stdout
 
     run(command, 'link.log', 120)
+    if binary.read_bytes() == baseline_library.read_bytes():
+        raise ValueError('Fresh source-rule library did not change')
+    protected[binary] = digest(binary)
     for name in ['link.map', 'archive-extraction.tsv']:
         if not (directory / name).is_file() or not (directory / name).stat().st_size:
             raise ValueError('Missing fresh source-relink map/extraction evidence')
@@ -115,6 +120,7 @@ def relink(output, env):
         elif arg == str(prior / 'crc-probe'): compile_command[i] = str(directory / 'crc-probe')
     run(compile_command, 'crc-compile.log', 60)
     media.pty.audit.elf((directory / 'crc-probe').read_bytes())
+    protected[directory / 'crc-probe'] = digest(directory / 'crc-probe')
     stdout = run([str(directory / 'crc-probe')], 'crc-run.log', 60)
     if (b'ANDCODE_SOURCE_FFMPEG_CRC_OK 2304 cases (Linux only)' not in stdout
             or b'ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)' not in stdout):

@@ -874,6 +874,10 @@ cover link failures/timeouts, object-set/input drift, missing map/ABI/CRC eviden
 and changed dependencies. Actual execution still requires native CI; this is
 not TUI/decoder coverage, original object equivalence, a full toolchain/source
 closure, LGPL relinking approval or Android admission. No baseline is replaced.
+The fresh library must differ from the retained baseline. Baseline library,
+fresh library and CRC probe bytes are guarded against mutation through probe
+completion; synthetic cases reject unchanged replacement bytes and mutation of
+each executable/library as well as retained inputs.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

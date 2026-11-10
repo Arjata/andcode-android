@@ -17,10 +17,12 @@ class Tests(unittest.TestCase):
     def test_relink_and_fail_closed(self):
         modes = ['ok', 'approval', 'source-drift', 'duplicate', 'set-gap', 'retained-drift',
                  'argument', 'link', 'timeout', 'map', 'extraction', 'needed', 'abi',
-                 'crc-shape', 'crc', 'mutation']
+                 'crc-shape', 'crc', 'mutation', 'baseline-mutation', 'library-mutation',
+                 'probe-mutation', 'unchanged-library']
         for mode in modes:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve(); output = root / 'build'; output.mkdir()
+                (output / 'libopentui.so').write_bytes(b'baseline library')
                 directory = output / 'modified-media-source-relink'
                 zig = root / 'tools/zig/zig'; zig.parent.mkdir(parents=True); zig.write_bytes(b'zig')
                 archive = zig.parent.parent / 'zig.tar.xz'; archive.write_bytes(b'fixed zig archive')
@@ -65,7 +67,7 @@ class Tests(unittest.TestCase):
                         self.assertEqual(command[2:4], [str(obj), str(other)])
                         if mode == 'link': raise subprocess.CalledProcessError(1, command)
                         if mode == 'timeout': raise subprocess.TimeoutExpired(command, 120, stderr=b'partial')
-                        (directory / 'libopentui.so').write_bytes(b'relinked library')
+                        (directory / 'libopentui.so').write_bytes(b'baseline library' if mode == 'unchanged-library' else b'relinked library')
                         (directory / 'link.map').write_text('missing' if mode == 'map' else str(obj))
                         (directory / 'archive-extraction.tsv').write_bytes(b'bad' if mode == 'extraction' else b'reference\textracted\tsymbol\n')
                     elif command[0] == 'bun':
@@ -79,6 +81,9 @@ class Tests(unittest.TestCase):
                         stdout = b'bad' if mode == 'crc' else (b'ANDCODE_SOURCE_FFMPEG_CRC_OK 2304 cases (Linux only)\n'
                             b'ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)\n')
                         if mode == 'mutation': other.write_bytes(b'changed')
+                        if mode == 'baseline-mutation': (output / 'libopentui.so').write_bytes(b'changed')
+                        if mode == 'library-mutation': (directory / 'libopentui.so').write_bytes(b'changed')
+                        if mode == 'probe-mutation': (directory / 'crc-probe').write_bytes(b'changed')
                     return subprocess.CompletedProcess(command, 0, stdout, b'')
 
                 with ExitStack() as stack:
