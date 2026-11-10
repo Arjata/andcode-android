@@ -160,6 +160,56 @@ class Tests(unittest.TestCase):
             self.assertEqual(report['objectsWithoutDependencyFiles'], [item])
             self.assertEqual(report['files'], [])
 
+    def test_media_generator_replay_exact_fail_closed_and_baseline_preserved(self):
+        for mode in ['ok', 'drift', 'failed', 'timeout', 'input-mutation', 'baseline-mutation', 'next-input-mutation']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                cache = root / 'native/.cache/ffmpeg'
+                build = cache / 'build/aarch64-linux/libswscale/aarch64'
+                source = cache / 'sources/ffmpeg-9.0.2/libswscale/aarch64'
+                build.mkdir(parents=True)
+                source.mkdir(parents=True)
+                (build / 'ops_asmgen').write_bytes(b'generator')
+                (source / 'ops_asmgen.c').write_bytes(b'source')
+                (source / 'Makefile').write_bytes(b'rules')
+                for name, data in [('ops_lookup.gen.c', b'lookup'), ('ops_neon.gen.S', b'neon')]:
+                    (build / name).write_bytes(data)
+                output = root / 'output'
+                output.mkdir()
+                def run(command, **kwargs):
+                    self.assertEqual(kwargs['cwd'], output / 'media-generator-replay')
+                    self.assertEqual(kwargs['timeout'], 60)
+                    if mode == 'input-mutation':
+                        (source / 'ops_asmgen.c').write_bytes(b'changed')
+                    if mode == 'baseline-mutation' and command[-1] == '-ops':
+                        (build / 'ops_lookup.gen.c').write_bytes(b'changed')
+                    if mode == 'next-input-mutation' and command[-1] == '-lookup':
+                        (build / 'ops_neon.gen.S').write_bytes(b'changed')
+                    if mode == 'timeout':
+                        raise subprocess.TimeoutExpired(command, 60, stderr=b'partial diagnostic')
+                    payload = b'lookup' if command[-1] == '-lookup' else b'neon'
+                    return subprocess.CompletedProcess(command, 7 if mode == 'failed' else 0,
+                                                       b'different' if mode == 'drift' else payload, b'diagnostic')
+                with patch.object(m.subprocess, 'run', side_effect=run):
+                    if mode == 'ok':
+                        report = m.replay_media_generators(root / 'native', output, {})
+                        self.assertEqual(len(report['outputs']), 2)
+                        self.assertFalse(report['redistributionApproved'])
+                        self.assertEqual((build / 'ops_lookup.gen.c').read_bytes(), b'lookup')
+                        with self.assertRaises(FileExistsError):
+                            m.replay_media_generators(root / 'native', output, {})
+                    elif mode == 'failed':
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            m.replay_media_generators(root / 'native', output, {})
+                        self.assertTrue((output / 'media-generator-replay/lookup.log').exists())
+                    elif mode == 'timeout':
+                        with self.assertRaises(subprocess.TimeoutExpired):
+                            m.replay_media_generators(root / 'native', output, {})
+                        self.assertIn(b'partial diagnostic', (output / 'media-generator-replay/lookup.log').read_bytes())
+                    else:
+                        with self.assertRaises(ValueError):
+                            m.replay_media_generators(root / 'native', output, {})
+
     def test_zlib_dependency_patch_is_exact_and_rejects_repeat(self):
         source = ('run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);\n'
                   '  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })\n'
@@ -718,7 +768,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -829,6 +879,8 @@ class Tests(unittest.TestCase):
                         patch.object(m.pty.rust.sources, 'inspect_archive', return_value={}), \
                         patch.object(m.pty.rust, 'unpack_candidate', return_value=source), \
                         patch.object(m, 'unpack_nested'), \
+                        patch.object(m, 'replay_media_generators', return_value={'outputs': ['lookup', 'neon']},
+                                     side_effect=ValueError('Generator replay failed') if failure == 'generator-replay' else None), \
                         patch.object(m, 'probe_ffmpeg_crc', return_value={'cases': 2304},
                                      side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None), \
                         patch.object(m, 'replay_link_inputs', return_value={'byteIdentical': True},
@@ -855,6 +907,7 @@ class Tests(unittest.TestCase):
                                          hashlib.sha256(b'linked object').hexdigest())
                         self.assertEqual(len(report['zigGeneratedSources']['files']), 1)
                         self.assertEqual(report['modifiedCrcRelink']['modifiedCalls'], 6912)
+                        self.assertEqual(len(report['ffmpegGeneratorReplay']['outputs']), 2)
                         self.assertEqual(len(report['ffmpegCompileCommands']['objects']), 1)
                         self.assertIs(report['zigGeneratedSources']['sourceAttributionApproved'], False)
                         self.assertEqual(target.read_bytes(), b'rebuilt')

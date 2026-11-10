@@ -368,6 +368,60 @@ def ffmpeg_source_inputs(native, prefix, objects):
             'scope': 'Recorded non-system compiler dependencies only; missing objects explicit, no complete compiler-input or per-file license approval'}
 
 
+def replay_media_generators(native, output, env):
+    """Replay two fixed host-generator modes without modifying build inputs."""
+    cache = (native / '.cache/ffmpeg').resolve(strict=True)
+    build = cache / 'build/aarch64-linux'
+    generator = (build / 'libswscale/aarch64/ops_asmgen').resolve(strict=True)
+    generator.relative_to(build)
+    source = (cache / 'sources/ffmpeg-9.0.2/libswscale/aarch64/ops_asmgen.c').resolve(strict=True)
+    rule = (cache / 'sources/ffmpeg-9.0.2/libswscale/aarch64/Makefile').resolve(strict=True)
+    inputs = [generator, source, rule]
+    for path in inputs:
+        path.relative_to(cache)
+    baseline = {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs}
+    directory = output / 'media-generator-replay'
+    directory.mkdir(exist_ok=False)
+    rows = []
+    modes = [('-lookup', 'ops_lookup.gen.c', 'lookup.log'),
+             ('-ops', 'ops_neon.gen.S', 'neon.log')]
+    expected_inputs, originals = {}, {}
+    for _, filename, _ in modes:
+        expected = (build / 'libswscale/aarch64' / filename).resolve(strict=True)
+        expected.relative_to(build)
+        original = expected.read_bytes()
+        expected_inputs[expected] = hashlib.sha256(original).hexdigest()
+        originals[filename] = (expected, original)
+    for mode, filename, logname in modes:
+        expected, original = originals[filename]
+        command = [str(generator), mode]
+        log = directory / logname
+        try:
+            done = subprocess.run(command, cwd=directory, env=env, capture_output=True, timeout=60)
+        except subprocess.TimeoutExpired as error:
+            log.write_bytes((shlex.join(command) + '\nTIMEOUT\n').encode() + (error.stderr or b''))
+            raise
+        log.write_bytes((shlex.join(command) + '\n').encode() + done.stderr)
+        done.check_returncode()
+        reproduced = directory / filename
+        reproduced.write_bytes(done.stdout)
+        if not original or done.stdout != original or expected.read_bytes() != original:
+            raise ValueError('Media generator replay differs from retained input: ' + filename)
+        rows.append({'command': command, 'cwd': str(directory),
+                     'input': expected.relative_to(cache).as_posix(),
+                     'output': reproduced.relative_to(output).as_posix(),
+                     'bytes': len(original), 'sha256': hashlib.sha256(original).hexdigest(),
+                     'log': log.relative_to(output).as_posix(),
+                     'logSha256': hashlib.sha256(log.read_bytes()).hexdigest()})
+    for path, digest in {**baseline, **expected_inputs}.items():
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError('Media generator replay changed its baseline inputs')
+    return {'inputs': [{'path': path.relative_to(cache).as_posix(), 'sha256': digest,
+                        'bytes': path.stat().st_size} for path, digest in baseline.items()],
+            'outputs': rows, 'redistributionApproved': False, 'androidApproved': False,
+            'scope': 'Two modes of retained FFmpeg host generator reproduced configured inputs byte-for-byte; not a rebuilt generator, all generators, source closure or license approval'}
+
+
 def probe_ffmpeg_crc(prefix, output, env):
     """Exercise retained libavutil against an independent bitwise reference."""
     source, binary = output / 'crc-probe.c', output / 'crc-probe'
@@ -868,6 +922,7 @@ def build(upstream, stage):
     compile_commands = media_compile_commands((output / 'command-0.log').read_text(encoding='utf8'),
                                               native, prefix, objects, source_inputs)
     notices = retain_ffmpeg_notices(native, source_inputs, output)
+    generator_replay = replay_media_generators(native, output, env)
     crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
@@ -893,6 +948,7 @@ def build(upstream, stage):
         'ffmpegSourceInputs': source_inputs,
         'ffmpegCompileCommands': compile_commands,
         'ffmpegNoticeCandidates': notices,
+        'ffmpegGeneratorReplay': generator_replay,
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
         'finalLinkReplay': replay,

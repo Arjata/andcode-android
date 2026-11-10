@@ -447,6 +447,34 @@ material has no IJG obligations. Three other files contain actual IJG terms.
 Generated-input provenance, complete notices and distribution approval remain
 open; the external reports are not an APK notice payload.
 
+The follow-up external generated-input report for run `42681418653` passed a
+separate parent byte/digest/direct-rule binding review. All 16 flagged inputs
+match run `42676981376`; four are byte-identical to files shipped in the pinned
+upstream source archives (zlib `crc32.h`, `trees.h`, `inffixed.h`, and FFmpeg
+`uops_macros.h`). Ten generator/rule source nodes and seven direct host-generator
+inputs match the pinned archives. In particular, zlib 1.3.2's `inffixed.h`
+maintenance generator is `inftrees.c` under `MAKEFIXED`, not `infback.c`.
+Research JSON SHA-256:
+`fddc19b7a11b93d8a47f095478d8f81f339fd5cba20e61440b8ee17dc845a1b3`;
+parent binding-review JSON SHA-256:
+`d38f49c53704b4e173a0aa4e855791a8cd20de195bc15e0f6384a2322650c6f4`.
+These checks do not independently approve legal classifications, prove all
+provenance, or execute any generator. The research report makes no regeneration
+claim. Upstream-shipped pre-generated inputs must not be described as generated
+by the observed normal build merely because maintenance generators exist.
+
+The next Linux-only recipe replays the retained FFmpeg `ops_asmgen` host tool
+in an isolated `media-generator-replay/` directory, once with `-lookup` and once
+with `-ops`, retaining stdout, stderr/command logs and digests. Both outputs must
+match the configured `ops_lookup.gen.c` / `ops_neon.gen.S` inputs byte-for-byte;
+the generator, source, rule and baseline outputs must remain unchanged. Failure,
+timeout, drift or a pre-existing replay directory prevents staging. This is a
+two-mode host-tool replay, not a rebuild of the generator, configure replay,
+maintenance-table regeneration, complete source closure or license approval.
+The baseline and modified CRC experiments and all approval fields stay unchanged.
+Windows synthetic tests cover the replay and build failure gate; real Linux
+execution remains a separate CI requirement.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
