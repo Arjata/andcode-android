@@ -591,6 +591,42 @@ This acceptance remains post-build sampling only: it does not establish original
 compile-time input capture, original-object reconstruction, complete modified
 media replacement, complete corresponding source or legal/Android approval.
 
+Observed Zig-header notice research v2 (2026-11-10) covers exactly those 192
+paths: 27 compiler headers, 34 Linux UAPI headers and 131 glibc headers. Parent
+review independently compared every observed header's retained preprocessing
+snapshot bytes with its Zig resource archive member in both artifacts
+`13737997725` and `13740806776`, checked the reported notice lines/byte ranges,
+and verified 210 selected resource members (192 headers plus 18 license files).
+All 945 content-snapshot payload paths are present; v1's contrary statement was
+a ZIP-prefix error and is withdrawn, with v1 preserved as superseded evidence.
+V2 report SHA-256:
+`18da5b8b9ed5adfb8d3c6f209312888e740f8f54501eae92f5bcbc6dcdbd3e43`;
+parent byte/citation review SHA-256:
+`c1d03b59752fe3e2a24544aeafaca8fc53f1bda8e60d2362d0a18ebcdc18bbcc`.
+
+Candidate grants remain file-specific: 26 compiler headers have embedded
+Apache-2.0 WITH LLVM-exception SPDX notices; `arm_neon.h` has an unsigned MIT-style
+grant, not that SPDX identifier. Among UAPI headers, 25 have GPL-2.0 WITH
+Linux-syscall-note identifiers and `linux/sockios.h` has GPL-2.0+; eight lack
+embedded grant markers. Among glibc headers, 111 have LGPL-2.1-or-later notices,
+one has a Regents BSD-style notice, and 19 lack embedded grant markers. The 28
+unresolved paths still need upstream provenance/applicability review; absence of
+an embedded marker does not establish absence of a license. `sys/ttydefaults.h`
+must retain its own complete copyright/USL paragraph and numbered clauses;
+glibc `LICENSES` has different copyright text and an explicit removed-clause
+entry and is not a verbatim substitute.
+
+Full Apache/LLVM-exception text is physically retained in the WASI/libc++-family
+license files; v1's blanket missing-full-text statement is withdrawn. Physical
+co-location alone does not bind those files to a particular observed header.
+Parent full-byte inventory/heading review SHA-256:
+`1e120ef558a960d4eb4f2b902475f11d8958d691a8bfe5703a92522dc779193d`.
+The 18-file inventory's lack of GPL/LGPL/syscall-note full-text heading matches
+is only a bounded observation, not proof of absence from all archive text.
+These are notice candidates and evidence bindings, not formal notices, original
+compile-input provenance, complete corresponding source or distribution,
+relinking or Android approval; every approval field remains false.
+
 The next bounded diagnostic compiles every retained post-build `.i` / `.s`
 sample with the same fixed Zig target and reviewed code-generation flags into
 separate AArch64 relocatable objects. Preprocessor include/definition options
