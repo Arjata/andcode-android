@@ -1206,6 +1206,36 @@ installed and no target code is generated or linked. Exact application objects,
 generated inputs, dependency/toolchain closure and practical modified-JSC Bun
 relinking remain missing; all four approval flags remain false.
 
+The native CI source collector now pins 25 selected Bun/WebKit declaration
+files rather than six, including application/Rust/codegen/source-acquisition
+rules, toolchain/sysroot declarations, linker script, Cargo manifest/lock and
+allocator patch. Every selected file must validate before any selected file is
+written; a later digest/size failure leaves no partially accepted file set.
+Thirteen collector regressions pass on Python 3.12/3.13, including late failure
+and material-rule inventory checks. A separate parent invocation fetches all
+25 fixed raw URLs over explicitly verified TLS and validates the same pinned
+hashes; review SHA-256:
+`a04906ffb8e3436cf446034073eaec47830ffed70ec65b950c0fa4672e9e2786`.
+The enlarged collector still needs its own native CI result; it does not execute
+the upstream scripts or approve complete corresponding source or relinking.
+
+Read-only static inventory of Bun's fixed dependency index retains all 24
+imported dependency modules, 45 literal patch files and 21 GitHub commit pins;
+review SHA-256:
+`d76598ece34ac91ab872397322f33f5748c1870f89b9513f3f8252aca17d09e6`.
+These are source declarations, not evaluated Linux/arm64 feature selection or
+complete fetch inputs. In particular, Bun's declared zlib provider is
+`zlib-ng/zlib-ng@12731092979c6d07f42da27da673a9f6c7b13586`, not media
+zlib 1.3.2 or Zig bootstrap zlib 1.3.1. Dynamic/non-patch inputs still need review.
+The fixed root Cargo material inventory separately retains 123 workspace/root
+manifests, 305 lock packages (180 registry identities/checksums) and 126 declared
+path references. Two referenced manifests are absent from the Bun archive:
+`vendor/rust-argon2/Cargo.toml` and `vendor/lolhtml/Cargo.toml`; their acquisition
+is declared separately. Inventory SHA-256:
+`4df3e7c1a7df9cc1083bfd2274311eac29d61861b985e2606506200e2b0162d4`.
+No cargo resolution, actual target/features/build scripts, dependency license
+closure, practical relink or distribution/Android approval is established.
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。

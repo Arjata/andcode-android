@@ -89,6 +89,25 @@ class SourceEvidenceTest(unittest.TestCase):
                     with self.assertRaises(ValueError):module.collect_runtime_declarations(Path(work))
                 self.assertFalse((Path(work) / 'runtime-declarations/bun/scripts/build/deps/webkit.ts').exists())
 
+    def test_late_runtime_declaration_failure_publishes_no_files(self):
+        content = b'valid fixed source text\n'
+        for changed in [b'changed', b'x' * (1024 * 1024 + 1)]:
+            with self.subTest(bytes=len(changed)), tempfile.TemporaryDirectory() as work:
+                files = {'LICENSE.md': module.digest(content), 'Cargo.lock': module.digest(content)}
+                with patch.object(module, 'RUNTIME_DECLARATIONS', {'bun': ('oven-sh/bun', module.BUN_COMMIT, files)}), \
+                        patch.object(module, 'download_archive', side_effect=[content, changed]):
+                    with self.assertRaises(ValueError): module.collect_runtime_declarations(Path(work))
+                self.assertFalse(list((Path(work) / 'runtime-declarations').rglob('*')))
+
+    def test_bun_build_declarations_include_material_relink_rules(self):
+        files = module.RUNTIME_DECLARATIONS['bun'][2]
+        for path in ['scripts/build/rust.ts', 'scripts/build/flags.ts', 'scripts/build/compile.ts',
+                     'scripts/build/codegen.ts', 'scripts/build/source.ts', 'scripts/build/deps/mimalloc.ts',
+                     'scripts/build/ci-images/spec.ts', 'rust-toolchain.toml', 'src/linker.lds',
+                     'Cargo.toml', 'Cargo.lock', 'patches/mimalloc/new-oom-hook.patch']:
+            self.assertIn(path, files)
+            self.assertRegex(files[path], r'^[0-9a-f]{64}$')
+
     def test_notices_build_inputs_and_nested_sources(self):
         nested = archive([('yoga/LICENSE', b'MIT example')])
         data = archive([('repo/LICENSE', b'MIT example'), ('repo/Cargo.toml', b'[package]\n'),

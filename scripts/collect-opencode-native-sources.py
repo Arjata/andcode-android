@@ -35,6 +35,25 @@ RUNTIME_DECLARATIONS = {
         'LICENSE.md': '362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd',
         'scripts/build/deps/webkit.ts': 'e801ac2b2c0b83767a10e4bf673addda60ff1c4e64d1246c0e442ce22b3c5059',
         'package.json': '68f7347c90102f4d394f9188fde96afc882cdb8871321d3ed13678002eaa3b35',
+        'scripts/build/config.ts': '8d2912cc8527ab39dd0ab649262c1dcee3ad44648e49657aeaec94e8488c7e71',
+        'scripts/build/bun.ts': 'dad682f0e2ab801fd5a32cd7a09f125e2b700491a6cf1b6dff55cd5777bf5bf3',
+        'scripts/build/compile.ts': '78cfb108b57a154e0d2fbaaea0f1e08ff6bf9b7c240090381393f1ca9c6c79f3',
+        'scripts/build/tools.ts': '2b52468ea4f2d94a23125c6242f8b9368c93dc6beca9f9fc3e46c90b8e383c71',
+        'scripts/build/flags.ts': '1cc89a51496f85d1ad1bc9bcc0fa2d675f9967901efc5f555a1154467e1abce0',
+        'scripts/build/rust.ts': 'e4cacd6ce7e4ffde9188f56df2484b2ebd420f0b1478b4ae7d01961d4032aafb',
+        'scripts/build/source.ts': '13935ba6f56fe6d8484837d77e89b7a2fe70b367c2455516b4d6067acf8fb079',
+        'scripts/build/codegen.ts': '241db6767d21e62b7501ffbbf07dd639b138f31cb4aee6251542d1bc001fb286',
+        'scripts/build/ci-images/spec.ts': '7e020dd8e7f523963892801451b2ca0da84ea3eceb7a8c87d4895f102c6d414a',
+        'scripts/build/deps/index.ts': '3f9f9d3efb199ba81939df57a0a7f6a018f6f5e896c2a96c25abfc07e2006108',
+        'scripts/build/deps/mimalloc.ts': 'c922c73db7648f6278f8e379469d00855f086b0fe1884616a7f70d0a870403d4',
+        'scripts/build/deps/tinycc.ts': '7d3f78461f57b09707f09e79864a18f2b2a385cac5cb76a2d09dccaa62ff474e',
+        'scripts/build/verify-binary.ts': '3f2c060781fee1d4bbe70a7e5ef8759f7ec36e4b294ae88c2d7c5737d99cac4f',
+        'scripts/build/binary-expectations.ts': 'f8ed0b0b43bc0aeb7e4e981dd01254e6a9f00ab0f6a43621362e3985e073844a',
+        'rust-toolchain.toml': '242f0f35398ac408c400d44468eef953ff05b5c1d81f4c03e5358526d1724b2e',
+        'src/linker.lds': 'a365da6e5ee059e4debb1a605bd9433e1cd334ea26f0c142a968757c7d657345',
+        'Cargo.toml': '09d19fcb3a570f072887f54803bde590cc12fd06f2ed3998dd5c1430c91bc449',
+        'Cargo.lock': 'e50fc1503af23002906856add618fb9b921a94573c9905d6b2d06a7851096860',
+        'patches/mimalloc/new-oom-hook.patch': '5c557597f9b9b6a8f47e49d8bbbc282e8c5201bb6ae8c9dbfb510567147631d6',
     }),
     'webkit': ('oven-sh/WebKit', WEBKIT_COMMIT, {
         'Source/JavaScriptCore/COPYING.LIB': '5094ecb9c9dcd0eadc34f3c11511d9b5535063032bc150164ecd1a5d5a445547',
@@ -150,6 +169,7 @@ def collect_runtime_declarations(evidence):
     """Selected fixed-source bytes only, deliberately not full corresponding source."""
     directory = evidence / 'runtime-declarations'
     directory.mkdir(exist_ok=False)
+    verified = []
     rows = []
     for name, (repo, commit, files) in RUNTIME_DECLARATIONS.items():
         for relative, expected in files.items():
@@ -164,12 +184,15 @@ def collect_runtime_declarations(evidence):
                 pins = re.findall(rb'^export const WEBKIT_VERSION = "([0-9a-f]{40})";', data, re.M)
                 if pins != [WEBKIT_COMMIT.encode()]:
                     raise ValueError('Fixed Bun WebKit source pin changed')
-            dest = directory / name / relative
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(data)
-            rows.append({'component': name, 'repository': repo, 'commit': commit,
-                         'path': relative, 'url': url, 'bytes': len(data), 'sha256': expected,
-                         'retainedPath': dest.relative_to(evidence).as_posix()})
+            verified.append((name, repo, commit, relative, url, expected, data))
+    # Publish no partially accepted set if any later pinned declaration fails.
+    for name, repo, commit, relative, url, expected, data in verified:
+        dest = directory / name / relative
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        rows.append({'component': name, 'repository': repo, 'commit': commit,
+                     'path': relative, 'url': url, 'bytes': len(data), 'sha256': expected,
+                     'retainedPath': dest.relative_to(evidence).as_posix()})
     return {'files': rows, 'redistributionApproved': False, 'correspondingSourceComplete': False,
             'relinkingApproved': False,
             'scope': 'Selected pinned declarations and build files, not complete source or binary correspondence'}
