@@ -655,6 +655,21 @@ or decoder behavior. Original compilation equivalence, complete modified-source
 rebuild, full corresponding source, notices, toolchain and Android/legal approval
 remain unproven. No replacement library was staged in the APK or on a device.
 
+The pristine media source-tree check is now exhaustive over retained regular
+files for that accepted artifact, rather than the earlier representative-file
+sample. The FFmpeg 9.0.2 official archive SHA-256
+`8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`
+contains 10399 regular files; zlib 1.3.2 archive SHA-256
+`bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16`
+contains 254. Both complete path sets, per-file sizes and SHA-256s match the
+retained pristine `sources/` trees in artifact `13740806776`, with no extra,
+missing or changed regular files. The official archives have only directories
+and regular files. Parent review JSON SHA-256:
+`80565ad71b62ed6667646abc9bec946d65abc50fda128ebabb26ca6ec6e227d3`.
+This check does not compare modes/timestamps, independently verify upstream
+archive signatures, rebuild source rules, establish modified/configured-tree
+provenance or close toolchain and complete corresponding-source obligations.
+
 The next Linux diagnostic tests the replacement library's own terminal rendering
 in a separate `media-tui/` tree. Other native inputs are copied unchanged; only
 OpenTUI uses replacement bytes under the original filename required by the
