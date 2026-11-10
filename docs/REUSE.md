@@ -627,6 +627,29 @@ These are notice candidates and evidence bindings, not formal notices, original
 compile-input provenance, complete corresponding source or distribution,
 relinking or Android approval; every approval field remains false.
 
+The fixed official Zig 0.17.0 source archive (23049960 bytes, SHA-256
+`b6c7f1728f043700d6529bac980800792f824256a9d2f1839b3d62beed0b8abd`)
+was separately fetched with TLS verification and matched the official download
+index entry. Retained index SHA-256:
+`81080b1daf59c569e04ebd90c3a9d2f87bbfd25716be61042c9602d3dbd44a3b`.
+All 192 observed tool headers match the corresponding official source members.
+Across the entire 19503-file retained resource set, 19415 files match and 88
+test-source files differ: their binary-package resource copies are empty while
+the official source copies are nonempty. The review records every difference;
+source and binary resource trees must not be described as wholly identical.
+Parent source/resource review JSON SHA-256:
+`91f8c953a34bb2ecef6b14ff2aba00a141589d38090af8e0dbc313ea2b8d82cf`.
+The source `CMakeLists.txt` lines 136-138 request LLVM/Clang 22, while
+`cmake/Findllvm.cmake` lines 36-46 check LLVM 22.x. These declarations neither
+identify the official binary's exact compiler nor make this Zig toolchain
+interchangeable with Bun's separately declared LLVM 23 toolchain. The source
+glibc README documents customized multi-version headers and start files, and
+the Linux-header update tool documents installation/architecture regrouping.
+Retaining those rules does not prove their execution or exact upstream
+glibc/kernel/LLVM revisions. No compiler was rebuilt or executed locally and
+source-build, full toolchain, per-file license and corresponding-source closure
+remain incomplete.
+
 The next bounded diagnostic compiles every retained post-build `.i` / `.s`
 sample with the same fixed Zig target and reviewed code-generation flags into
 separate AArch64 relocatable objects. Preprocessor include/definition options
