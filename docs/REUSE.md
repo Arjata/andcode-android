@@ -610,6 +610,23 @@ identity, full live-code coverage, decoder/TUI behavior of the replacement,
 complete corresponding source, toolchain closure or legal/Android approval.
 The replacement library is never staged in the APK.
 
+The first all-media attempt, CI `42763817879` (`1fe64da`), failed before
+compiling its first replacement object: Zig 0.17 rejects `-x cpp-output` with
+`language not recognized`. Regular CI `42763796545` succeeded. Failed-log
+artifact `13739018684` (1624699 bytes) matches API SHA-256
+`3eaf163c72b50958197f1df428e00f4900f5bbab42e9b88953ec022cdfb9a22a`;
+job log SHA-256:
+`dcaffad92e116029f1d528d9ae9f17d26329ab20cc4691ad94cba0961730c846`.
+This is not a successful replacement artifact. The corrected diagnostic uses
+explicit C language for retained `.i` text, not unsupported `cpp-output`.
+Consequently this performs a second preprocessing pass and must not be described
+as direct frontend consumption of preprocessed C. Only numeric line markers
+and pragmas are allowed as directives; include/define/other directives fail
+closed. No original include paths or macro definitions are supplied. Built-in
+macro behavior and this extra pass remain differences from original compilation;
+object equality and original-input equivalence are not assumed. Linux execution
+and independent artifact review are still required for the corrected attempt.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

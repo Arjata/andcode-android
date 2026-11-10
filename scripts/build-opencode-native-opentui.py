@@ -1170,7 +1170,15 @@ def relink_media_objects(link, zig, result, output, env, preprocessing, modified
                     continue
                 raise ValueError('Unapproved media recompile option')
             flags.append(flag)
-        language = 'cpp-output' if source.suffix == '.i' else 'assembler'
+        # Zig's driver rejects Clang's cpp-output language. Treat retained C
+        # text as C explicitly; this performs a second preprocessing pass.
+        # Reject includes/macros so that pass cannot import new source bytes.
+        if source.suffix == '.i':
+            for line in source.read_bytes().splitlines():
+                directive = re.match(rb'\s*#\s*([^\s]+)', line)
+                if directive and not (directive[1].isdigit() or directive[1] == b'pragma'):
+                    raise ValueError('Unapproved directive in sampled C input')
+        language = 'c' if source.suffix == '.i' else 'assembler'
         if source.suffix not in ['.i', '.s']:
             raise ValueError('Unexpected preprocessed media suffix')
         destination = directory / 'objects' / f'{index:04d}.o'
@@ -1249,7 +1257,7 @@ def relink_media_objects(link, zig, result, output, env, preprocessing, modified
             'instrumentedReplacement': replacements[crc_key].relative_to(output).as_posix(),
             'needed': needed, 'crcCases': 2304, 'modifiedCalls': 6912,
             'redistributionApproved': False, 'androidApproved': False, 'relinkingApproved': False,
-            'scope': 'Recompile all post-build sampled media units, substitute separately instrumented CRC, relink and run ABI/CRC only; not original-object equality, full modified-source closure, decoder/TUI coverage or legal/Android approval'}
+            'scope': 'Recompile all post-build sampled media units (retained C text receives a second preprocessing pass), substitute separately instrumented CRC, relink and run ABI/CRC only; not original-object equality, full modified-source closure, decoder/TUI coverage or legal/Android approval'}
 
 
 def validate(result, target, output, env):

@@ -746,7 +746,7 @@ class Tests(unittest.TestCase):
     def test_all_media_recompile_relink_and_fail_closed(self):
         modes = ['ok', 'set', 'duplicate', 'tool', 'input', 'flags', 'compile', 'timeout',
                  'elf', 'link', 'unchanged', 'needed', 'map', 'extraction', 'abi',
-                 'crc', 'probe-compile', 'mutate']
+                 'crc', 'probe-compile', 'mutate', 'include-directive', 'define-directive']
         for mode in modes:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
@@ -786,6 +786,11 @@ class Tests(unittest.TestCase):
                 if mode == 'tool': zig.write_bytes(b'changed')
                 if mode == 'input': (output / sampled[0]['preprocessed']).write_bytes(b'changed')
                 if mode == 'flags': sampled[0]['command'].insert(4, '-fplugin=bad')
+                if mode in ['include-directive', 'define-directive']:
+                    source = output / sampled[0]['preprocessed']
+                    source.write_bytes(b'#include "outside.h"\n' if mode == 'include-directive' else b'#define NAME value\n')
+                    sampled[0]['sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
+                    sampled[0]['bytes'] = source.stat().st_size
 
                 def run(command, **kwargs):
                     self.assertEqual(kwargs['cwd'], directory)
@@ -794,7 +799,7 @@ class Tests(unittest.TestCase):
                     if command[:2] == [str(zig), 'cc']:
                         self.assertNotIn('-MD', command)
                         self.assertNotIn('-E', command)
-                        self.assertIn(command[command.index('-x') + 1], ['cpp-output', 'assembler'])
+                        self.assertIn(command[command.index('-x') + 1], ['c', 'assembler'])
                         if mode == 'compile': return subprocess.CompletedProcess(command, 2, b'', b'failed')
                         if mode == 'timeout': raise subprocess.TimeoutExpired(command, 120, stderr=b'partial')
                         raw = bytearray(64); raw[:6] = b'\x7fELF\x02\x01'
