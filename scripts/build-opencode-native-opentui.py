@@ -19,6 +19,7 @@ pty = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pty)
 ORIGINAL = '3d733490879955965a67a16364e50fe724d9fec63731e97fa6855285c3db70f2'
 ZIG_SHA256 = '9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8'
+HOST_SYSTEM_ROOT = Path('/usr')
 MARKER = 'ANDCODE_SOURCE_OPENTUI_ABI_OK'
 PROBE = '''import {dlopen,FFIType as T} from "bun:ffi";
 import {readFile,realpath} from "node:fs/promises";
@@ -420,6 +421,147 @@ def replay_media_generators(native, output, env):
                         'bytes': path.stat().st_size} for path, digest in baseline.items()],
             'outputs': rows, 'redistributionApproved': False, 'androidApproved': False,
             'scope': 'Two modes of retained FFmpeg host generator reproduced configured inputs byte-for-byte; not a rebuilt generator, all generators, source closure or license approval'}
+
+
+def rebuild_media_generator(native, output, env):
+    """Recompile the standalone host tool in isolation; never execute log argv."""
+    cache = (native / '.cache/ffmpeg').resolve(strict=True)
+    source = (cache / 'sources/ffmpeg-9.0.2').resolve(strict=True)
+    build = cache / 'build/aarch64-linux'
+    dependency = build / 'libswscale/aarch64/ops_asmgen.d'
+    original_generator = build / 'libswscale/aarch64/ops_asmgen'
+    rule = source / 'libswscale/aarch64/Makefile'
+    baseline = {path: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in [dependency, original_generator, rule]}
+    modes = [('-lookup', 'ops_lookup.gen.c', 'lookup.log'),
+             ('-ops', 'ops_neon.gen.S', 'neon.log')]
+    expected = {}
+    for _, filename, _ in modes:
+        path = build / 'libswscale/aarch64' / filename
+        expected[filename] = path.read_bytes()
+        baseline[path] = hashlib.sha256(expected[filename]).hexdigest()
+    target, separator, body = dependency.read_text(encoding='utf8').replace('\\\n', ' ').partition(':')
+    if not separator or target.strip() != 'libswscale/aarch64/ops_asmgen.o':
+        raise ValueError('Unexpected host generator dependency target')
+    directory = output / 'media-generator-rebuild'
+    directory.mkdir(exist_ok=False)
+    copied = directory / 'source'
+    copied.mkdir()
+    inputs = []
+    seen = set()
+    for name in shlex.split(body):
+        parts = PurePosixPath(name).parts
+        if (not parts or parts[0] != 'src' or '..' in parts or '\\' in name
+                or PurePosixPath(name).is_absolute()):
+            raise ValueError('Unexpected host generator source dependency')
+        relative = PurePosixPath(*parts[1:]).as_posix()
+        if relative in seen:
+            continue
+        seen.add(relative)
+        path = (source / relative).resolve(strict=True)
+        path.relative_to(source)
+        content = path.read_bytes()
+        baseline[path] = hashlib.sha256(content).hexdigest()
+        destination = copied / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+        inputs.append({'path': path.relative_to(cache).as_posix(),
+                       'copy': destination.relative_to(output).as_posix(),
+                       'bytes': len(content), 'sha256': baseline[path]})
+    main = copied / 'libswscale/aarch64/ops_asmgen.c'
+    if not main.is_file():
+        raise ValueError('Missing host generator main source')
+    compiler_name = shutil.which('gcc')
+    if not compiler_name:
+        raise ValueError('Missing host GCC')
+    compiler = Path(compiler_name).resolve(strict=True)
+    if not compiler.is_file():
+        raise ValueError('Missing host GCC')
+    compiler_digest = hashlib.sha256(compiler.read_bytes()).hexdigest()
+    clean_env = dict(env)
+    for key in ['CPATH', 'C_INCLUDE_PATH', 'CPLUS_INCLUDE_PATH', 'OBJC_INCLUDE_PATH',
+                'GCC_EXEC_PREFIX', 'COMPILER_PATH', 'LIBRARY_PATH', 'DEPENDENCIES_OUTPUT',
+                'SUNPRO_DEPENDENCIES', 'LD_PRELOAD', 'LD_LIBRARY_PATH']:
+        clean_env.pop(key, None)
+    commands = []
+
+    def run(command, logname):
+        log = directory / logname
+        commands.append({'command': command, 'cwd': str(directory),
+                         'log': log.relative_to(output).as_posix()})
+        try:
+            done = subprocess.run(command, cwd=directory, env=clean_env,
+                                  capture_output=True, timeout=120)
+        except subprocess.TimeoutExpired as error:
+            log.write_bytes((shlex.join(command) + '\nTIMEOUT\n').encode()
+                            + (error.stdout or b'') + (error.stderr or b''))
+            raise
+        log.write_bytes((shlex.join(command) + '\n').encode() + done.stdout + done.stderr)
+        done.check_returncode()
+        return done.stdout
+
+    version = run([str(compiler), '--version'], 'compiler.log')
+    flags = ['-I.', '-Isource', '-D_ISOC11_SOURCE', '-D_POSIX_C_SOURCE=200112',
+             '-D_XOPEN_SOURCE=600', '-D_POSIX_C_SOURCE=200112', '-D_XOPEN_SOURCE=600',
+             '-std=c17', '-Wall', '-O3']
+    run([str(compiler), *flags, '-MD', '-MF', 'ops_asmgen.d', '-MT', 'ops_asmgen.o',
+         '-E', '-o', 'ops_asmgen.i', 'source/libswscale/aarch64/ops_asmgen.c'], 'preprocess.log')
+    preprocessed = directory / 'ops_asmgen.i'
+    preprocessed_digest = hashlib.sha256(preprocessed.read_bytes()).hexdigest()
+    target, separator, body = (directory / 'ops_asmgen.d').read_text(encoding='utf8').replace('\\\n', ' ').partition(':')
+    if not separator or target.strip() != 'ops_asmgen.o':
+        raise ValueError('Invalid rebuilt generator dependency target')
+    headers = []
+    copied_inputs = set()
+    header_baseline = {}
+    for name in sorted(set(shlex.split(body))):
+        path = Path(name)
+        if not path.is_absolute():
+            path = directory / path
+        path = path.resolve(strict=True)
+        content = path.read_bytes()
+        digest = hashlib.sha256(content).hexdigest()
+        header_baseline[path] = digest
+        if path.is_relative_to(copied):
+            copied_inputs.add(path.relative_to(copied).as_posix())
+            continue
+        if not path.is_relative_to(HOST_SYSTEM_ROOT.resolve(strict=True)):
+            raise ValueError('Host generator header outside approved /usr tree')
+        destination = directory / 'system-headers' / path.relative_to(Path(path.anchor))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+        headers.append({'original': str(path), 'copy': destination.relative_to(output).as_posix(),
+                        'bytes': len(content), 'sha256': digest})
+    if copied_inputs != seen or not headers:
+        raise ValueError('Rebuilt generator source/header dependency set differs')
+    run([str(compiler), '-std=c17', '-Wall', '-O3', '-c', '-o', 'ops_asmgen.o',
+         'ops_asmgen.i'], 'compile.log')
+    run([str(compiler), '-o', 'ops_asmgen', 'ops_asmgen.o', '-lm'], 'link.log')
+    if (not (directory / 'ops_asmgen.i').stat().st_size
+            or not (directory / 'ops_asmgen').read_bytes().startswith(b'\x7fELF')):
+        raise ValueError('Missing preprocessing or ELF host generator output')
+    for mode, filename, logname in modes:
+        raw = run([str(directory / 'ops_asmgen'), mode], logname)
+        (directory / filename).write_bytes(raw)
+        if not raw or raw != expected[filename]:
+            raise ValueError('Rebuilt host generator output differs: ' + filename)
+    protected = {**baseline, **header_baseline, compiler: compiler_digest,
+                 preprocessed: preprocessed_digest}
+    protected.update({output / row['copy']: row['sha256'] for row in inputs + headers})
+    for path, digest in protected.items():
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError('Host generator rebuild changed a retained input')
+    files = []
+    for path in sorted(directory.rglob('*')):
+        if path.is_file():
+            files.append({'path': path.relative_to(output).as_posix(), 'bytes': path.stat().st_size,
+                          'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+    return {'compiler': {'path': str(compiler), 'sha256': compiler_digest,
+                         'version': version.decode('utf8')},
+            'commands': commands, 'sourceInputs': inputs, 'systemHeaders': headers,
+            'files': files, 'outputMatches': 2, 'redistributionApproved': False,
+            'androidApproved': False, 'relinkingApproved': False,
+            'scope': 'Isolated standalone host generator rebuild with observed full dependency snapshots and preprocessed TU; two output byte matches, not toolchain closure, reproducible generator ELF, other generators, complete source or legal approval'}
 
 
 def probe_ffmpeg_crc(prefix, output, env):
@@ -923,6 +1065,7 @@ def build(upstream, stage):
                                               native, prefix, objects, source_inputs)
     notices = retain_ffmpeg_notices(native, source_inputs, output)
     generator_replay = replay_media_generators(native, output, env)
+    generator_rebuild = rebuild_media_generator(native, output, env)
     crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
@@ -949,6 +1092,7 @@ def build(upstream, stage):
         'ffmpegCompileCommands': compile_commands,
         'ffmpegNoticeCandidates': notices,
         'ffmpegGeneratorReplay': generator_replay,
+        'ffmpegGeneratorRebuild': generator_rebuild,
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
         'finalLinkReplay': replay,

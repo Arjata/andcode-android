@@ -211,6 +211,95 @@ class Tests(unittest.TestCase):
                         with self.assertRaises(ValueError):
                             m.replay_media_generators(root / 'native', output, {})
 
+    def test_host_generator_rebuild_isolated_and_fail_closed(self):
+        for mode in ['ok', 'drift', 'compile', 'timeout', 'object-failure', 'link-failure',
+                     'missing-header', 'source-set', 'baseline-mutation', 'compiler-mutation',
+                     'header-mutation', 'copy-mutation', 'preprocessed-mutation', 'empty-preprocessed',
+                     'non-elf', 'escape']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                native, output = root / 'native', root / 'output'
+                cache = native / '.cache/ffmpeg'
+                source = cache / 'sources/ffmpeg-9.0.2/libswscale/aarch64'
+                build = cache / 'build/aarch64-linux/libswscale/aarch64'
+                source.mkdir(parents=True); build.mkdir(parents=True); output.mkdir()
+                (source / 'ops_asmgen.c').write_bytes(b'generator source')
+                (source / 'Makefile').write_bytes(b'rule')
+                (build / 'ops_asmgen').write_bytes(b'original generator')
+                (build / 'ops_asmgen.d').write_text(
+                    'libswscale/aarch64/ops_asmgen.o: ' +
+                    ('../escape' if mode == 'escape' else 'src/libswscale/aarch64/ops_asmgen.c') + '\n')
+                (build / 'ops_lookup.gen.c').write_bytes(b'lookup')
+                (build / 'ops_neon.gen.S').write_bytes(b'neon')
+                system = root / 'usr'
+                system.mkdir()
+                header = system / 'stdio.h'; header.write_bytes(b'system header')
+                compiler = system / 'gcc'; compiler.write_bytes(b'compiler')
+                directory = output / 'media-generator-rebuild'
+
+                def run(command, **kwargs):
+                    self.assertEqual(kwargs['cwd'], directory)
+                    self.assertEqual(kwargs['timeout'], 120)
+                    self.assertNotIn('CPATH', kwargs['env'])
+                    self.assertNotIn('LD_PRELOAD', kwargs['env'])
+                    self.assertEqual(kwargs['env']['KEEP'], 'yes')
+                    data = b''
+                    if command[-1] == '--version': data = b'gcc fixture version\n'
+                    elif '-E' in command:
+                        if mode == 'compile': return subprocess.CompletedProcess(command, 2, b'', b'compile failed')
+                        if mode == 'timeout': raise subprocess.TimeoutExpired(command, 120, stderr=b'partial')
+                        (directory / 'ops_asmgen.i').write_bytes(b'' if mode == 'empty-preprocessed' else b'preprocessed')
+                        (directory / 'ops_asmgen.d').write_text(
+                            'ops_asmgen.o: source/libswscale/aarch64/ops_asmgen.c' +
+                            ('' if mode == 'missing-header' else ' ' + shlex.quote(str(header))) +
+                            (' extra.c' if mode == 'source-set' else '') + '\n')
+                        if mode == 'source-set': (directory / 'extra.c').write_bytes(b'extra')
+                    elif '-c' in command:
+                        self.assertEqual(command[-1], 'ops_asmgen.i')
+                        if mode == 'object-failure': return subprocess.CompletedProcess(command, 2, b'', b'object failed')
+                        (directory / 'ops_asmgen.o').write_bytes(b'object')
+                    elif '-lm' in command:
+                        if mode == 'link-failure': return subprocess.CompletedProcess(command, 2, b'', b'link failed')
+                        (directory / 'ops_asmgen').write_bytes(b'invalid' if mode == 'non-elf' else b'\x7fELFfixture')
+                    else:
+                        data = b'lookup' if command[-1] == '-lookup' else b'neon'
+                        if mode == 'drift': data = b'drift'
+                        if mode == 'baseline-mutation': (source / 'ops_asmgen.c').write_bytes(b'changed')
+                        if mode == 'compiler-mutation': compiler.write_bytes(b'changed')
+                        if mode == 'header-mutation': header.write_bytes(b'changed')
+                        if mode == 'copy-mutation': (directory / 'source/libswscale/aarch64/ops_asmgen.c').write_bytes(b'changed')
+                        if mode == 'preprocessed-mutation': (directory / 'ops_asmgen.i').write_bytes(b'changed')
+                    return subprocess.CompletedProcess(command, 0, data, b'diagnostic')
+
+                with patch.object(m, 'HOST_SYSTEM_ROOT', system), \
+                        patch.object(m.shutil, 'which', return_value=str(compiler)), \
+                        patch.object(m.subprocess, 'run', side_effect=run):
+                    env = {'CPATH': 'untrusted', 'LD_PRELOAD': 'untrusted', 'KEEP': 'yes'}
+                    if mode == 'ok':
+                        report = m.rebuild_media_generator(native, output, env)
+                        self.assertEqual(report['outputMatches'], 2)
+                        self.assertEqual(len(report['sourceInputs']), 1)
+                        self.assertEqual(len(report['systemHeaders']), 1)
+                        self.assertEqual(len(report['commands']), 6)
+                        self.assertFalse(report['redistributionApproved'])
+                        self.assertFalse(report['androidApproved'])
+                        self.assertFalse(report['relinkingApproved'])
+                        for row in report['files']:
+                            raw = (output / row['path']).read_bytes()
+                            self.assertEqual(len(raw), row['bytes'])
+                            self.assertEqual(hashlib.sha256(raw).hexdigest(), row['sha256'])
+                        self.assertEqual((build / 'ops_asmgen').read_bytes(), b'original generator')
+                        with self.assertRaises(FileExistsError): m.rebuild_media_generator(native, output, env)
+                    elif mode in ['compile', 'object-failure', 'link-failure']:
+                        with self.assertRaises(subprocess.CalledProcessError): m.rebuild_media_generator(native, output, env)
+                        logname = {'compile': 'preprocess.log', 'object-failure': 'compile.log', 'link-failure': 'link.log'}[mode]
+                        self.assertIn(b'failed', (directory / logname).read_bytes())
+                    elif mode == 'timeout':
+                        with self.assertRaises(subprocess.TimeoutExpired): m.rebuild_media_generator(native, output, env)
+                        self.assertIn(b'partial', (directory / 'preprocess.log').read_bytes())
+                    else:
+                        with self.assertRaises(ValueError): m.rebuild_media_generator(native, output, env)
+
     def test_zlib_dependency_patch_is_exact_and_rejects_repeat(self):
         source = ('run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);\n'
                   '  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })\n'
@@ -769,7 +858,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'generator-rebuild', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -886,6 +975,8 @@ class Tests(unittest.TestCase):
                         patch.object(m, 'unpack_nested'),
                         patch.object(m, 'replay_media_generators', return_value={'outputs': ['lookup', 'neon']},
                                      side_effect=ValueError('Generator replay failed') if failure == 'generator-replay' else None),
+                        patch.object(m, 'rebuild_media_generator', return_value={'outputMatches': 2},
+                                     side_effect=ValueError('Generator rebuild failed') if failure == 'generator-rebuild' else None),
                         patch.object(m, 'probe_ffmpeg_crc', return_value={'cases': 2304},
                                      side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None),
                         patch.object(m, 'replay_link_inputs', return_value={'byteIdentical': True},
@@ -916,6 +1007,7 @@ class Tests(unittest.TestCase):
                         self.assertEqual(len(report['zigGeneratedSources']['files']), 1)
                         self.assertEqual(report['modifiedCrcRelink']['modifiedCalls'], 6912)
                         self.assertEqual(len(report['ffmpegGeneratorReplay']['outputs']), 2)
+                        self.assertEqual(report['ffmpegGeneratorRebuild']['outputMatches'], 2)
                         self.assertEqual(len(report['ffmpegCompileCommands']['objects']), 1)
                         self.assertIs(report['zigGeneratedSources']['sourceAttributionApproved'], False)
                         self.assertEqual(target.read_bytes(), b'rebuilt')

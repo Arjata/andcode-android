@@ -506,6 +506,24 @@ This accepts the bounded two-mode replay only, not a generator rebuild, complete
 preprocessing/system-header inputs, full modified FFmpeg replacement, LGPL
 compliance or Android acceptance. All approval fields remain false.
 
+The next bounded diagnostic recompiles the standalone `ops_asmgen` host tool
+in `media-generator-rebuild/`, without replacing the retained baseline tool,
+media objects or staged OpenTUI. Only the fixed main source and its recorded
+non-system dependency closure are copied. The command is constructed from the
+reviewed GCC flags; compiler-log text is never executed. Host GCC path, version
+and executable digest are recorded; inherited include/compiler/library injection
+variables are removed. Preprocessing emits both a full `-MD` dependency file
+(including system headers) and the actual `.i` translation unit subsequently
+compiled. Observed system headers must resolve under `/usr` and are copied with
+hashes; the copied non-system dependency set must match the retained set.
+The rebuilt tool must produce both byte-identical generated outputs. Baseline
+inputs, compiler, observed headers, copies and preprocessed bytes are guarded
+against mutation. Failure, timeout, drift or pre-existing output prevents staging.
+This is not a toolchain/source closure or a byte-identical generator-ELF claim;
+it does not regenerate configure or upstream maintenance tables, approve
+distribution/relinking, or add any experimental ELF to the APK. Synthetic Windows
+regressions are separate from the required Linux CI build and external review.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
