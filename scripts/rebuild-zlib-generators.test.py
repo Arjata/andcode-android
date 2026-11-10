@@ -18,7 +18,7 @@ class Tests(unittest.TestCase):
                      'generator-elf', 'object-machine', 'object-type', 'object-version',
                      'generator-machine', 'generator-type', 'generator-version',
                      'object-mutate', 'generator-mutate', 'run', 'drift', 'mutate', 'compiler-mutate',
-                     'trees-dependency', 'harness-mutate', 'trees-drift', 'trees-missing']:
+                     'trees-dependency', 'harness-mutate', 'trees-drift', 'trees-missing', 'output-mutate']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve(); source = root / 'upstream'; source.mkdir()
                 output = root / 'output'; output.mkdir()
@@ -91,6 +91,7 @@ class Tests(unittest.TestCase):
                             if mode == 'compiler-mutate': compiler.write_bytes(b'changed')
                         elif mode != 'trees-missing':
                             (work / 'trees.h').write_bytes(b'changed' if mode == 'trees-drift' else files['trees.h'])
+                            if mode == 'output-mutate': (directory / 'makecrch/crc32.h').write_bytes(b'changed')
                     return subprocess.CompletedProcess(command, 0, stdout, b'')
 
                 with patch.object(m.shutil, 'which', return_value=None if mode == 'compiler' else str(compiler)), \

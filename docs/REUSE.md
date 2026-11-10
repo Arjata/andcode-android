@@ -854,6 +854,8 @@ Synthetic tests reject missing tree dependencies, harness mutation and missing
 or changed output. This is a proposed maintenance harness, not proof that zlib's
 original build used that entry point; successful regeneration awaits native CI.
 The prior accepted two-mode artifacts and their recorded counts remain unchanged.
+Previously compared generated headers remain mutation-guarded until all modes
+finish; a later generator changing an earlier output rejects the entire review.
 
 Read-only remaining-generator research identifies swscale `uops_macros.h` as
 the output of the configured `libswscale/tests/sws_ops -macros` test program,

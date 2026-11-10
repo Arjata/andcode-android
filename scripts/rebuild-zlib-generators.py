@@ -156,6 +156,7 @@ def rebuild(source, output, env):
             generated.write_bytes(stdout)
         if not generated.is_file() or generated.read_bytes() != (copied / filename).read_bytes():
             raise ValueError('Regenerated zlib header differs: ' + filename)
+        protected[generated] = digest(generated)
         rows.append({'mode': mode, 'define': define, 'units': units,
                      'output': generated.relative_to(output).as_posix(),
                      'bytes': generated.stat().st_size, 'sha256': digest(generated)})
