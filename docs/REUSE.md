@@ -637,6 +637,22 @@ header exists anywhere in the upstream tree). A parent note was corrected:
 `features.h` does not pin 2.43 in-file; tree-level binding comes from the 2.44
 sync commit. Parent review SHA-256:
 `535268032b2f6b68aebd3e10918f00156cbe4691a26b71b3974a5488e9f00f61`.
+
+The 25-pinned-declaration collector commit `77a2a89` now also has its own
+independent nine-gate acceptance for run `42802742226`. Artifact `13759215670`
+is 689785005 bytes; its API/downloaded ZIP SHA-256 is
+`d5e6e05b16a80ccdbe5c2ff0971b69ecc2d76dfe7440d68814c9ea44f8ccf0f7`. The
+archive's `native-source-review.json` carries exactly 25 declaration files
+(22 Bun + 3 WebKit) matching the current pinned set, and no Bun archive yet
+(that capability landed in the next commit). Fresh source-rule relink, swscale
+regeneration (`swscaleMacrosOutputMatched`), fresh TUI with replacement
+SHA-256 `a188b86ebacdff9ec6371e6dfe46b52f90d0186fe771274010017d1953c04168`
+and 15/14/14/23 semantic rejection groups all pass. Nine-gate parent
+acceptance index SHA-256:
+`78f45ea14dad995edfb8e3836033dcffa55f151a453ce8e95a6a854456c65843`;
+job `129784131962` log SHA-256:
+`a79df3c30b92e4ba4aa522fdc60985753a96d57dee9046c927cb5b170ac3a8dc`.
+
 Honest boundaries: trimmed comparisons are not byte identity except the
 `arm_neon.h` case; `headers_install`, glibc install and clang TableGen
 generation were not reproduced on Linux; missing embedded notices still do not
