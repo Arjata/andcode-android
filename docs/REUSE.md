@@ -1032,6 +1032,32 @@ by synthetic tests. Actual map/render/no-extracted-ELF acceptance requires new
 native CI and independent archive review; it is not a release payload, decoder
 coverage, full corresponding source or Android/legal approval.
 
+Independent acceptance of that separate fresh-source TUI is now complete for
+native run `42793824292`, commit
+`16767203a8145596ce2f1b7e8dfd6737b4e91f71`. Artifact `13754222024` is
+688707219 bytes, with downloaded/API ZIP SHA-256
+`a4285bae2f40efc28bd659ac1ae57f5c175d0ec077c219cb2fd643b8f8f981ed`.
+Nine archive gates pass over a closed 65759-file manifest, including the fresh
+345-object source-rule build, full 446-input final-link reconstruction and
+three-mode zlib regeneration. The separately staged TUI retains four native
+copies and ten diagnostic files, 365 rendered bytes and actual maps for the
+replacement alias and explicit staged Ubuntu loader/libc. Replacement SHA-256:
+`46c24b5e9f9f7a51062c071fe73cbc9ccd765a16decc25dd546fb7b269804236`.
+Its lookup manifest is only a diagnostic selector, not a release manifest;
+baseline native inputs remain unchanged and retained isolated HOME/BUN_TMPDIR
+contain no ELF. Fresh TUI independent review SHA-256:
+`f58ccebd716ee918d230e77c1f81e30f867ae8fd85b3370defb1187aa5fd3c10`.
+Fourteen self-consistent mutations reject approval/selector/review drift,
+release-manifest and extraction claims, inventory/copy/map/render/log changes
+and an injected runtime ELF; rejection log SHA-256:
+`29f7faa8d69f6fd88369c0092ffee365e840d136633e4e1e33f7c4e0c4ec41cb`.
+Job `129753736712` log SHA-256:
+`1412ddab687b91541bc3af2929d3c13ae4bd5e3056cded1ce55966d1045ecb16`.
+This is Linux CI TUI execution plus independent archived evidence, not local
+execution, general decoder coverage, every live section, complete original
+preprocessing/source/toolchain or legal/Android approval. It predates swscale
+regeneration and the later mutation guards; all approval flags remain false.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
@@ -1154,6 +1180,31 @@ parent binding-review JSON SHA-256:
 No Bun/WebKit tool was executed or toolchain installed in this research;
 Android/Bionic assets remain excluded from the glibc candidate. No legal,
 relinking or Android approval follows from these source declarations.
+
+A subsequent read-only inventory retains the whole fixed Bun commit archive
+outside the repository: 92996071 compressed bytes, SHA-256
+`64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520`,
+26952 members and 277897935 declared expanded bytes. Ten previously pinned
+license/build/toolchain texts match this archive byte-for-byte. Inventory
+SHA-256: `1a034b942965892026caae5c0eacdee2ea00dd517674087dfc59bb11a1f37820`.
+This observed codeload digest is not an upstream published archive checksum,
+signature or proof of the official executable's source correspondence.
+The parent additionally matches nine fixed raw files against the archive:
+`rust.ts`, dependency `index.ts`/`mimalloc.ts`, `verify-binary.ts`,
+`binary-expectations.ts`, `src/linker.lds`, Cargo manifest/lock and the mimalloc
+OOM patch. Binding review SHA-256:
+`d283e486dae7697c657b9b516a171721e8a18405ecec702e8b3be1c366fd1945`.
+`rustLtoInLink()` declares `release && !asan`, independently of the C/C++ LTO
+switch; that branch adds `-Clinker-plugin-lto` and `-Cembed-bitcode=yes`.
+Disabling C/C++ LTO alone therefore does not establish a machine-code-only Rust
+relink kit. Non-Windows target rustflags explicitly select lld; the source notes
+the current staticlib/rlib path has no rustc target final-link step. The mimalloc
+direct build declares `src/static.c` compiled as C++, PIC and a glibc
+initial-exec TLS model; this remains a build declaration, not final allocator
+provider/liveness evidence. No source script is executed, no toolchain is
+installed and no target code is generated or linked. Exact application objects,
+generated inputs, dependency/toolchain closure and practical modified-JSC Bun
+relinking remain missing; all four approval flags remain false.
 
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
