@@ -172,6 +172,8 @@
 | `probe-opencode-native.py` | Linux CI 实验 API 准入:普通/持久 PTY、shell,口令只在内存使用不输出 | `scripts/` |
 | `probe-opencode-native-tui.py` | Linux CI 独立 PTY 启动源码实验 TUI,要求实际映射预置 OpenTUI 并渲染;仅终止自有进程组 | `scripts/` |
 | `opencode-native-prototype.yml` | 手动执行的原生扩展预置源码构建实验;失败/未审计工件不得接入 APK | `.github/workflows/` |
+| `bun-source-build-experiment.yml` | 手动执行的固定提交 Bun 候选源码构建实验:pinned 工具链身份、依赖获取与 configure-only ninja 生成;仅诊断,不声称官方 ELF 对应或许可批准 | `.github/workflows/` |
+| `bun-source-build-experiment`、`bun-source-build-failure` | 上述实验的诊断工件:源码/工具链/依赖身份、配置日志与失败现场;不进入 APK 或 bundle | CI artifacts |
 | `libandcode-oc2-native-<sha256前16位>.so` | 实验 Bun 插件按内容命名的原生扩展预置副本,完整摘要校验去重/冲突 | 实验输出 native/ |
 | `oc2-native.tsv` | 上述副本的来源/完整摘要/长度记录;不是正式 bundle manifest | 实验输出 |
 | `libandcode-usr-lib-opencode-pty-opencode-pty.so` | 预置 process-daemon v0.4.0 ELF 本体;静态 libandcode-opencode-pty.so 入口显式调用 loader | nativeLibraryDir |
