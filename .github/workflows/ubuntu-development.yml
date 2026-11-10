@@ -90,7 +90,9 @@ jobs:
   mmdebstrap:
     if: github.event_name == 'workflow_dispatch' && inputs.evaluate_mmdebstrap
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
+    # Exact source downloads exceeded 45 minutes on the pinned snapshot service.
+    # Keep time for diagnostic upload after the bounded build step fails.
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
       - name: Install build-only bootstrap tool
@@ -103,6 +105,7 @@ jobs:
           python3 scripts/build-ubuntu-mmdebstrap.test.py
           python3 scripts/collect-ubuntu-sources.test.py
       - name: Build isolated mmdebstrap rootfs and image
+        timeout-minutes: 80
         run: bash scripts/build-ubuntu-mmdebstrap.sh dist/ubuntu-mmdebstrap
       - name: Convert the trusted canonical archive for PRoot
         run: |

@@ -121,6 +121,16 @@ logs, not an approved source payload or rootfs. A failed source pipeline cannot
 continue to image construction or successful candidate upload.
 These additional guards passed 12 synthetic Python tests on Windows; Linux
 recipe execution and real source downloads remain separate CI requirements.
+The first source-acquisition experiment, CI `42688539116` (`ec0cd45`, job
+`129401821961`), was cancelled at the former 45-minute job limit after logging
+75/100 verified source downloads. It produced no successful source/rootfs
+candidate. Its 14 root tree-comparison regression tests passed without skips.
+Retained job log SHA-256:
+`c69ad68aabf654b52ad79c02bc65fa92dd91f2fb530693e92f355b1f001aaab8`.
+The optional job now has a bounded 80-minute build step within a 100-minute job,
+leaving time for failure diagnostics; the snapshot, authentication and required
+complete installed source-version set are unchanged. A successful rerun and
+independent source-archive review are still required.
 Missing exact versions,
 apt failures, existing output or unexpected download paths fail the candidate.
 This new acquisition path awaits Linux CI and independent archive verification.
