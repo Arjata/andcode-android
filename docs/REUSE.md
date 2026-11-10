@@ -868,6 +868,25 @@ The prior accepted two-mode artifacts and their recorded counts remain unchanged
 Previously compared generated headers remain mutation-guarded until all modes
 finish; a later generator changing an earlier output rejects the entire review.
 
+The tree-header harness now has independent native-artifact acceptance at run
+`42792765746`, commit `bd34724498ff7ee705e265f60635971ff19c3e8f` (artifact
+identity and other gate boundaries below). All three generated headers match
+pristine upstream; `trees.h` is 8472 bytes, SHA-256
+`bb0a9d3ca88ee00c81adb7c636e73b97085f6ef1b52d6d58edbe2b6dc3adeb4d`.
+The archive-only gate binds four actual preprocessed compilation units, the
+explicit same-TU harness and `trees.c` dependency, 254 copied source files,
+53 system headers, executable/object identities, commands and 341 diagnostic
+files. Zlib review SHA-256:
+`99159bb1284cfa12fcaeae55dd357d1bfd730294c0fdbbe942fddcb0a77c9696`.
+Fifteen self-consistent archive mutation cases reject altered approvals,
+ELF identity, command/dependency/source/output bindings and the harness itself;
+retained rejection log SHA-256:
+`8b579f70be3587fc65e289c6f706a249ec112147c46ee7d41e60b1ee390806cd`.
+This run predates the later end-of-all-modes generated-header mutation guard;
+the independent verifier checks every retained generated output. It proves this
+diagnostic regeneration, not the invocation used to produce upstream releases
+or complete toolchain/corresponding-source/legal approval.
+
 Read-only remaining-generator research identifies swscale `uops_macros.h` as
 the output of the configured `libswscale/tests/sws_ops -macros` test program,
 not a standalone zlib-style generator. `libswscale/output.c` is handwritten
@@ -972,6 +991,36 @@ all-object map assertion, not at an accepted ABI/CRC result. Its job
 `129742564402` log is retained (SHA-256
 `cfd883e646861e495905aeaca7d096f48e7a460039886162f7bb450f3671ced0`);
 the corrected gate requires a new native run and independent archive review.
+
+The corrected source-rule final-link diagnostic now passes independent
+acceptance for native run `42792765746`, exact commit
+`bd34724498ff7ee705e265f60635971ff19c3e8f`. Artifact `13754410711` is
+673370304 bytes; its downloaded ZIP matches API SHA-256
+`115d29df18642a323d352d38e60d9c6b0ee7ae95a05be900a915978a7bc3bc49`.
+All eight archive gates pass, including a closed 65748-file full manifest,
+the prior sampled-object diagnostics and three-mode zlib regeneration. The
+fresh source-rule gate separately binds 10399 FFmpeg / 254 zlib source files,
+345 fresh objects and 22318 diagnostic files (review SHA-256
+`cfa05c4daaaa74e77622cc2dc454bfbebf1e25506cb7d1e6938877849d33d9f1`).
+The new link gate reconstructs all 446 input positions, replaces every one of
+the 345 selected media objects with its fresh source-rule counterpart, preserves
+the retained non-media inputs, and validates CRC map retention plus archived
+ABI/2304-case/6912-call execution evidence. Replacement library SHA-256 is
+`8dd0abe94ee7e47370680d2b06e70a7e79ade56affb92b5c1c74888dc0c15dc0`;
+the library/probe pass the AArch64/16K/glibc <=2.39 gate and unchanged NEEDED.
+Final-link independent review SHA-256:
+`0686db5bb50bb15629ef1f2ad86cc129510679b6f6878d855448fb686de8064a`.
+Fourteen self-consistent semantic mutations reject approval/review/inventory,
+object/input counts, argv/log/map/extraction, ABI/CRC markers and executable
+machine drift; rejection log SHA-256:
+`dd1ccb63b9f66fe7ad63d2efc810d448ab00f326da36527418844f6060738590`.
+Exact job `129750136113` log SHA-256:
+`0010e2d28410bdafdcdf81b26230a9fa63f3fc6593485e79a194f2383498d636`.
+This artifact predates fresh-source TUI and swscale macro regeneration. Its
+sampled-media TUI is not evidence for the fresh source-rule library. Complete
+original preprocessing, decoder behavior, section liveness, full corresponding
+source/toolchain, legal relinking/distribution and Android admission remain
+unapproved; all four approval flags remain false and APK/device inputs unchanged.
 
 An explicit `source-rules` selector runs the existing isolated PTY/TUI gate on
 the fresh source-rule relink library, bound to its own accepted diagnostic input
