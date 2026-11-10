@@ -1,6 +1,17 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.47 (design draft) · Date: 2026-11-10
+> Version: v0.4.48 (design draft) · Date: 2026-11-11
+> v0.4.48 change: record the Tier M proxy+CA retest milestone and the provider
+> DNS constraint. The gateway hostname resolves only through the host proxy's
+> fake-IP TUN DNS (198.18.0.0/15); any on-device direct connection therefore
+> fails by design (app-domain `EAI_AGAIN`, root shell `ENOTFOUND` via public
+> resolvers), so the explicit-proxy path is required for model traffic until a
+> publicly resolvable provider endpoint exists. Tier M (`/data/adb/andcode`)
+> retested on device after the model-flag fix: two complete model round-trips
+> (text reply and bash tool with correct arithmetic) succeeded via
+> `HTTPS_PROXY` + `NODE_EXTRA_CA_CERTS` through an adb-reverse loopback proxy;
+> the earlier "500" root cause (wrong `--model openai/...` flag) is confirmed
+> fixed. This is a manual root-shell diagnostic, not an app-domain result.
 > v0.4.47 change: add authenticated deb-src indexes and exact installed source-
 > version download evidence to the optional snapshot experiment. Retain .dsc,
 > archives, apt commands/logs and hashes outside the rootfs; no source extraction,
@@ -428,6 +439,11 @@ magisk-module/
   `/dev`、`/proc`、`/sys`,可选 bind `/sdcard/Download` 为工作区(只放源码不放 ELF)。
 - 开机自启由 Magisk `service.d` 机制完成,**无需任何 App**。
 - 管理入口:`su -c /data/adb/andcode/sbin/andcode-entry`,或 `ssh localhost`(dropbear)。
+- 2026-11-11 真机复测(v0.4.48):模型流量必须走显式代理——网关主机名仅在宿主
+  代理侧 fake-IP DNS 可解析,设备直连(public DNS 或 netd)均无法解析;root shell
+  经 `HTTPS_PROXY`(adb reverse loopback)+ `NODE_EXTRA_CA_CERTS` 完成文本与
+  bash 工具两轮完整往返。该结果属 root 手动诊断,不等价于应用域验收;
+  `home/.config/opencode/opencode.json`(0600)为本次写入的 arjata provider 配置。
 
 ### 4.3 Tier A — adb 直推包(locked 设备,零 App 依赖)
 
