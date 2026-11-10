@@ -637,6 +637,12 @@ Across the entire 19503-file retained resource set, 19415 files match and 88
 test-source files differ: their binary-package resource copies are empty while
 the official source copies are nonempty. The review records every difference;
 source and binary resource trees must not be described as wholly identical.
+All 88 differing paths end in `test.zig`; source `build.zig` lines 158-187
+declare installation of `lib/` with `blank_extensions` containing `test.zig`
+at lines 183-185. This is a matching source-side rule, not evidence that the
+official package was produced by an independently executed rebuild. Rule/citation
+review SHA-256:
+`1520967b0307ff796c967e4b20cc8e47df055274e131f54926895361d96a239b`.
 Parent source/resource review JSON SHA-256:
 `91f8c953a34bb2ecef6b14ff2aba00a141589d38090af8e0dbc313ea2b8d82cf`.
 The source `CMakeLists.txt` lines 136-138 request LLVM/Clang 22, while
