@@ -812,6 +812,37 @@ through the remainder of the diagnostic. Synthetic regressions reject wrong
 machine/type/version fields and link/run-time mutation; these local mocked tests
 do not execute GCC or establish a successful new Linux build.
 
+Independent acceptance of the actual zlib-generator artifact is complete for
+native run `42776837614`, commit
+`7ac5ff5169696ec2e9298511527cff9c6cea258b`, artifact `13744779170`
+(587100121 bytes; ZIP SHA-256
+`5273ed3f4fc94727c1c16251a265c4c48cf763c6812bd077b2f2dc781dfb5902`).
+All six archive-only gates passed, including the closed 43410-file manifest,
+baseline native evidence, sampled-media relink, preprocessing, media-generator
+rebuild, replacement TUI and isolated zlib maintenance rebuild. The zlib review
+binds all 254 copied source files, three actual GCC-preprocessed compilation
+units, 53 observed system headers and 331 diagnostic files. Both generated
+headers match fixed pristine upstream bytes; AArch64 object/generator identities,
+exact commands, dependency paths, emitted input/output bytes and log bindings
+were independently rechecked without executing downloaded code locally.
+Zlib review SHA-256:
+`599b27ccac98532d0ee4fbd373e129c34203e2a2c709f99a530c9d670bbb545f`.
+Object-relink, preprocessing, media-generator and replacement-TUI review
+SHA-256s respectively:
+`cd59d1c375203687db6488d5aaefd4924183fb2cb8e52512ccb90ce0cd362fc9`,
+`5d69383d77882186b6f62940d508d12c42968ea02f7d9ccd2415c06639b8bdf9`,
+`84cb1c67182f99d2ceec3725cc3f53021874162674211f6861a242bcbd0100e4`,
+`d725b3d6a8ddf6c066c05d80d29fecdeac3bc40b4a070bdb933fdeaa836f47e3`.
+Job `129697214357` log SHA-256:
+`e4f8f67c3536fbc292a83cc01a159a36e4ccab7ec569cffd3b605bd91b9ac825`;
+regular CI `42776795592` succeeded at the exact same commit. This accepted run
+predates the subsequent build-time ELF/mutation hardening; its independent
+archive verifier separately enforced AArch64 object/generator checks. Acceptance
+covers MAKECRCH/MAKEFIXED only, not `trees.h`, swscale maintenance generators,
+original build/toolchain provenance, a complete modified-source rebuild, full
+corresponding source or redistribution/relinking/Android approval. Formal APK
+inputs, device data and existing Ubuntu instances remain unchanged.
+
 The next independent diagnostic starts from fresh copies of the fixed media
 archives, their complete byte-matched pristine source trees and the retained
 patched build script. It modifies only the copied pinned CRC translation unit,
