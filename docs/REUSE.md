@@ -1362,6 +1362,26 @@ archive identity still does not establish official-ELF correspondence,
 dependency acquisition, compiler execution or any approval; all approval flags
 remain false.
 
+The Bun-archive collector commit `a93e93d` has its own independent nine-gate
+acceptance for run `42806387561`. Artifact `13760693571` is 781680453 bytes;
+its API/downloaded ZIP SHA-256 is
+`4442dd44a1cfdff490f8aeda8b41f0d0073be05efae78aa5b5700b8e96cdd2ec`. The
+diagnostic now also contains the CI-fetched Bun candidate source archive with
+exactly the parent-pinned identity: SHA-256
+`64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520`, 92996071
+bytes, 26952 members (24703 files, 2240 directories, 9 symlinks), 277897935
+expanded bytes, alongside the same 25 pinned declaration files. The CI
+collector's own inventory SHA-256 is
+`875ddc3b22246893fef1362a0198c499b861f1de53e9325f0fd67a872c6b9827`. This is a
+bounded member identity/inventory capability, not evidence that the official
+Bun executable was built from this source: dependency acquisition, patch
+application, compiler execution and complete corresponding source remain
+unproven, and all approval flags remain false. Nine-gate parent acceptance
+index SHA-256:
+`78920fcfe26c43e268a2acf4241aad1a9f0b5767a19905406e3da475bb526ff7`;
+job `129796496545` log SHA-256:
+`7f64ae868068c52aa97ee8246d6ee0aef6eb09aaad534e38c34987281ed48877`.
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。
