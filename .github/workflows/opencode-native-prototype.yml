@@ -42,6 +42,7 @@ jobs:
           python3 scripts/build-opencode-native-fff.test.py
           python3 scripts/build-opencode-native-opentui.test.py
           python3 scripts/manifest-opencode-native.test.py
+          python3 scripts/rebuild-zlib-generators.test.py
       - name: Optional CA real TLS, bundled roots and hostname rejection
         timeout-minutes: 3
         run: python3 scripts/custom-ca-tls.test.py
@@ -74,6 +75,9 @@ jobs:
           tar -xJf work/zig-opentui/zig.tar.xz -C work/zig-opentui
           export PATH="$GITHUB_WORKSPACE/work/zig-opentui/zig-aarch64-linux-0.17.0:$PATH"
           python3 scripts/build-opencode-native-opentui.py work/upstream work/native-prototype
+      - name: Isolated zlib maintenance generators (diagnostic only)
+        run: |
+          python3 scripts/rebuild-zlib-generators.py work/native-prototype/native-opentui-build/source/opentui-9a09079c0c7ad0fb2d55404f66a5c453204328dd/packages/native/.cache/ffmpeg/sources/zlib-1.3.2 work/native-prototype/native-opentui-build
       - name: Build experimental source V2 including Web assets
         env:
           OPENCODE_CHANNEL: beta
@@ -221,6 +225,8 @@ jobs:
             work/native-prototype/native-opentui-build/media-object-relink/media-tui/tui.log
             work/native-prototype/native-opentui-build/media-object-relink/media-tui/tui-output.bin
             work/native-prototype/native-opentui-build/media-object-relink/media-tui/tui-maps.txt
+            work/native-prototype/native-opentui-build/zlib-generator-rebuild/**/*.log
+            work/native-prototype/native-opentui-build/zlib-generator-rebuild/**/*.d
             work/native-prototype/native-opentui-build/zig-generated-sources/
             work/native-prototype/native-opentui-build/link-replay/*.log
             work/native-prototype/native-opentui-build/link-replay/link.map

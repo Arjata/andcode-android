@@ -683,6 +683,20 @@ directories. Failures/timeouts do not create an accepted review. This experiment
 does not change the baseline native directory, rebuild the compiled CLI, approve
 decoder coverage or provide a content-addressed release payload/Android approval.
 
+The isolated zlib maintenance-generator diagnostic copies the pristine zlib
+tree, then rebuilds `crc32.c` with `MAKECRCH` and `inftrees.c` / `zutil.c` with
+`MAKEFIXED`. Host GCC performs full-dependency preprocessing and compiles the
+retained actual `.i` files; the diagnostic retains observed `/usr` headers,
+source inputs, object/executable bytes and all command/log bindings. Generated
+`crc32.h` and `inffixed.h` must match pristine upstream copies byte-for-byte.
+Original/copied source files, actual `.i`, observed system inputs and the GCC
+executable are mutation-guarded. Failures, dependency escapes, missing main
+dependencies, drift and timeouts do not create an accepted review. No result
+replaces configured media inputs or APK payloads. This covers only these two
+maintenance modes; `trees.h`, swscale maintenance generators, complete compiler
+and sysroot sources, original build provenance and legal/Android approval remain
+outside this diagnostic and require separate evidence.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
