@@ -872,6 +872,17 @@ parent binding SHA-256:
 The research proposes rules only; no swscale macro regeneration, full toolchain,
 corresponding-source, relinking or distribution approval follows.
 
+The configured source-rule diagnostic now also builds
+`libswscale/tests/sws_ops` in the copied media tree and runs only `-macros`
+from a new `swscale-generator-rebuild/` working directory. Explicit test-link
+flags request 16K alignment; the existing AArch64/glibc ELF gate applies before
+execution, and stdout must equal the pristine `uops_macros.h` byte-for-byte.
+Selected media objects, recorded dependencies and pristine sources are guarded
+through this test build; the generator itself is guarded through execution.
+This adds test-program build/run evidence, not original preprocessing capture or
+full toolchain/source closure. Synthetic failure, timeout, output drift, ELF and
+mutation cases pass locally; real macro regeneration still awaits native CI.
+
 The next independent diagnostic starts from fresh copies of the fixed media
 archives, their complete byte-matched pristine source trees and the retained
 patched build script. It modifies only the copied pinned CRC translation unit,

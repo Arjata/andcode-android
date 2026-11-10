@@ -90,8 +90,11 @@ class Tests(unittest.TestCase):
                         if mode == 'object-elf': raw = b'bad'
                         if mode == 'crc-unchanged' and key == keys[0]: raw = b'baseline object'
                         p = target / key; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(raw)
+                        group = 'zlib' if key.startswith('objects/libz/') else 'libavutil'
+                        built = copied_cache / 'build/aarch64-linux' / group / Path(key).name
+                        built.parent.mkdir(parents=True, exist_ok=True); built.write_bytes(raw)
                     config = copied_cache / 'build/aarch64-linux/config.h'
-                    config.parent.mkdir(parents=True); config.write_bytes(b'configuration')
+                    config.parent.mkdir(parents=True, exist_ok=True); config.write_bytes(b'configuration')
                     if mode == 'source-mutation': crc_source.write_bytes(b'changed')
                     if mode == 'baseline-mutation': (prefix / keys[1]).write_bytes(b'changed')
                     if mode == 'escape-output':
@@ -113,6 +116,7 @@ class Tests(unittest.TestCase):
                     stack.enter_context(patch.object(m.media, 'ffmpeg_configuration', return_value={'CONFIG_GPL': '0'}))
                     stack.enter_context(patch.object(m.media, 'ffmpeg_source_inputs', return_value=dependency))
                     stack.enter_context(patch.object(m.media, 'media_compile_commands', side_effect=compile_commands))
+                    stack.enter_context(patch.object(m, 'rebuild_swscale_macros', return_value={'mockOnly': True}))
                     stack.enter_context(patch.object(m.subprocess, 'run', side_effect=run))
                     if mode == 'ok':
                         result = m.rebuild(native, output, {'NODE_TLS_REJECT_UNAUTHORIZED': '0'})
@@ -132,6 +136,43 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             native = Path(tmp).resolve(); output = native / 'nested'; output.mkdir()
             with self.assertRaisesRegex(ValueError, 'overlap'): m.rebuild(native, output, {})
+
+    def test_swscale_macro_source_rule_and_rejections(self):
+        for mode in ['ok', 'preexisting', 'build', 'timeout', 'bad-elf', 'run', 'drift', 'mutation']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp).resolve(); cache = directory / 'cache'
+                build = cache / 'build/aarch64-linux'; build.mkdir(parents=True)
+                header = cache / 'sources/ffmpeg-9.0.2/libswscale/uops_macros.h'
+                header.parent.mkdir(parents=True); header.write_bytes(b'macro bytes\n')
+                generator = build / 'libswscale/tests/sws_ops'
+                generator.parent.mkdir(parents=True)
+                if mode == 'preexisting': generator.write_bytes(b'old ELF')
+
+                def run(command, **kwargs):
+                    if command[0] == 'make':
+                        self.assertEqual(kwargs['cwd'], build)
+                        self.assertEqual(command, ['make', 'V=1', 'libswscale/tests/sws_ops', 'ELIBS=-Wl,-z,max-page-size=16384'])
+                        if mode == 'timeout': raise subprocess.TimeoutExpired(command, 300, stderr=b'partial')
+                        generator.write_bytes(b'new ELF')
+                        return subprocess.CompletedProcess(command, 1 if mode == 'build' else 0, b'compile argv', b'')
+                    self.assertEqual(command, [str(generator), '-macros'])
+                    self.assertEqual(kwargs['cwd'], directory / 'swscale-generator-rebuild')
+                    if mode == 'mutation': generator.write_bytes(b'changed ELF')
+                    return subprocess.CompletedProcess(command, 1 if mode == 'run' else 0,
+                        b'different' if mode == 'drift' else header.read_bytes(), b'')
+
+                with patch.object(m.subprocess, 'run', side_effect=run), \
+                     patch.object(m.media.pty.audit, 'elf', side_effect=ValueError('bad ELF') if mode == 'bad-elf' else None,
+                                  return_value=({}, ['libc.so.6'])):
+                    if mode == 'ok':
+                        result = m.rebuild_swscale_macros(cache, directory, {})
+                        self.assertEqual(result['sha256'], m.digest(header))
+                        self.assertEqual(result['generatorSha256'], m.digest(generator))
+                        self.assertEqual(len(result['commands']), 2)
+                        self.assertFalse(result['redistributionApproved'])
+                    else:
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+                            m.rebuild_swscale_macros(cache, directory, {})
 
     def test_evidence_directory_alias_and_cycle(self):
         with tempfile.TemporaryDirectory() as tmp:

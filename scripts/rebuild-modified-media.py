@@ -81,6 +81,45 @@ def evidence_files(directory, output):
     return rows
 
 
+def rebuild_swscale_macros(cache, directory, env):
+    work = directory / 'swscale-generator-rebuild'
+    work.mkdir(exist_ok=False)
+    build = cache / 'build/aarch64-linux'
+    generator = build / 'libswscale/tests/sws_ops'
+    if generator.exists():
+        raise ValueError('Unexpected preexisting swscale test generator')
+    commands = []
+
+    def run(command, log, cwd):
+        commands.append({'command': command, 'cwd': str(cwd), 'log': log.relative_to(directory).as_posix()})
+        try:
+            done = subprocess.run(command, cwd=cwd, env=env, capture_output=True, timeout=300)
+        except subprocess.TimeoutExpired as error:
+            log.write_bytes(b'TIMEOUT\n' + (error.stdout or b'') + (error.stderr or b''))
+            raise
+        log.write_bytes(done.stdout + done.stderr)
+        done.check_returncode()
+        return done.stdout
+
+    run(['make', 'V=1', 'libswscale/tests/sws_ops', 'ELIBS=-Wl,-z,max-page-size=16384'],
+        work / 'build.log', build)
+    _, needed = media.pty.audit.elf(generator.read_bytes())
+    checksum = digest(generator)
+    generated = run([str(generator), '-macros'], work / 'run.log', work)
+    (work / 'uops_macros.h').write_bytes(generated)
+    original = cache / 'sources/ffmpeg-9.0.2/libswscale/uops_macros.h'
+    if not generated or generated != original.read_bytes():
+        raise ValueError('Regenerated swscale macros differ from pristine upstream')
+    if digest(generator) != checksum:
+        raise ValueError('Swscale generator mutated during execution')
+    return {'commands': commands, 'generator': generator.relative_to(directory).as_posix(),
+            'generatorSha256': checksum, 'needed': needed,
+            'output': (work / 'uops_macros.h').relative_to(directory).as_posix(),
+            'bytes': len(generated), 'sha256': hashlib.sha256(generated).hexdigest(),
+            'redistributionApproved': False, 'androidApproved': False,
+            'scope': 'Configured sws_ops source-rule build and -macros byte comparison only; not original preprocessing, full toolchain or legal approval'}
+
+
 def rebuild(native, output, env):
     native, output = Path(native).resolve(strict=True), Path(output).resolve(strict=True)
     directory = output / 'modified-media-source-rebuild'
@@ -161,6 +200,16 @@ def rebuild(native, output, env):
                 or int.from_bytes(raw[18:20], 'little') != 183
                 or int.from_bytes(raw[20:24], 'little') != 1):
             raise ValueError('Modified media object is not AArch64 ELF64 relocatable')
+        protected[prefix / row['object']] = digest(prefix / row['object'])
+        parts = PurePosixPath(row['object']).parts
+        group = 'zlib' if parts[1] == 'libz' else parts[1]
+        built = cache / 'build/aarch64-linux' / group / str(PurePosixPath(*parts[2:]))
+        protected[built] = digest(built)
+    for row in dependencies['files']:
+        protected[cache / row['path']] = row['sha256']
+    for row in dependencies['objects']:
+        protected[cache / row['dependencyFile']] = digest(cache / row['dependencyFile'])
+    swscale_generator = rebuild_swscale_macros(cache, directory, child_env)
     for path, checksum in protected.items():
         if digest(path) != checksum:
             raise ValueError('Modified media rebuild changed protected source')
@@ -168,6 +217,7 @@ def rebuild(native, output, env):
     result = {'command': command, 'cwd': str(copied), 'log': log.relative_to(output).as_posix(),
               'files': files, 'configuration': configuration, 'sourceDependencies': dependencies,
               'compileCommands': compilation, 'modifiedCrcSha256': protected[crc],
+              'swscaleGeneratorRebuild': swscale_generator,
               'redistributionApproved': False, 'androidApproved': False, 'relinkingApproved': False,
               'fullCorrespondingSourceApproved': False,
               'scope': 'Fresh source-rule configure/make and all selected FFmpeg/zlib objects with modified CRC; no sampled .i reuse, final OpenTUI relink, decoder/TUI execution, original object equivalence, complete toolchain/source or legal approval'}
