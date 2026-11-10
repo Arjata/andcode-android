@@ -1098,6 +1098,160 @@ def probe_modified_crc_relink(native, link, zig, result, output, env):
             'scope': 'One instrumented CRC object and final shared-library execution only; not complete source, general replacement, decoder/TUI or LGPL approval'}
 
 
+def relink_media_objects(link, zig, result, output, env, preprocessing, modified_crc):
+    """Recompile every sampled unit, then substitute the isolated CRC instrument."""
+    sampled = preprocessing['objects']
+    media_prefix = '.cache/ffmpeg/prefix/aarch64-linux/'
+    media = {row['scopeRelativePath'].removeprefix(media_prefix): row for row in link['inputs']
+             if row['scope'] == 'opentui-source-build'
+             and row['scopeRelativePath'].startswith(media_prefix + 'objects/')}
+    if (not sampled or len(sampled) > 1000 or len(media) != len(sampled)
+            or set(media) != {row['object'] for row in sampled}
+            or len({row['object'] for row in sampled}) != len(sampled)):
+        raise ValueError('Media recompile/link input set differs')
+    zig = Path(zig).resolve(strict=True)
+    if hashlib.sha256(zig.read_bytes()).hexdigest() != preprocessing['zigSha256']:
+        raise ValueError('Media recompile Zig changed')
+    directory = output / 'media-object-relink'
+    directory.mkdir(exist_ok=False)
+    (directory / 'objects').mkdir()
+    protected, replacements, rows, commands = {}, {}, [], []
+    original_result_digest = hashlib.sha256(result.read_bytes()).hexdigest()
+
+    def protect(path, digest, size=None):
+        path = path.resolve(strict=True)
+        path.relative_to(output.resolve(strict=True))
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != digest or (size is not None and len(raw) != size):
+            raise ValueError('Media recompile retained input differs')
+        protected[path] = digest
+        return path
+
+    for row in link['inputs']:
+        protect(output / row['retainedPath'], row['sha256'], row['bytes'])
+    for row in preprocessing['snapshots']:
+        protect(output / row['path'], row['sha256'], row['bytes'])
+    for row in modified_crc['files']:
+        protect(output / row['path'], row['sha256'], row['bytes'])
+    clean_env = dict(env)
+    for key in ['CPATH', 'C_INCLUDE_PATH', 'CPLUS_INCLUDE_PATH', 'OBJC_INCLUDE_PATH',
+                'GCC_EXEC_PREFIX', 'COMPILER_PATH', 'LIBRARY_PATH', 'DEPENDENCIES_OUTPUT',
+                'SUNPRO_DEPENDENCIES', 'LD_PRELOAD', 'LD_LIBRARY_PATH']:
+        clean_env.pop(key, None)
+
+    def run(command, log, timeout=120):
+        commands.append({'command': command, 'log': log.relative_to(output).as_posix()})
+        try:
+            done = subprocess.run(command, cwd=directory, env=clean_env,
+                                  capture_output=True, timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            log.write_bytes((shlex.join(command) + '\nTIMEOUT\n').encode()
+                            + (error.stdout or b'') + (error.stderr or b''))
+            raise
+        log.write_bytes((shlex.join(command) + '\n').encode() + done.stdout + done.stderr)
+        done.check_returncode()
+        return done.stdout
+
+    for index, row in enumerate(sampled):
+        source = protect(output / row['preprocessed'], row['sha256'], row['bytes'])
+        args = row['command']
+        if (args[:4] != [str(zig), 'cc', '-target', 'aarch64-linux-gnu.2.17']
+                or args[-9:] != ['-MD', '-MF', str(output / row['dependencyFile']),
+                                 '-MT', row['object'], '-E', '-o', str(source), args[-1]]):
+            raise ValueError('Unexpected media preprocessing command shape')
+        flags = []
+        for flag in args[4:-9]:
+            if flag.startswith(('-I', '-D')):
+                continue
+            if flag not in {'-O3', '-Os', '-Oz', '-Qunused-arguments', '-fPIC', '-fdata-sections',
+                            '-ffunction-sections', '-fno-math-errno', '-fno-signed-zeros',
+                            '-fomit-frame-pointer', '-fvisibility=hidden', '-mstack-alignment=16', '-pthread', '-std=c17'}:
+                if flag.startswith('-W') and not any(c.isspace() for c in flag):
+                    continue
+                raise ValueError('Unapproved media recompile option')
+            flags.append(flag)
+        language = 'cpp-output' if source.suffix == '.i' else 'assembler'
+        if source.suffix not in ['.i', '.s']:
+            raise ValueError('Unexpected preprocessed media suffix')
+        destination = directory / 'objects' / f'{index:04d}.o'
+        command = [str(zig), 'cc', '-target', 'aarch64-linux-gnu.2.17', *flags,
+                   '-x', language, '-c', str(source), '-o', str(destination)]
+        run(command, directory / f'{index:04d}.log')
+        raw = destination.read_bytes()
+        if (not raw.startswith(b'\x7fELF\x02\x01') or len(raw) < 20
+                or int.from_bytes(raw[16:18], 'little') != 1
+                or int.from_bytes(raw[18:20], 'little') != 183):
+            raise ValueError('Recompiled media object is not AArch64 ET_REL')
+        protected[destination] = hashlib.sha256(raw).hexdigest()
+        replacements[row['object']] = destination
+        rows.append({'object': row['object'], 'preprocessed': row['preprocessed'],
+                     'path': destination.relative_to(output).as_posix(), 'sha256': protected[destination],
+                     'bytes': len(raw), 'byteIdenticalToBaseline': raw == (output / media[row['object']]['retainedPath']).read_bytes()})
+    crc_key = 'objects/libavutil/crc.o'
+    if crc_key not in replacements or modified_crc['replacement'] != media[crc_key]:
+        raise ValueError('Missing instrumented CRC replacement binding')
+    replacements[crc_key] = output / 'modified-crc-relink/crc.o'
+    arguments = list(link['command'])
+    if arguments[0] != 'ld.lld' or arguments.count('-o') != 1:
+        raise ValueError('Unexpected all-media linker command')
+    for row in link['inputs']:
+        if arguments[row['argumentIndex']] != row['path']:
+            raise ValueError('All-media linker argument binding differs')
+        key = row['scopeRelativePath'].removeprefix(media_prefix)
+        arguments[row['argumentIndex']] = str(replacements[key]
+            if row['scope'] == 'opentui-source-build' and key in replacements
+            else output / row['retainedPath'])
+    binary = directory / 'libopentui.so'
+    arguments[arguments.index('-o') + 1] = str(binary)
+    command = [str(zig), *arguments, '--Map=' + str(directory / 'link.map'),
+               '--why-extract=' + str(directory / 'archive-extraction.tsv')]
+    run(command, directory / 'link.log')
+    payload = binary.read_bytes()
+    if payload == result.read_bytes():
+        raise ValueError('All-media instrumented library did not change')
+    _, needed = pty.audit.elf(payload)
+    if sorted(needed) != sorted(pty.audit.elf(result.read_bytes())[1]):
+        raise ValueError('All-media replacement dependencies changed')
+    mapping = (directory / 'link.map').read_text(encoding='utf8')
+    if not mapping or not (directory / 'archive-extraction.tsv').read_text(encoding='utf8').startswith('reference\textracted\tsymbol\n'):
+        raise ValueError('Missing all-media linker reports')
+    if str(replacements[crc_key]) not in mapping:
+        raise ValueError('Instrumented CRC missing from all-media linker map')
+    abi = run(['bun', str(output / 'modified-crc-relink/probe.mjs'), str(binary)], directory / 'abi.log', 30)
+    if MARKER.encode() not in abi:
+        raise ValueError('All-media ABI probe did not complete')
+    probe_commands = [list(command) for command in modified_crc['probeCommands']]
+    for command in probe_commands:
+        for index, arg in enumerate(command):
+            if arg == str(output / 'modified-crc-relink/libopentui.so'):
+                command[index] = str(binary)
+            elif arg == '-Wl,-rpath,' + str(output / 'modified-crc-relink'):
+                command[index] = '-Wl,-rpath,' + str(directory)
+            elif arg == str(output / 'modified-crc-relink/crc-probe'):
+                command[index] = str(directory / 'crc-probe')
+    if len(probe_commands) != 2 or probe_commands[-1] != [str(directory / 'crc-probe')]:
+        raise ValueError('Unexpected all-media CRC probe shape')
+    run(probe_commands[0], directory / 'crc-probe.log', 60)
+    crc = run(probe_commands[1], directory / 'crc-execution.log', 60)
+    if (CRC_MARKER.encode() + b' 2304 cases (Linux only)' not in crc
+            or b'ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)' not in crc):
+        raise ValueError('All-media modified CRC probe did not complete')
+    for path, digest in {**protected, zig: preprocessing['zigSha256']}.items():
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError('All-media replacement changed protected inputs')
+    if hashlib.sha256(result.read_bytes()).hexdigest() != original_result_digest:
+        raise ValueError('All-media replacement changed baseline library')
+    files = [{'path': p.relative_to(output).as_posix(), 'bytes': p.stat().st_size,
+              'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+             for p in sorted(directory.rglob('*')) if p.is_file()]
+    return {'objects': rows, 'replacedObjects': len(replacements), 'instrumentedObject': crc_key,
+            'inputCount': len(link['inputs']), 'commands': commands, 'files': files,
+            'instrumentedReplacement': replacements[crc_key].relative_to(output).as_posix(),
+            'needed': needed, 'crcCases': 2304, 'modifiedCalls': 6912,
+            'redistributionApproved': False, 'androidApproved': False, 'relinkingApproved': False,
+            'scope': 'Recompile all post-build sampled media units, substitute separately instrumented CRC, relink and run ABI/CRC only; not original-object equality, full modified-source closure, decoder/TUI coverage or legal/Android approval'}
+
+
 def validate(result, target, output, env):
     payload = result.read_bytes()
     _, needed = pty.audit.elf(payload)
@@ -1228,6 +1382,7 @@ def build(upstream, stage):
         raise ValueError('Installed OpenTUI differs from final-link output')
     replay = replay_link_inputs(link, zig, result, output, env)
     modified_relink = probe_modified_crc_relink(native, link, zig, result, output, env)
+    media_relink = relink_media_objects(link, zig, result, output, env, preprocessed_inputs, modified_relink)
     generated_sources = retain_zig_generated_sources(output, env)
     shutil.copyfile(result, output / 'libopentui.so')
     needed = validate(result, target, output, env)
@@ -1253,6 +1408,7 @@ def build(upstream, stage):
         'finalLink': link,
         'finalLinkReplay': replay,
         'modifiedCrcRelink': modified_relink,
+        'mediaObjectRelink': media_relink,
         'limitations': ['FFmpeg objects and build tree retained, not complete LGPL relinking approval',
                         'Explicit linker input copies do not prove selected archive members, per-file source attribution or toolchain corresponding source',
                         'Per-file notices, Bun/JSC obligations and Android remain under review']

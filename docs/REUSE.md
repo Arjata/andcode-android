@@ -591,6 +591,25 @@ This acceptance remains post-build sampling only: it does not establish original
 compile-time input capture, original-object reconstruction, complete modified
 media replacement, complete corresponding source or legal/Android approval.
 
+The next bounded diagnostic compiles every retained post-build `.i` / `.s`
+sample with the same fixed Zig target and reviewed code-generation flags into
+separate AArch64 relocatable objects. Preprocessor include/definition options
+are not re-applied; C language-standard flags are retained. It records object
+hashes and baseline byte comparisons without requiring equality. All media
+linker positions must match the sampled object set; final linking replaces the
+generic sampled CRC object with the separately built instrumented CRC object,
+uses newly compiled objects for all other media inputs, and retains non-media
+inputs. The recompiled uninstrumented CRC object is retained but is not the
+final link input. Commands, maps, archive extraction, ABI and 2304-case / 6912-call
+CRC execution logs remain isolated. The baseline library, retained inputs and
+sample snapshots are mutation-guarded; failures/timeouts prevent staging.
+This is not a complete modified-source rebuild: the instrumented CRC follows
+its earlier separate configured-tree build, while the other inputs come from
+post-build preprocessing samples. It does not establish original object byte
+identity, full live-code coverage, decoder/TUI behavior of the replacement,
+complete corresponding source, toolchain closure or legal/Android approval.
+The replacement library is never staged in the APK.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

@@ -213,6 +213,9 @@ jobs:
             work/native-prototype/native-opentui-build/media-generator-rebuild/*.S
             work/native-prototype/native-opentui-build/media-preprocess/*.log
             work/native-prototype/native-opentui-build/media-preprocess/*.d
+            work/native-prototype/native-opentui-build/media-object-relink/*.log
+            work/native-prototype/native-opentui-build/media-object-relink/*.map
+            work/native-prototype/native-opentui-build/media-object-relink/*.tsv
             work/native-prototype/native-opentui-build/zig-generated-sources/
             work/native-prototype/native-opentui-build/link-replay/*.log
             work/native-prototype/native-opentui-build/link-replay/link.map

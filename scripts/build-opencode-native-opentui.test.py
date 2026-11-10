@@ -743,6 +743,103 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.retain_link_inputs(shlex.join(args), native, output, env)
 
+    def test_all_media_recompile_relink_and_fail_closed(self):
+        modes = ['ok', 'set', 'duplicate', 'tool', 'input', 'flags', 'compile', 'timeout',
+                 'elf', 'link', 'unchanged', 'needed', 'map', 'extraction', 'abi',
+                 'crc', 'probe-compile', 'mutate']
+        for mode in modes:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                output = root / 'output'; output.mkdir()
+                zig = root / 'zig'; zig.write_bytes(b'fixed compiler')
+                result = root / 'original.so'; result.write_bytes(b'original library')
+                link = {'command': ['ld.lld', '-o', str(result)], 'inputs': []}
+                sampled = []
+                directory = output / 'media-object-relink'
+                for index, (key, suffix) in enumerate([('objects/libavutil/crc.o', '.i'),
+                                                      ('objects/libswscale/neon.o', '.s')]):
+                    retained = output / f'retained-{index}.o'; retained.write_bytes(b'original object')
+                    row = {'scope': 'opentui-source-build',
+                           'scopeRelativePath': '.cache/ffmpeg/prefix/aarch64-linux/' + key,
+                           'retainedPath': retained.name, 'sha256': hashlib.sha256(retained.read_bytes()).hexdigest(),
+                           'bytes': retained.stat().st_size, 'path': str(root / key), 'argumentIndex': len(link['command'])}
+                    link['command'].append(row['path']); link['inputs'].append(row)
+                    source = output / f'{index:04d}{suffix}'; source.write_bytes(b'preprocessed')
+                    dep = output / f'{index:04d}.d'
+                    command = [str(zig), 'cc', '-target', 'aarch64-linux-gnu.2.17', '-O3', '-fPIC',
+                               '-MD', '-MF', str(dep), '-MT', key, '-E', '-o', str(source), 'original.c']
+                    sampled.append({'object': key, 'preprocessed': source.name, 'dependencyFile': dep.name,
+                                    'sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+                                    'bytes': source.stat().st_size, 'command': command})
+                modified = output / 'modified-crc-relink'; modified.mkdir()
+                for name in ['crc.o', 'probe.mjs', 'crc-probe.c']:
+                    (modified / name).write_bytes(b'instrumented fixture')
+                prior = {'replacement': link['inputs'][0],
+                         'files': [{'path': p.relative_to(output).as_posix(), 'bytes': p.stat().st_size,
+                                    'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in modified.iterdir()],
+                         'probeCommands': [['cc', str(modified / 'crc-probe.c'), str(modified / 'libopentui.so'),
+                                            '-Wl,-rpath,' + str(modified), '-o', str(modified / 'crc-probe')],
+                                           [str(modified / 'crc-probe')]]}
+                preprocessing = {'objects': sampled, 'snapshots': [], 'zigSha256': hashlib.sha256(zig.read_bytes()).hexdigest()}
+                if mode == 'set': preprocessing['objects'] = sampled[:1]
+                if mode == 'duplicate': preprocessing['objects'] = [sampled[0], sampled[0]]
+                if mode == 'tool': zig.write_bytes(b'changed')
+                if mode == 'input': (output / sampled[0]['preprocessed']).write_bytes(b'changed')
+                if mode == 'flags': sampled[0]['command'].insert(4, '-fplugin=bad')
+
+                def run(command, **kwargs):
+                    self.assertEqual(kwargs['cwd'], directory)
+                    self.assertNotIn('CPATH', kwargs['env'])
+                    stdout = b''
+                    if command[:2] == [str(zig), 'cc']:
+                        self.assertNotIn('-MD', command)
+                        self.assertNotIn('-E', command)
+                        self.assertIn(command[command.index('-x') + 1], ['cpp-output', 'assembler'])
+                        if mode == 'compile': return subprocess.CompletedProcess(command, 2, b'', b'failed')
+                        if mode == 'timeout': raise subprocess.TimeoutExpired(command, 120, stderr=b'partial')
+                        raw = bytearray(64); raw[:6] = b'\x7fELF\x02\x01'
+                        raw[16:18] = (1).to_bytes(2, 'little'); raw[18:20] = (183).to_bytes(2, 'little')
+                        Path(command[-1]).write_bytes(b'invalid' if mode == 'elf' else bytes(raw))
+                    elif command[:2] == [str(zig), 'ld.lld']:
+                        self.assertIn(str(modified / 'crc.o'), command)
+                        self.assertIn(str(directory / 'objects/0001.o'), command)
+                        for row in link['inputs']: self.assertNotIn(str(output / row['retainedPath']), command)
+                        if mode == 'link': return subprocess.CompletedProcess(command, 2, b'', b'failed')
+                        (directory / 'libopentui.so').write_bytes(b'original library' if mode == 'unchanged' else b'modified library')
+                        (directory / 'link.map').write_text('other' if mode == 'map' else str(modified / 'crc.o'))
+                        (directory / 'archive-extraction.tsv').write_text('bad' if mode == 'extraction' else 'reference\textracted\tsymbol\n')
+                    elif command[0] == 'bun':
+                        stdout = b'' if mode == 'abi' else m.MARKER.encode()
+                    elif command[0] == 'cc':
+                        self.assertIn(str(directory / 'libopentui.so'), command)
+                        self.assertIn('-Wl,-rpath,' + str(directory), command)
+                        if mode == 'probe-compile': return subprocess.CompletedProcess(command, 2, b'', b'failed')
+                        (directory / 'crc-probe').write_bytes(b'probe')
+                    else:
+                        self.assertEqual(command, [str(directory / 'crc-probe')])
+                        stdout = (m.CRC_MARKER + ' 2304 cases (Linux only)\n').encode()
+                        if mode != 'crc': stdout += b'ANDCODE_MODIFIED_CRC_RELINK_OK 6912 calls (Linux only)\n'
+                        if mode == 'mutate': (output / sampled[0]['preprocessed']).write_bytes(b'changed')
+                    return subprocess.CompletedProcess(command, 0, stdout, b'')
+
+                def elf(raw):
+                    return None, ['libc.so.6', 'libextra.so'] if mode == 'needed' and raw == b'modified library' else ['libc.so.6']
+
+                with patch.object(m.subprocess, 'run', side_effect=run), patch.object(m.pty.audit, 'elf', side_effect=elf):
+                    if mode == 'ok':
+                        report = m.relink_media_objects(link, zig, result, output, {'CPATH': 'untrusted'}, preprocessing, prior)
+                        self.assertEqual(report['replacedObjects'], 2)
+                        self.assertEqual(report['modifiedCalls'], 6912)
+                        self.assertEqual(len(report['commands']), 6)
+                        self.assertTrue(all(not report[k] for k in ['redistributionApproved', 'androidApproved', 'relinkingApproved']))
+                        for row in report['files']:
+                            raw = (output / row['path']).read_bytes()
+                            self.assertEqual(hashlib.sha256(raw).hexdigest(), row['sha256'])
+                        self.assertEqual(result.read_bytes(), b'original library')
+                    else:
+                        with self.assertRaises((ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+                            m.relink_media_objects(link, zig, result, output, {}, preprocessing, prior)
+
     CRC_FIXTURE = (b'/* upstream license fixture */\n#include "config.h"\n#include "crc.h"\n'
                    b'int av_crc_init(void) { return 0; }\n'
                    b'const AVCRC *av_crc_get_table(void) { return 0; }\n'
@@ -935,7 +1032,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'generator-rebuild', 'preprocessing', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'generator-rebuild', 'preprocessing', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'media-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -1062,6 +1159,8 @@ class Tests(unittest.TestCase):
                                      side_effect=ValueError('Replay failed') if failure == 'replay' else None),
                         patch.object(m, 'probe_modified_crc_relink', return_value={'modifiedCalls': 6912},
                                      side_effect=ValueError('Modified relink failed') if failure == 'modified-relink' else None),
+                        patch.object(m, 'relink_media_objects', return_value={'replacedObjects': 345},
+                                     side_effect=ValueError('Media relink failed') if failure == 'media-relink' else None),
                         patch.object(m.subprocess, 'check_output', return_value='0.17.0'),
                         patch.object(m.subprocess, 'run', side_effect=run),
                     ]
@@ -1085,6 +1184,7 @@ class Tests(unittest.TestCase):
                                          hashlib.sha256(b'linked object').hexdigest())
                         self.assertEqual(len(report['zigGeneratedSources']['files']), 1)
                         self.assertEqual(report['modifiedCrcRelink']['modifiedCalls'], 6912)
+                        self.assertEqual(report['mediaObjectRelink']['replacedObjects'], 345)
                         self.assertEqual(len(report['ffmpegGeneratorReplay']['outputs']), 2)
                         self.assertEqual(report['ffmpegGeneratorRebuild']['outputMatches'], 2)
                         self.assertEqual(len(report['ffmpegPreprocessing']['objects']), 1)
