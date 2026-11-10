@@ -909,6 +909,13 @@ Complete object substitution is checked against linker argv, not inferred from
 map liveness: garbage collection may discard entire unused media objects. The
 map must retain the explicitly exercised instrumented CRC object; no all-object
 or all-section liveness claim follows.
+A focused synthetic case substitutes two media objects while deliberately
+omitting the unused one from the map; CRC/map/ABI execution evidence still must
+pass. The first link run `42790552909` at `6b439e4` failed at the superseded
+all-object map assertion, not at an accepted ABI/CRC result. Its job
+`129742564402` log is retained (SHA-256
+`cfd883e646861e495905aeaca7d096f48e7a460039886162f7bb450f3671ced0`);
+the corrected gate requires a new native run and independent archive review.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

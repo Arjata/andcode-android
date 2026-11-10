@@ -15,7 +15,7 @@ spec.loader.exec_module(m)
 
 class Tests(unittest.TestCase):
     def test_relink_and_fail_closed(self):
-        modes = ['ok', 'approval', 'source-drift', 'duplicate', 'set-gap', 'retained-drift',
+        modes = ['ok', 'discarded-media', 'approval', 'source-drift', 'duplicate', 'set-gap', 'retained-drift',
                  'argument', 'link', 'timeout', 'map', 'extraction', 'needed', 'abi',
                  'crc-shape', 'crc', 'mutation', 'baseline-mutation', 'library-mutation',
                  'probe-mutation', 'unchanged-library']
@@ -49,6 +49,15 @@ class Tests(unittest.TestCase):
                 if mode == 'set-gap': inputs[0]['scope'] = 'other'
                 if mode == 'retained-drift': other.write_bytes(b'changed')
                 if mode == 'argument': inputs[0]['path'] = '/wrong'
+                if mode == 'discarded-media':
+                    unused = obj.parent / 'unused.o'; unused.write_bytes(b'fresh unused media')
+                    source['files'].append({'path': unused.relative_to(output).as_posix(),
+                        'bytes': unused.stat().st_size, 'sha256': m.digest(unused)})
+                    source['compileCommands']['objects'].append({'object': 'objects/libavutil/unused.o',
+                        'objectSha256': m.digest(unused)})
+                    source_review.write_text(json.dumps(source))
+                    inputs[1]['scope'] = 'opentui-source-build'
+                    inputs[1]['scopeRelativePath'] = '.cache/ffmpeg/prefix/aarch64-linux/objects/libavutil/unused.o'
                 prior = output / 'modified-crc-relink'; prior.mkdir()
                 (prior / 'crc-probe.c').write_bytes(b'probe source')
                 (output / 'probe.mjs').write_bytes(b'ABI source')
@@ -64,7 +73,7 @@ class Tests(unittest.TestCase):
                 def run(command, **kwargs):
                     calls.append(command); stdout = b''
                     if command[0] == str(zig):
-                        self.assertEqual(command[2:4], [str(obj), str(other)])
+                        self.assertEqual(command[2:4], [str(obj), str(unused if mode == 'discarded-media' else other)])
                         if mode == 'link': raise subprocess.CalledProcessError(1, command)
                         if mode == 'timeout': raise subprocess.TimeoutExpired(command, 120, stderr=b'partial')
                         (directory / 'libopentui.so').write_bytes(b'baseline library' if mode == 'unchanged-library' else b'relinked library')
@@ -91,9 +100,9 @@ class Tests(unittest.TestCase):
                     stack.enter_context(patch.object(m.media, 'ZIG_SHA256', m.digest(archive)))
                     stack.enter_context(patch.object(m.media.pty.audit, 'elf', return_value=({}, ['unexpected' if mode == 'needed' else 'libc.so.6'])))
                     stack.enter_context(patch.object(m.subprocess, 'run', side_effect=run))
-                    if mode == 'ok':
+                    if mode in ['ok', 'discarded-media']:
                         result = m.relink(output, {})
-                        self.assertEqual(result['replacedObjects'], 1)
+                        self.assertEqual(result['replacedObjects'], 2 if mode == 'discarded-media' else 1)
                         self.assertEqual(len(result['commands']), 4)
                         self.assertEqual(result['modifiedCalls'], 6912)
                         for row in result['files']: self.assertEqual(m.digest(output / row['path']), row['sha256'])
