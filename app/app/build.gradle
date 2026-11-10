@@ -18,6 +18,19 @@ android {
     namespace = "dev.andcode.app"
     compileSdk = 37
 
+    // Fail-closed release signing: all four properties together or none.
+    // The keystore never enters the repository; CI injects it from secrets.
+    def releaseSigning = [
+        providers.gradleProperty("andcodeReleaseStoreFile"),
+        providers.gradleProperty("andcodeReleaseStorePassword"),
+        providers.gradleProperty("andcodeReleaseKeyAlias"),
+        providers.gradleProperty("andcodeReleaseKeyPassword"),
+    ]
+    def signingCount = releaseSigning.count { it.isPresent() }
+    if (signingCount != 0 && signingCount != 4) {
+        throw new GradleException("andcodeRelease* signing properties must be provided together")
+    }
+
     defaultConfig {
         applicationId = "dev.andcode.app"
         minSdk = 31
@@ -38,6 +51,31 @@ android {
     if (nativePayload.isPresent()) {
         sourceSets.main.jniLibs.srcDir(file(nativePayload.get()))
         sourceSets.main.assets.srcDir(new File(file(nativePayload.get()), "assets"))
+    }
+    if (signingCount == 4) {
+        def store = file(releaseSigning[0].get())
+        if (!store.isFile()) {
+            throw new GradleException("andcodeReleaseStoreFile does not exist: " + store)
+        }
+        signingConfigs {
+            release {
+                storeFile = store
+                storePassword = releaseSigning[1].get()
+                keyAlias = releaseSigning[2].get()
+                keyPassword = releaseSigning[3].get()
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // Without signing properties assembleRelease stays unsigned and is
+            // not a distribution candidate; never replace the installed
+            // debug-signed APK with a different signing identity.
+            if (signingCount == 4) {
+                signingConfig = signingConfigs.release
+                minifyEnabled = false
+            }
+        }
     }
 }
 
