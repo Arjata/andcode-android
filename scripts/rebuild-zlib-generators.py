@@ -1,4 +1,4 @@
-"""Isolated host rebuild of two zlib maintenance generators, not source approval."""
+"""Isolated zlib maintenance rebuilds and tree harness, not source approval."""
 import hashlib
 import json
 import os
@@ -10,6 +10,9 @@ import sys
 
 
 SYSTEM_ROOT = Path('/usr')
+TREES_HARNESS = ('/* andcode diagnostic entry point; upstream source is unchanged. */\n'
+                 '#include "trees.c"\n'
+                 'int main(void) { tr_static_init(); return 0; }\n')
 
 
 def digest(path):
@@ -53,7 +56,7 @@ def rebuild(source, output, env):
         protected[path] = checksum
         protected[destination] = checksum
         source_rows.append({'path': relative.as_posix(), 'bytes': len(raw), 'sha256': checksum})
-    for name in ['crc32.c', 'inftrees.c', 'zutil.c', 'crc32.h', 'inffixed.h', 'LICENSE']:
+    for name in ['crc32.c', 'inftrees.c', 'zutil.c', 'trees.c', 'crc32.h', 'inffixed.h', 'trees.h', 'LICENSE']:
         if not (copied / name).is_file():
             raise ValueError('Missing zlib generator source input')
     compiler_name = shutil.which('gcc')
@@ -84,14 +87,20 @@ def rebuild(source, output, env):
     headers, rows = {}, []
     for mode, define, sources, filename in [
         ('makecrch', 'MAKECRCH', ['crc32.c'], 'crc32.h'),
-        ('makefixed', 'MAKEFIXED', ['inftrees.c', 'zutil.c'], 'inffixed.h')]:
+        ('makefixed', 'MAKEFIXED', ['inftrees.c', 'zutil.c'], 'inffixed.h'),
+        ('gentrees', 'GEN_TREES_H', ['trees-generator.c'], 'trees.h')]:
         work = directory / mode
         work.mkdir()
+        harness = work / 'trees-generator.c'
+        if mode == 'gentrees':
+            harness.write_text(TREES_HARNESS, encoding='utf8', newline='\n')
+            protected[harness] = digest(harness)
         objects, units = [], []
         for index, name in enumerate(sources):
+            main_source = harness if mode == 'gentrees' else copied / name
             preprocessed, dep, obj = [work / f'{index:04d}{suffix}' for suffix in ['.i', '.d', '.o']]
             command = [str(compiler), '-O2', '-std=c17', '-I' + str(copied), '-D' + define,
-                       '-MD', '-MF', str(dep), '-MT', obj.name, '-E', '-o', str(preprocessed), str(copied / name)]
+                       '-MD', '-MF', str(dep), '-MT', obj.name, '-E', '-o', str(preprocessed), str(main_source)]
             run(command, work, work / f'{index:04d}-preprocess.log')
             target, separator, body = dep.read_text(encoding='utf8').replace('\\\n', ' ').partition(':')
             if not separator or target.strip() != obj.name:
@@ -101,7 +110,11 @@ def rebuild(source, output, env):
                 path = Path(spelling)
                 path = (path if path.is_absolute() else work / path).resolve(strict=True)
                 checksum = digest(path)
-                if path.is_relative_to(copied):
+                if mode == 'gentrees' and path == harness:
+                    if protected[path] != checksum:
+                        raise ValueError('Changed zlib generator harness')
+                    dependencies.append({'kind': 'harness', 'path': harness.relative_to(output).as_posix(), 'sha256': checksum})
+                elif path.is_relative_to(copied):
                     if protected.get(path) != checksum:
                         raise ValueError('Changed copied zlib dependency')
                     dependencies.append({'kind': 'source', 'path': path.relative_to(copied).as_posix(), 'sha256': checksum})
@@ -117,8 +130,12 @@ def rebuild(source, output, env):
                     headers[str(path)] = {'path': str(path), 'copy': destination.relative_to(output).as_posix(),
                                           'sha256': checksum, 'bytes': path.stat().st_size}
                     dependencies.append({'kind': 'system', 'path': str(path), 'sha256': checksum})
-            if name not in {r['path'] for r in dependencies if r['kind'] == 'source'}:
+            main_path = harness.relative_to(output).as_posix() if mode == 'gentrees' else name
+            main_kind = 'harness' if mode == 'gentrees' else 'source'
+            if main_path not in {r['path'] for r in dependencies if r['kind'] == main_kind}:
                 raise ValueError('Missing zlib generator main dependency')
+            if mode == 'gentrees' and 'trees.c' not in {r['path'] for r in dependencies if r['kind'] == 'source'}:
+                raise ValueError('Missing upstream trees.c dependency')
             protected[dep] = digest(dep)
             protected[preprocessed] = digest(preprocessed)
             run([str(compiler), '-O2', '-std=c17', '-c', str(preprocessed), '-o', str(obj)],
@@ -153,9 +170,9 @@ def rebuild(source, output, env):
                          'sha256': digest(path)} for path in sorted(directory.rglob('*')) if path.is_file()],
               'redistributionApproved': False, 'androidApproved': False, 'relinkingApproved': False,
               'fullCorrespondingSourceApproved': False,
-              'scope': 'Two host maintenance generators rebuilt from copied pristine zlib inputs via retained actual GCC preprocessed C; output byte comparisons only, not all generators, original toolchain closure or legal/Android approval'}
+              'scope': 'MAKECRCH/MAKEFIXED and own same-TU GEN_TREES_H harness via retained actual GCC preprocessed C; byte comparisons only, not original upstream invocation, all generators, toolchain closure or legal/Android approval'}
     (directory / 'review.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf8')
-    print('ANDCODE_ZLIB_GENERATORS_REBUILT_OK 2 outputs (Linux CI only)')
+    print('ANDCODE_ZLIB_GENERATORS_REBUILT_OK 3 outputs (Linux CI only)')
     return result
 
 

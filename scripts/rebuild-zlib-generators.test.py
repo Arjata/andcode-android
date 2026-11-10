@@ -17,12 +17,14 @@ class Tests(unittest.TestCase):
                      'timeout', 'dependency-target', 'external-header', 'missing-main', 'object-elf',
                      'generator-elf', 'object-machine', 'object-type', 'object-version',
                      'generator-machine', 'generator-type', 'generator-version',
-                     'object-mutate', 'generator-mutate', 'run', 'drift', 'mutate', 'compiler-mutate']:
+                     'object-mutate', 'generator-mutate', 'run', 'drift', 'mutate', 'compiler-mutate',
+                     'trees-dependency', 'harness-mutate', 'trees-drift', 'trees-missing']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve(); source = root / 'upstream'; source.mkdir()
                 output = root / 'output'; output.mkdir()
                 files = {'crc32.c': b'crc source', 'inftrees.c': b'tree source', 'zutil.c': b'utility',
-                         'crc32.h': b'generated crc header', 'inffixed.h': b'generated fixed header',
+                          'crc32.h': b'generated crc header', 'inffixed.h': b'generated fixed header',
+                          'trees.c': b'upstream tree source', 'trees.h': b'generated trees header',
                          'LICENSE': b'zlib license', 'zlib.h': b'zlib header'}
                 for name, raw in files.items(): (source / name).write_bytes(raw)
                 compiler = root / 'gcc'; compiler.write_bytes(b'compiler')
@@ -55,6 +57,11 @@ class Tests(unittest.TestCase):
                         if mode == 'dependency-target': target = 'other.o'
                         dependencies = [command[-1], str(directory / 'source/zlib.h'),
                                         str(outside if mode == 'external-header' else system_header)]
+                        if work.name == 'gentrees':
+                            self.assertEqual(Path(command[-1]).read_text(), m.TREES_HARNESS)
+                            self.assertIn('-DGEN_TREES_H', command)
+                            if mode != 'trees-dependency': dependencies.append(str(directory / 'source/trees.c'))
+                            if mode == 'harness-mutate': Path(command[-1]).write_bytes(b'changed')
                         if mode == 'missing-main': dependencies.pop(0)
                         import shlex
                         dep.write_text(target + ': ' + shlex.join(dependencies) + '\n')
@@ -78,20 +85,22 @@ class Tests(unittest.TestCase):
                         if mode == 'generator-mutate': Path(command[0]).write_bytes(elf(3) + b'changed')
                         if work.name == 'makecrch':
                             (work / 'crc32.h').write_bytes(b'changed' if mode == 'drift' else files['crc32.h'])
-                        else:
+                        elif work.name == 'makefixed':
                             stdout = files['inffixed.h']
                             if mode == 'mutate': (directory / 'source/zlib.h').write_bytes(b'changed')
                             if mode == 'compiler-mutate': compiler.write_bytes(b'changed')
+                        elif mode != 'trees-missing':
+                            (work / 'trees.h').write_bytes(b'changed' if mode == 'trees-drift' else files['trees.h'])
                     return subprocess.CompletedProcess(command, 0, stdout, b'')
 
                 with patch.object(m.shutil, 'which', return_value=None if mode == 'compiler' else str(compiler)), \
                      patch.object(m, 'SYSTEM_ROOT', system), patch.object(m.subprocess, 'run', side_effect=run):
                     if mode in ['ok', 'exec']:
                         result = m.rebuild(source, output, {'CPATH': 'untrusted'})
-                        self.assertEqual(len(result['outputs']), 2)
+                        self.assertEqual(len(result['outputs']), 3)
                         self.assertEqual(len(result['systemHeaders']), 1)
-                        self.assertEqual(len(result['commands']), 11)
-                        self.assertEqual(sum(len(row['units']) for row in result['outputs']), 3)
+                        self.assertEqual(len(result['commands']), 15)
+                        self.assertEqual(sum(len(row['units']) for row in result['outputs']), 4)
                         self.assertTrue(all(not result[key] for key in ['redistributionApproved', 'androidApproved',
                                         'relinkingApproved', 'fullCorrespondingSourceApproved']))
                         for name, raw in files.items(): self.assertEqual((source / name).read_bytes(), raw)

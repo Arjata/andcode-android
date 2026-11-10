@@ -843,6 +843,33 @@ original build/toolchain provenance, a complete modified-source rebuild, full
 corresponding source or redistribution/relinking/Android approval. Formal APK
 inputs, device data and existing Ubuntu instances remain unchanged.
 
+The follow-up tree-header diagnostic adds an explicitly non-upstream standalone
+entry point: `trees-generator.c` includes the unchanged `trees.c` in the same
+translation unit and calls its internal `tr_static_init()` with `GEN_TREES_H`
+defined. Host GCC records actual preprocessing/dependencies before compiling the
+retained `.i`, linking and running in a fresh `gentrees/` working directory.
+The harness itself, its upstream `trees.c` dependency and executable are bound
+and mutation-guarded; generated `trees.h` must match the pristine upstream bytes.
+Synthetic tests reject missing tree dependencies, harness mutation and missing
+or changed output. This is a proposed maintenance harness, not proof that zlib's
+original build used that entry point; successful regeneration awaits native CI.
+The prior accepted two-mode artifacts and their recorded counts remain unchanged.
+
+Read-only remaining-generator research identifies swscale `uops_macros.h` as
+the output of the configured `libswscale/tests/sws_ops -macros` test program,
+not a standalone zlib-style generator. `libswscale/output.c` is handwritten
+source with compile-time macro instantiation, not a missing generated C file.
+Tablegen source-rule classification depends on the recorded disabled
+`CONFIG_HARDCODED_TABLES`; this does not establish regeneration of other configs.
+Research JSON SHA-256:
+`e6da977ba986fa43727056cb119be4f82cb8c10d98ed04b3e567294b6b5da700`.
+Parent review rechecked 21 cited file hashes and 18 fixed-archive source-file
+matches, plus the direct tree initializer call and actual swscale option handler;
+parent binding SHA-256:
+`6e0fe8eafe2aa06d043148aafa55ad3ed71248b8c94b814c59b8151c007b1ac7`.
+The research proposes rules only; no swscale macro regeneration, full toolchain,
+corresponding-source, relinking or distribution approval follows.
+
 The next independent diagnostic starts from fresh copies of the fixed media
 archives, their complete byte-matched pristine source trees and the retained
 patched build script. It modifies only the copied pinned CRC translation unit,
