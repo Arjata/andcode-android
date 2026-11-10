@@ -1,6 +1,20 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.48 (design draft) · Date: 2026-11-11
+> Version: v0.4.49 (design draft) · Date: 2026-11-11
+> v0.4.49 change: record the fresh-install regression and the CI debug-keystore
+> drift finding. The current CI runner's auto-generated debug key
+> (`2bf7e722…`) no longer matches the device install signed by the local
+> machine debug keystore (`86d13d4b…`), so CI debug APKs are not upgrade-capable
+> over time; stable updates require the release-signing secrets path
+> (`andcode-apk-release`). The local rebuild from the trusted CI native payload
+> is byte-identical to the installed APK (deterministic payload + same source),
+> and the authorized uninstall/reinstall regression passed end to end: first
+> launch bootstraps a new runtime farm, the backend serves 2.2.6 on 4096, the
+> restored session DB returns all 12 sessions, the app-domain persistent PTY
+> runs and exits 0, the PRoot rootfs gate passes in `untrusted_app` with
+> Seccomp=2 (`ubuntu-base-exit=0`), and the full development gate passes with
+> `development-exit=0 network-mode=direct` (apt, toolchain, compile, PTY).
+> The app data UID changed 10348→10356 as expected after uninstall.
 > v0.4.48 change: record the Tier M proxy+CA retest milestone and the provider
 > DNS constraint. The gateway hostname resolves only through the host proxy's
 > fake-IP TUN DNS (198.18.0.0/15); any on-device direct connection therefore

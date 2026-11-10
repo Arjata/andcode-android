@@ -1382,6 +1382,41 @@ index SHA-256:
 job `129796496545` log SHA-256:
 `7f64ae868068c52aa97ee8246d6ee0aef6eb09aaad534e38c34987281ed48877`.
 
+2026-11-11 Bun candidate-source build experiment (diagnostic only, manual
+workflow `bun-source-build-experiment.yml`). Milestone 1 (run `42874759506`,
+commit `06fe195bcfefa21dd2283e6b380d633793016bd1`): the pinned source archive
+(digest re-verified in-CI: `64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520`)
+passes `bun install --frozen-lockfile` and `--configure-only` on
+ubuntu-24.04-arm, emitting the full ninja graph (`build/debug/build.ninja`,
+`compile_commands.json`, dependency and codegen directories) with a recorded
+toolchain identity: Bun 1.4.4, Ubuntu clang 23.1.6, LLD 23.1.6,
+rustc 1.100.0-nightly (574ff7d98, pinned `nightly-2026-09-15`), ninja 1.13.2
+plus Bun's own pinned `oven-sh/ninja` fetch, cmake 3.31.6, perl 5.38.2.
+Configure job log SHA-256:
+`51d5dca0b4819791fc5d8592d9a70cae026c5f5086812f8e8ee7f4cf6a83a81f`.
+Milestone 2 (run `42876084120`, commit `7e028e107c69ae03999273403a1840f51785242b`):
+the full debug-profile build completes on the same runner within the job
+budget, producing a runnable application-side binary `build/debug/bun-debug`
+(1305197544 bytes, AArch64 ELF, SHA-256
+`8f29c518de6eb3f502030a7e52129ffd8a97a664b9d836c413c1526e78deaed2`) from 1241
+compiled objects, reporting version `1.4.4-debug` and passing a smoke eval
+(`andcode-bun-build-smoke-ok 42`). Build job log SHA-256:
+`2ac0eee94ae16584e69d24f7e75597f214ba9c176efad535796eefe9a78b4f2d`; artifacts
+`13792637172` (binary evidence, API SHA-256
+`950aa266d5e29b74c9321ec7974d307877ddd6608c5d0d3b49e25a3b3d7c5f7e`) and
+`13791497391` (configure evidence, API SHA-256
+`eb91e5bb64bbccc8888da76b8d12c198c3be00805dc48cad979044b5baa4e962`).
+Boundaries: this proves the pinned candidate source builds mechanically on
+trusted CI with a pinned toolchain and yields runnable application-side
+objects. It does not replicate the official release toolchain exactly (apt
+clang 23.1.6 within the declared `>=23.1.0 <23.1.99` range, no ubuntu-20.04
+glibc sysroot, debug profile without ThinLTO), does not establish
+official-ELF correspondence, does not run `verify-binary.ts` against official
+expectations, and does not approve dependency licenses, modified-JSC
+relinking, redistribution or Android admission. The release-profile rebuild
+with the pinned sysroot and a modified-library relink drill remain future
+work; all approval flags remain false.
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。
