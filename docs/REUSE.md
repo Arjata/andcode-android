@@ -812,6 +812,17 @@ through the remainder of the diagnostic. Synthetic regressions reject wrong
 machine/type/version fields and link/run-time mutation; these local mocked tests
 do not execute GCC or establish a successful new Linux build.
 
+The exact hardened commit `21c2ad6b7cd972fec2f3f0e226efc2511049f326`
+subsequently passed native run `42786104011` and regular CI `42786068255`.
+Job `129727581798` retains the actual two-output generator success marker and
+replacement-TUI markers; its 1704404-byte log SHA-256 is
+`07cc4fe79629f0848cb70babfc3a2579f294b55041461f94039ce44e3607e693`.
+The API records artifact `13750637145`, 587094175 bytes, digest
+`30233cfe514a68ca0ed4eafd15c6a1c8d9805379a80866941acaca249be80060`.
+That specific ZIP has not been downloaded or independently accepted. Its CI
+success is not substituted for the earlier artifact's archive-only acceptance;
+the later `0489a01` artifact below includes the hardening and has its own review.
+
 Independent acceptance of the actual zlib-generator artifact is complete for
 native run `42776837614`, commit
 `7ac5ff5169696ec2e9298511527cff9c6cea258b`, artifact `13744779170`
