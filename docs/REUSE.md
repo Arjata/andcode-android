@@ -655,6 +655,19 @@ or decoder behavior. Original compilation equivalence, complete modified-source
 rebuild, full corresponding source, notices, toolchain and Android/legal approval
 remain unproven. No replacement library was staged in the APK or on a device.
 
+The next Linux diagnostic tests the replacement library's own terminal rendering
+in a separate `media-tui/` tree. Other native inputs are copied unchanged; only
+OpenTUI uses replacement bytes under the original filename required by the
+already-built CLI. This is explicitly a lookup alias: the byte-preserved lookup
+manifest is not a valid release digest manifest. The report binds original and
+replacement digests, process maps, raw terminal output, command and isolated
+HOME/BUN_TMPDIR contents. The real PTY probe requires the alias mapping, staged
+runtime and rendered OpenCode content. Baseline native inputs, CLI and diagnostic
+copies must remain unchanged; no extracted ELF is allowed in isolated data
+directories. Failures/timeouts do not create an accepted review. This experiment
+does not change the baseline native directory, rebuild the compiled CLI, approve
+decoder coverage or provide a content-addressed release payload/Android approval.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

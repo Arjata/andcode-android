@@ -25,6 +25,8 @@ env.pop('CI', None)
 process = None
 output = bytearray()
 mapped = False
+maps = ''
+evidence = Path(sys.argv[2]).resolve(strict=True) if len(sys.argv) > 2 else None
 
 
 def controlling_terminal():
@@ -81,3 +83,6 @@ finally:
     if slave is not None:
         os.close(slave)
     os.close(master)
+    if evidence is not None:
+        (evidence / 'tui-output.bin').write_bytes(output)
+        (evidence / 'tui-maps.txt').write_text(maps, encoding='utf8')

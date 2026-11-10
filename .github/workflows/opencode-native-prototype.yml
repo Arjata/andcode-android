@@ -162,6 +162,8 @@ jobs:
           test "$ready" = 1
           python3 scripts/probe-opencode-native.py
           python3 scripts/probe-opencode-native-tui.py "$EXE"
+          python3 scripts/probe-opencode-media-tui.test.py
+          python3 scripts/probe-opencode-media-tui.py "$EXE" "$GITHUB_WORKSPACE/work/native-prototype"
           python3 - <<'PY'
           from pathlib import Path
           for root in ['work/probe-home', 'work/probe-tmp']:
@@ -216,6 +218,9 @@ jobs:
             work/native-prototype/native-opentui-build/media-object-relink/*.log
             work/native-prototype/native-opentui-build/media-object-relink/*.map
             work/native-prototype/native-opentui-build/media-object-relink/*.tsv
+            work/native-prototype/native-opentui-build/media-object-relink/media-tui/tui.log
+            work/native-prototype/native-opentui-build/media-object-relink/media-tui/tui-output.bin
+            work/native-prototype/native-opentui-build/media-object-relink/media-tui/tui-maps.txt
             work/native-prototype/native-opentui-build/zig-generated-sources/
             work/native-prototype/native-opentui-build/link-replay/*.log
             work/native-prototype/native-opentui-build/link-replay/link.map
