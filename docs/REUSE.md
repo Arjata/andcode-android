@@ -1058,6 +1058,39 @@ execution, general decoder coverage, every live section, complete original
 preprocessing/source/toolchain or legal/Android approval. It predates swscale
 regeneration and the later mutation guards; all approval flags remain false.
 
+Swscale regeneration and the generated-header protection also have independent
+archive acceptance for run `42795683456`, exact commit
+`0ed2c932552d343c798d4d8240aa4b8b951a8ecd`. Artifact `13755083168` is
+689541127 bytes; its API/downloaded ZIP SHA-256 is
+`0e4da68924db4c502ef07623e4f84d5716180cd296eb46021463cc04d6ec8e3f`.
+All nine gates pass with a closed 65765-file manifest. The fresh source-rule
+diagnostic has 22324 files and retains the configured build's actual swscale
+compile/link commands, `sws_ops.o` and dependency file. `make V=1` builds the
+AArch64 executable; a separate `-macros` execution produces 153519 bytes,
+identical to pristine `libswscale/uops_macros.h`, SHA-256
+`7005eb8091c070e609a8038d5e27860cddf5300e3577875da90796c8ba5164c6`.
+Generator SHA-256:
+`d25c4bb7d78d80c7dfad9e83ba93658b8419c8192e932802fdeeda1a11972b5c`.
+The independent gate checks executable/object ELF identity, exact compile/link
+inputs, dependency target and in-cache scope; 23 self-consistent source-evidence
+mutations are rejected on Python 3.12 and 3.13 (identical rejection-log SHA-256
+`1e3f71a4d5387a27eb3d88c75e5a764975821d44fb349947b27716e9be0cde42`).
+The fresh library again replaces all 345 media positions among 446 final-link
+inputs, and the distinct fresh TUI review binds replacement SHA-256
+`9727f8a823d1352be489ef319fd7f6599a9c70d73d9e8900b72d9aa008172f78`,
+365 rendered bytes, actual replacement/Ubuntu-runtime maps and no ELF in the
+isolated runtime directories. Fresh TUI review SHA-256:
+`ab2d1eef88195b9dcb05990059e58177615e79a7b47c2803d89352d93f67e58d`.
+Nine-gate parent acceptance index SHA-256:
+`cda88c5fbf3e7ef5f5e0f4bda5beff2cd91a40639692b02d2d6d8de520c766e7`;
+job `129760151319` log SHA-256:
+`5ee16f0ba5ab3ae814e11a8020276bac56e2f1277db4dd6147d9d2ce3de7009e`.
+These are Linux CI execution/archived-evidence results, not original full
+preprocessing, compiler/toolchain closure, general decoding, every live section,
+complete corresponding source or release/Android approval. The later
+`021f0f5` executable-header guards and lookup-manifest checks still require their
+own artifact review. APK/device inputs remain unchanged and all approvals false.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
@@ -1235,6 +1268,20 @@ is declared separately. Inventory SHA-256:
 `4df3e7c1a7df9cc1083bfd2274311eac29d61861b985e2606506200e2b0162d4`.
 No cargo resolution, actual target/features/build scripts, dependency license
 closure, practical relink or distribution/Android approval is established.
+
+The CI source collector now also retains the whole fixed Bun candidate source
+archive (`oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`, pinned
+SHA-256 `64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520`)
+after a complete bounded member inventory validates: every member is hashed
+without extraction, directory/symlink/regular types are recorded, unsafe or
+duplicate paths, absolute/out-of-root symlinks and expansion over 512 MiB are
+rejected, and all 25 pinned declaration files must byte-match inside the
+archive before any evidence file is written. Sixteen collector regressions pass
+on Python 3.12 and 3.13, including digest drift, oversize, path-escape,
+absolute-symlink and declaration-drift rejection plus refuse-overwrite. This
+archive identity still does not establish official-ELF correspondence,
+dependency acquisition, compiler execution or any approval; all approval flags
+remain false.
 
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata

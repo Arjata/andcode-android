@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
+import posixpath
 import re
 import sys
 import tarfile
@@ -29,6 +30,7 @@ MEDIA_SOURCES = {
                         'bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16'),
 }
 BUN_COMMIT = '38afee6c84fcf48c0edb2466aa4b27d287a59c30'
+BUN_SOURCE_SHA256 = '64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520'
 WEBKIT_COMMIT = 'd6375c72affe0f70222cdcb45012b10f0bf3a9d5'
 RUNTIME_DECLARATIONS = {
     'bun': ('oven-sh/bun', BUN_COMMIT, {
@@ -153,6 +155,7 @@ def collect(stage):
         media.append({'archive': filename, 'url': url, 'sha256': expected, 'evidence': review,
                       'status': 'blocked-actual-binary-correspondence-and-relinking'})
     runtime = collect_runtime_declarations(evidence)
+    bun = collect_bun_source(evidence)
     (stage / 'native-source-review.json').write_text(json.dumps({
         'redistributionApproved': False,
         'scope': 'Four candidate source repositories plus selected Bun/WebKit declarations; excludes complete Bun/JS/Web closure',
@@ -161,7 +164,7 @@ def collect(stage):
                         'Lockfiles include inactive targets/features; no target closure claim',
                         'LGPL corresponding-source, relinking and replacement obligations remain open'],
         'sources': rows, 'opentuiStaticMediaSources': media,
-        'runtimeDeclarations': runtime}, indent=2) + '\n', encoding='utf8')
+        'runtimeDeclarations': runtime, 'bunCandidateSource': bun}, indent=2) + '\n', encoding='utf8')
     print('Four pinned candidate source archives and FFmpeg/zlib collected; redistribution remains BLOCKED')
 
 
@@ -196,6 +199,75 @@ def collect_runtime_declarations(evidence):
     return {'files': rows, 'redistributionApproved': False, 'correspondingSourceComplete': False,
             'relinkingApproved': False,
             'scope': 'Selected pinned declarations and build files, not complete source or binary correspondence'}
+
+
+def inspect_bun_source(data, expected):
+    """Hash original members without extraction, link following or upstream execution."""
+    if len(data) > LIMIT or digest(data) != expected:
+        raise ValueError('Bun candidate source archive size or digest mismatch')
+    root = 'bun-' + BUN_COMMIT
+    rows, seen, regular_hashes, expanded = [], set(), {}, 0
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
+        for member in archive:
+            path = PurePosixPath(member.name)
+            canonical = member.name.rstrip('/') if member.isdir() else member.name
+            if (path.is_absolute() or '..' in path.parts or '\\' in member.name
+                    or not path.parts or path.parts[0] != root or path.as_posix() != canonical
+                    or canonical in seen):
+                raise ValueError('Unsafe, aliased or duplicate Bun candidate source path')
+            seen.add(canonical)
+            if len(seen) > 50000 or member.size < 0:
+                raise ValueError('Bun candidate source member bound exceeded')
+            relative = PurePosixPath(*path.parts[1:]).as_posix()
+            row = {'path': relative, 'bytes': member.size}
+            if member.isdir():
+                if member.size: raise ValueError('Nonempty Bun source directory member')
+                row['type'] = 'directory'
+            elif member.issym():
+                target = member.linkname
+                resolved = posixpath.normpath(posixpath.join(str(path.parent), target))
+                if (member.size or not target or PurePosixPath(target).is_absolute()
+                        or '\\' in target or not resolved.startswith(root + '/')):
+                    raise ValueError('Unsafe Bun candidate source symlink')
+                row.update(type='symlink', target=target)
+            elif member.isfile():
+                expanded += member.size
+                if expanded > 512 * 1024 * 1024 or member.size > LIMIT:
+                    raise ValueError('Bun candidate source expansion exceeds bound')
+                content = archive.extractfile(member).read(member.size + 1)
+                if len(content) != member.size: raise ValueError('Truncated Bun source member')
+                row.update(type='file', sha256=digest(content))
+                regular_hashes[relative] = row['sha256']
+            else:
+                raise ValueError('Unsupported Bun candidate source member type')
+            rows.append(row)
+    for path, expected_hash in RUNTIME_DECLARATIONS['bun'][2].items():
+        if regular_hashes.get(path) != expected_hash:
+            raise ValueError('Bun archive does not match pinned declaration: ' + path)
+    return {'members': rows, 'expandedBytes': expanded,
+            'redistributionApproved': False, 'androidApproved': False,
+            'relinkingApproved': False, 'fullCorrespondingSourceApproved': False,
+            'scope': 'Fixed Bun candidate source/member and selected declaration identity only; no extraction, dependency acquisition, compiler execution, official ELF correspondence or complete source/toolchain/relink approval'}
+
+
+def collect_bun_source(evidence):
+    """Retain a fixed archive only after its complete bounded inventory validates."""
+    filename = 'bun-' + BUN_COMMIT + '.tar.gz'
+    inventory = evidence / 'bun-source-inventory.json'
+    destination = evidence / filename
+    if destination.exists() or inventory.exists():
+        raise FileExistsError('Bun candidate source evidence already exists')
+    url = f'https://codeload.github.com/oven-sh/bun/tar.gz/{BUN_COMMIT}'
+    data = download_archive(url)
+    result = inspect_bun_source(data, BUN_SOURCE_SHA256)
+    result.update(repository='oven-sh/bun', commit=BUN_COMMIT, url=url,
+                  archive=filename, bytes=len(data), sha256=BUN_SOURCE_SHA256)
+    with destination.open('xb') as stream: stream.write(data)
+    with inventory.open('x', encoding='utf8', newline='\n') as stream:
+        json.dump(result, stream, indent=2); stream.write('\n')
+    return {key: value for key, value in result.items() if key != 'members'} | {
+        'memberCount': len(result['members']), 'inventory': inventory.name,
+        'inventorySha256': digest(inventory.read_bytes())}
 
 
 if __name__ == '__main__':

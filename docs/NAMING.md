@@ -131,6 +131,7 @@
 | `collect-opencode-native-licenses.py`、`collect-opencode-native-licenses.test.py` | 固定安装树原生扩展的包版本/许可/包内声明快照,缺声明明确记录为 blocked,不构成发布许可批准 | `scripts/` |
 | `native-license-review.json`、`native-license-evidence/` | 实验工件中四个原生扩展的人工审查待办与包内声明副本,不进入正式 APK | 源码实验工件 |
 | `runtime-declarations/` | Pinned Bun/WebKit declaration bytes, including selected application-link/Rust/codegen/toolchain/allocator rules and Cargo identities; validate the whole selected set before writing files, not complete corresponding source or release notices | `native-source-evidence/` |
+| `bun-<commit>.tar.gz`, `bun-source-inventory.json` | Fixed Bun candidate source archive and bounded member inventory; original archive bytes only, no extraction or upstream script execution, not a complete source/relink kit | `native-source-evidence/` |
 | `sort-test`、`sort-test.log` | 自有标准库稳定排序适配层的独立 Rust 测试 ELF 与编译/运行日志;仅 Linux 源码实验,不进入 APK | `native-fff-build/` |
 | `ffmpeg-notice-candidates.json` | 从实际编译依赖全文中保留声明候选注释的字节范围、原文与摘要;不是正式 notices 或完整许可判定 | `native-opentui-build/` |
 | `zig-generated-sources/` | Original bytes and per-file digests of `b/<hash>/builtin.zig` from the pinned Zig global/local caches after building; generated-input snapshots only, not proof of complete compiler inputs | `native-opentui-build/` |
