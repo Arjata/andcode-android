@@ -612,6 +612,20 @@ Bionic targets are reference only and excluded by this project's glibc/no-NDK
 baseline. A build-configuration tinycc exclusion is not evidence of final ELF
 contents. All redistribution, relinking and Android approvals remain false.
 
+A further read-only parent inspection parsed all 727 retained compilation
+declarations and found `-march=armv8-a+crc` and `-mtune=ampere1` in each.
+One declaration, `/webkit/Source/bmalloc/mimalloc/mimalloc/src/static.c`, then
+appends `-march=armv8.1-a`. Do not describe the entire archive as uniformly
+compiled for the lower architecture, or infer absence of mimalloc from Bun's
+`USE_EXTERNAL_MIMALLOC` build configuration. This metadata is not proof that the
+declared compile ran, of the bitcode target/producer, or of which code survived
+the final Bun link. The archive-contained sysroot option occurs twice per
+entry; counts are option occurrences, not additional compile executions.
+Parent flags-review JSON SHA-256:
+`8bfa3e6ff2bd7385aa5c30e12ab2af3bb372d84b6a3b92edd43bc83d92b7c1ef`.
+Actual allocator providers, symbol/liveness relationships and minimum-CPU
+compatibility remain unverified. No archive tool or binary was executed.
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。
