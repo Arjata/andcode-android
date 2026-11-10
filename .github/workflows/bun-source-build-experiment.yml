@@ -267,9 +267,9 @@ jobs:
             tar -xzf "/tmp/sysroot-img/$layer" -C "$SYSROOT" || true
           done
           download_deb() {
-            url="https://ports.ubuntu.com/ubuntu-ports/pool/main/$1"
-            curl -fLSs --retry 3 --connect-timeout 30 "$url" -o /tmp/deb.deb
-            echo "$4  /tmp/deb.deb" | sha256sum -c -
+            curl -fLSs --retry 3 --connect-timeout 30 \
+              "https://ports.ubuntu.com/ubuntu-ports/pool/main/$1" -o /tmp/deb.deb
+            echo "$2  /tmp/deb.deb" | sha256sum -c -
             dpkg-deb -x /tmp/deb.deb "$SYSROOT"
           }
           download_deb i/icu/libicu70_70.1-2_arm64.deb ac68372cf4a976e6a206858fd9b28c68e49d37d650b9b8653270038a6e7bc174
