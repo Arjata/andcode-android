@@ -524,6 +524,33 @@ it does not regenerate configure or upstream maintenance tables, approve
 distribution/relinking, or add any experimental ELF to the APK. Synthetic Windows
 regressions are separate from the required Linux CI build and external review.
 
+Source CI `42756591596` (`d101ece`, job `129632296087`) and regular CI
+`42756568100` succeeded. Independent review of artifact `13736437847`
+(537051597 bytes) matched API ZIP SHA-256
+`f50471ed74a24f169b02d56d135af350280d40e3a8665b0b7d357d5eef5a8452`.
+The complete 40389-file manifest is closed. The isolated generator rebuild binds
+14 copied source inputs, 75 observed system-header snapshots and 101 retained
+diagnostic files. GCC is Ubuntu 13.3.0-6ubuntu2~24.04.1, executable SHA-256
+`a20520ee21543f243d40636a9181a142c45ecd989de31ab86b99a8ea5ada870d`.
+The actual compiled `.i` has 262236 bytes, SHA-256
+`dc0f80343ffa307acecc5bb5e27499a07d409232430c04d40a9ef11b37428a04`.
+Both regenerated outputs match the baseline and earlier retained-tool replay
+byte-for-byte. Independent checks bind the full observed dependency sets,
+constructed preprocessing/compile/link/run argv, logs and AArch64 ELF identity.
+Generator rebuild review JSON SHA-256:
+`4d226d12e72d16cea730f73f98e5eec16f15b153494919e85c7707edda8f85a1`.
+Existing 345 object-command / 755 non-system dependency bindings, 446-input
+original relink, single-CRC replacement, source-notice candidates and Linux
+PTY/TUI/runtime gates also passed. Job log SHA-256:
+`637dafbd8fb1862c2879caa254e8d9e35b5fb0a3480bef7957c4b2c3a8d83b0e`;
+complete independent verification log SHA-256:
+`9a74d69405034b675b5acbb4dd8aca6daed84a9bedc4b689429499b029c8c6e2`.
+This proves only the bounded standalone-generator rebuild and two output byte
+matches. It does not prove generator ELF reproducibility, complete toolchain
+inputs, preprocessing of all media objects, other generators, complete source,
+modified-library replacement or license/Android approval. No experimental ELF
+has been added to the APK or installed on a device.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
