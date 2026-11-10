@@ -99,6 +99,23 @@ public final class ServeManager {
         }
         sPassword = null;
         sStarting = false;
+        // The old password is invalid; remove the terminal direct-connect fragment too
+        new File(ctx.getApplicationContext().getFilesDir(), SERVE_ENV_NAME).delete();
+    }
+
+    /** Env fragment file name for the terminal opencode() direct connect (NAMING: term-serve.env). */
+    static final String SERVE_ENV_NAME = "term-serve.env";
+
+    /** Writes the 0600 URL+password fragment; failure is ignored and never affects serve itself. */
+    private static void writeServeEnv(File files, String password) {
+        File f = new File(files, SERVE_ENV_NAME);
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+            out.write(("OPENCODE_SERVER_URL=http://127.0.0.1:" + PORT + "\n"
+                + "OPENCODE_PASSWORD=" + password + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            // A new file may carry group/other bits from umask; the password fragment must be 0600 (384).
+            android.system.Os.chmod(f.getAbsolutePath(), 384);
+        } catch (Exception ignored) {
+        }
     }
 
     /**
@@ -210,6 +227,9 @@ public final class ServeManager {
                         synchronized (ServeManager.class) {
                             sPassword = line.substring("server password ".length()).trim();
                         }
+                        // Terminal TUI connects to the managed serve: write the URL/password
+                        // env fragment so the TUI never spawns itself under loader semantics.
+                        writeServeEnv(files, getPassword());
                     }
                 }
             } catch (IOException ignored) {

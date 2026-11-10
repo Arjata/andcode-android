@@ -163,20 +163,34 @@ public class TerminalActivity extends AppCompatActivity {
         sb.append("if [ -n \"${BASH_VERSION:-}\" ]; then\n");
         sb.append("  PS1='\\W \\$ '; HISTFILE=\"$HOME/.bash_history\"\n");
         sb.append("  shopt -s checkwinsize\n");
-        sb.append("  [ ! -r \"$HOME/.bashrc\" ] || . \"$HOME/.bashrc\"\n");
+        // ANDCODE_BASHRC set means this profile is being sourced from ~/.bashrc;
+        // skip sourcing back to avoid infinite recursion.
+        sb.append("  [ -n \"$ANDCODE_BASHRC\" ] || [ ! -r \"$HOME/.bashrc\" ] || . \"$HOME/.bashrc\"\n");
         sb.append("else\n");
         sb.append("  [ ! -r /system/etc/mkshrc ] || . /system/etc/mkshrc\n");
         sb.append("  PS1='$PWD $ '\n");
         sb.append("  printf '%s\\n' 'Bash 未部署，当前使用系统 sh。'\n");
         sb.append("fi\n");
         sb.append("printf '%s\\n' 'andcode 终端 · 输入 opencode 启动 AI 编码代理'\n");
-        // shell 函数而非可执行文件:应用数据目录禁 exec(targetSdk 37.2),
-        // loader/oc2 在 nativeLibraryDir 或 /data/local/tmp,exec 放行
+        if (mRuntimeRoot != null)
+            sb.append("export ANDCODE_RUNTIME_ROOT=\"").append(mRuntimeRoot.getAbsolutePath()).append("\"\n");
+        // Shell function, not an executable: app data dirs forbid exec (targetSdk 37.2);
+        // loader/oc2 live in nativeLibraryDir or /data/local/tmp where exec is allowed.
+        // Connect via --server when the managed serve is online (self-spawn breaks
+        // under loader semantics, see DESIGN v0.4.49).
         if (p != null) {
             sb.append("opencode() {\n");
+            sb.append("  srv=''\n");
+            sb.append("  if [ -r \"$ANDCODE_APP_DATA/term-serve.env\" ] && /system/bin/toybox nc -w1 127.0.0.1 4096 </dev/null >/dev/null 2>&1; then\n");
+            sb.append("    . \"$ANDCODE_APP_DATA/term-serve.env\"\n");
+            sb.append("    export OPENCODE_PASSWORD\n");
+            sb.append("    srv=\"--server $OPENCODE_SERVER_URL\"\n");
+            sb.append("  fi\n");
+            sb.append("  export LD_LIBRARY_PATH=\"${ANDCODE_RUNTIME_ROOT:-}/lib:").append(p.lib).append("\"\n");
+            sb.append("  export TMPDIR=\"$ANDCODE_APP_DATA/tmp\" BUN_TMPDIR=\"$ANDCODE_APP_DATA/tmp\"\n");
             sb.append("  GLIBC_TUNABLES=glibc.pthread.rseq=0 \"").append(p.ld)
-              .append("\" --library-path \"").append(p.lib)
-              .append("\" --inhibit-cache \"").append(p.oc2).append("\" \"$@\"\n");
+              .append("\" --library-path \"${ANDCODE_RUNTIME_ROOT:-}/lib:").append(p.lib)
+              .append("\" --inhibit-cache \"").append(p.oc2).append("\" \"$@\" $srv\n");
             sb.append("}\n");
         }
         sb.append("andcode-ubuntu-proot() { /system/bin/sh \"$ANDCODE_APP_DATA/term-ubuntu-proot\" \"$@\"; }\n");
@@ -184,6 +198,18 @@ public class TerminalActivity extends AppCompatActivity {
         prepareUbuntuProot(files);
         writeFile(new File(files, "term-env.sh"), sb.toString());
         writeFile(new File(files, "term-bashrc"), sb.toString());
+        // Interactive bash only reads ~/.bashrc (never ENV); create a bootstrap file when
+        // missing so the opencode() function applies to bash sessions too. Never overwrite
+        // a user-provided file. ANDCODE_BASHRC=1 lets the profile skip sourcing back,
+        // preventing infinite .bashrc <-> profile recursion.
+        File bashrc = new File(home, ".bashrc");
+        String bashrcWanted = "ANDCODE_BASHRC=1\n"
+            + "[ -r \"$ANDCODE_APP_DATA/term-bashrc\" ] && . \"$ANDCODE_APP_DATA/term-bashrc\"\n";
+        // The early unguarded v0.4.49 template recursed with the profile; replace it on sight.
+        String bashrcLegacy = "[ -r \"$ANDCODE_APP_DATA/term-bashrc\" ] && . \"$ANDCODE_APP_DATA/term-bashrc\"\n";
+        if (!bashrc.exists() || bashrcLegacy.equals(readSmallFile(bashrc))) {
+            writeFile(bashrc, bashrcWanted);
+        }
     }
 
     /** 只解释脚本;不 su、不 relabel、不自动下载/解包、不把模型接入特权维护入口。 */
@@ -301,6 +327,19 @@ public class TerminalActivity extends AppCompatActivity {
         try (OutputStream out = new FileOutputStream(dst)) {
             out.write(text.getBytes(StandardCharsets.UTF_8));
         } catch (Exception ignored) {
+        }
+    }
+
+    /** Reads a small file fully; returns an empty string on failure (treated as content mismatch). */
+    private static String readSmallFile(File src) {
+        try (java.io.InputStream in = new java.io.FileInputStream(src)) {
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int n;
+            while ((n = in.read(chunk)) != -1) buf.write(chunk, 0, n);
+            return new String(buf.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            return "";
         }
     }
 

@@ -121,6 +121,7 @@
 | `andcodeReleaseStoreFile`、`andcodeReleaseStorePassword`、`andcodeReleaseKeyAlias`、`andcodeReleaseKeyPassword` | Fail-closed release 签名 Gradle 属性组;四项必须同时提供或同时缺失,缺一即构建失败;keystore 文件不入库(CI secrets 注入),签名身份变更不得覆盖安装既有 debug 签名安装包 | `-PandcodeReleaseStoreFile=<绝对路径> ...` |
 | `ANDCODE_RELEASE_STORE_B64`、`ANDCODE_RELEASE_STORE_PASSWORD`、`ANDCODE_RELEASE_KEY_ALIAS`、`ANDCODE_RELEASE_KEY_PASSWORD` | CI release 签名 secrets:base64 keystore 与三项口令/别名;四项齐备时才执行 assembleRelease,否则保持 debug 中间件 | GitHub Actions secrets |
 | `andcode-apk-release` | CI release 签名 APK 工件,仅在四项签名 secrets 齐备时产生;apksigner v2 校验通过;签名身份变更不得覆盖安装既有 debug 签名安装包 | Actions artifact |
+| `term-serve.env` | 应用私有 0600 env 片段:当前托管 serve 的 URL 与口令;serve 就绪时写入、stop 时删除;终端 `opencode()` 在线探测后 source 并以 `--server` 直连,不再自行 spawn | APK `files/` |
 | `andcode-runtime` | APK assets 内 CI 生成的只读 bundle 数据与 manifest.farm,不含运行期解包 ELF | `assets/andcode-runtime/` |
 | `RuntimePayload.java`、`RuntimePayloadTest.java` | APK 只读原生载荷链接农场初始化与平台 JDK 安全回归 | `dev.andcode.app`、`app/tests/` |
 | `pty-launcher.c` | 自有静态 musl PTY 入口,由 /proc/self/exe 定位同目录 loader/daemon,不依赖固定安装路径 | `bundle/launcher/` |

@@ -1,6 +1,31 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.49 (design draft) · Date: 2026-11-11
+> Version: v0.4.50 (design draft) · Date: 2026-11-11
+> v0.4.50 change: fix the Tier P terminal TUI startup chain (three defects, all
+> verified on device). (1) The interactive bash session died with SIGSEGV
+> (session toast "exit -11"): the newly created `~/.bashrc` sourced
+> `term-bashrc`, whose bash branch sources `$HOME/.bashrc` back — infinite
+> mutual recursion → stack overflow. The profile now skips the back-source
+> when `ANDCODE_BASHRC` is set, and the bootstrap `~/.bashrc` exports it;
+> the early unguarded template is replaced on sight. (2) `opencode` in the
+> terminal now connects to the managed serve via `--server`: serve writes a
+> 0600 `term-serve.env` (URL + password, NAMING-registered) on readiness and
+> removes it on stop; the shell function sources it after a `toybox nc`
+> probe, avoiding the loader-semantics self-spawn failure (execPath is the
+> loader itself). (3) The Bun-extracted OpenTUI shared object resolves its
+> plain-name deps (`libm.so.6`) via the runtime farm's plain-name symlinks:
+> the patched loader rewrites `LD_LIBRARY_PATH` to the `--library-path`
+> value, so the farm lib dir must be passed in `--library-path` itself
+> (dual path: farm/lib:nativeLibraryDir); plain names never resolved in the
+> app domain before this (the earlier CI TUI probe only passed on the Linux
+> runner where system plain-name glibc exists). On-device results: TUI
+> renders fully in the app terminal, adb-injected text reaches the TUI and
+> submits, a session is created and the model call starts; the model round
+> trip still fails with `EAI_AGAIN` because the managed serve strips proxy
+> env by design (v0.4.48 provider DNS constraint) — Tier P proxy wiring
+> remains open. Also recorded: the runtime farm identity includes the
+> nativeLibraryDir path string, so every `install -r` creates a new farm
+> directory and stale farms accumulate (cleanup pending).
 > v0.4.49 change: record the fresh-install regression and the CI debug-keystore
 > drift finding. The current CI runner's auto-generated debug key
 > (`2bf7e722…`) no longer matches the device install signed by the local
