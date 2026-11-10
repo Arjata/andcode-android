@@ -616,6 +616,34 @@ must retain its own complete copyright/USL paragraph and numbered clauses;
 glibc `LICENSES` has different copyright text and an explicit removed-clause
 entry and is not a verbatim substitute.
 
+The 28 unresolved header paths now have a completed provenance research pass
+(retained outside the repository under the bounded 0.17.0 source archive).
+Parent recomputation confirms all 28 retained extract SHA-256 values, and the
+`arm_neon.h` exact-identity claim: the 0.17.0 tarball copy (SHA-256
+`ed8fc4135aef7c5af5f30ca3715d96ee9ad5a2bc97f558214fadda5704742b26`) is
+byte-identical to the Zig sync commit `520af6966041b891442ab34ac13b0f6861a09fc0`
+copy. Mapping summary: one clang build-time TableGen product (unsigned
+MIT-style notice traced to `NeonEmitter.cpp`'s embedded string; the .td files
+are Apache-2.0 WITH LLVM-exception but do not claim to cover generated
+output); eight Linux UAPI paths (six one-line `cmd_wrap` redirectors with
+rule-text matches, `linux/errno.h` a verbatim upstream copy, `unistd_64.h`
+consistent with Linux v7.0 `headers_install` output with the
+`_UAPI_ASM_`→`_ASM_` guard rewrite); sixteen glibc copies that are
+byte-identical across 2.42/2.43/2.44 (so tags cannot pin the sync version);
+two glibc build-time `stubs` outputs with mechanism evidence but no
+upstream bytes; and `bits/cloexec.h` identified as a Zig-authored compat shim
+added by commit `23aa045ef456`, not an upstream glibc file (no `*cloexec*`
+header exists anywhere in the upstream tree). A parent note was corrected:
+`features.h` does not pin 2.43 in-file; tree-level binding comes from the 2.44
+sync commit. Parent review SHA-256:
+`535268032b2f6b68aebd3e10918f00156cbe4691a26b71b3974a5488e9f00f61`.
+Honest boundaries: trimmed comparisons are not byte identity except the
+`arm_neon.h` case; `headers_install`, glibc install and clang TableGen
+generation were not reproduced on Linux; missing embedded notices still do not
+establish license absence, and provenance equality does not establish license
+applicability. Per-file license attribution and notice obligations remain open;
+all approvals remain false.
+
 Full Apache/LLVM-exception text is physically retained in the WASI/libc++-family
 license files; v1's blanket missing-full-text statement is withdrawn. Physical
 co-location alone does not bind those files to a particular observed header.
