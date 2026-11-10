@@ -917,6 +917,16 @@ all-object map assertion, not at an accepted ABI/CRC result. Its job
 `cfd883e646861e495905aeaca7d096f48e7a460039886162f7bb450f3671ced0`);
 the corrected gate requires a new native run and independent archive review.
 
+An explicit `source-rules` selector runs the existing isolated PTY/TUI gate on
+the fresh source-rule relink library, bound to its own accepted diagnostic input
+review. Its native copies, lookup alias, HOME/BUN_TMPDIR, maps and render files
+are separate from the prior sampled-object TUI. Baseline manifest and native
+files remain unchanged, and the input review is also mutation-guarded. Selector
+and approval rejection, review drift and both fixed staging variants are covered
+by synthetic tests. Actual map/render/no-extracted-ELF acceptance requires new
+native CI and independent archive review; it is not a release payload, decoder
+coverage, full corresponding source or Android/legal approval.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

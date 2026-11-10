@@ -178,6 +178,7 @@ jobs:
           python3 scripts/probe-opencode-native-tui.py "$EXE"
           python3 scripts/probe-opencode-media-tui.test.py
           python3 scripts/probe-opencode-media-tui.py "$EXE" "$GITHUB_WORKSPACE/work/native-prototype"
+          python3 scripts/probe-opencode-media-tui.py "$EXE" "$GITHUB_WORKSPACE/work/native-prototype" source-rules
           python3 - <<'PY'
           from pathlib import Path
           for root in ['work/probe-home', 'work/probe-tmp']:

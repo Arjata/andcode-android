@@ -1,4 +1,4 @@
-"""Linux-only isolated TUI experiment for the sampled-media replacement library."""
+"""Linux-only isolated TUI experiments for explicitly selected media replacements."""
 import hashlib
 import json
 import os
@@ -12,21 +12,29 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def probe(exe, stage, env):
+def probe(exe, stage, env, variant='sampled'):
+    if variant not in ['sampled', 'source-rules']:
+        raise ValueError('Unexpected media TUI diagnostic selector')
     stage = Path(stage).resolve(strict=True)
     exe = Path(exe).resolve(strict=True)
     native = (stage / 'native').resolve(strict=True)
     manifest = stage / 'oc2-native.tsv'
-    review = json.loads((stage / 'native-opentui-build-review.json').read_text(encoding='utf8'))
     output = stage / 'native-opentui-build'
-    replacement = output / 'media-object-relink/libopentui.so'
+    parent = 'modified-media-source-relink' if variant == 'source-rules' else 'media-object-relink'
+    review_path = output / parent / 'review.json' if variant == 'source-rules' else stage / 'native-opentui-build-review.json'
+    review = json.loads(review_path.read_text(encoding='utf8'))
+    evidence = review if variant == 'source-rules' else review['mediaObjectRelink']
+    if variant == 'source-rules' and any(evidence[k] is not False for k in
+            ['redistributionApproved', 'androidApproved', 'relinkingApproved', 'fullCorrespondingSourceApproved']):
+        raise ValueError('Unexpected source-rule TUI approval')
+    replacement = output / parent / 'libopentui.so'
     rows = [line.split('\t') for line in manifest.read_text(encoding='utf8').splitlines()]
     if not rows or any(len(row) != 4 for row in rows):
         raise ValueError('Invalid native manifest')
     selected = [row for row in rows if '/@opentui/core-linux-arm64/' in row[3]]
     if len(selected) != 1 or len({row[0] for row in rows}) != len(rows):
         raise ValueError('Expected one unique OpenTUI input')
-    protected = {exe: digest(exe), manifest: digest(manifest)}
+    protected = {exe: digest(exe), manifest: digest(manifest), review_path: digest(review_path)}
     for name, checksum, size, _ in rows:
         if Path(name).name != name or '\\' in name or name in ('.', '..'):
             raise ValueError('Invalid native filename')
@@ -35,15 +43,14 @@ def probe(exe, stage, env):
         if digest(path) != checksum or path.stat().st_size != int(size):
             raise ValueError('Changed baseline native input')
         protected[path] = checksum
-    library_rows = [row for row in review['mediaObjectRelink']['files']
-                    if row['path'] == 'media-object-relink/libopentui.so']
+    library_rows = [row for row in evidence['files'] if row['path'] == parent + '/libopentui.so']
     if (len(library_rows) != 1 or digest(replacement) != library_rows[0]['sha256']
             or replacement.stat().st_size != library_rows[0]['bytes']):
         raise ValueError('Changed replacement library')
     protected[replacement] = digest(replacement)
     if protected[replacement] == selected[0][1]:
         raise ValueError('Expected a changed replacement library')
-    directory = output / 'media-object-relink/media-tui'
+    directory = output / parent / 'media-tui'
     directory.mkdir(exist_ok=False)
     copied = directory / 'native'
     copied.mkdir()
@@ -88,6 +95,7 @@ def probe(exe, stage, env):
         if digest(path) != checksum:
             raise ValueError('Replacement TUI changed a protected input')
     result = {'command': command, 'alias': alias.relative_to(output).as_posix(),
+              'variant': variant, 'inputReviewSha256': protected[review_path],
               'originalSha256': selected[0][1], 'replacementSha256': protected[replacement],
               'lookupManifestIsReleaseManifest': False, 'mappedReplacement': True,
               'renderedTui': True, 'runtimeExtractedElf': False,
@@ -101,4 +109,4 @@ def probe(exe, stage, env):
 
 
 if __name__ == '__main__':
-    probe(sys.argv[1], sys.argv[2], os.environ)
+    probe(sys.argv[1], sys.argv[2], os.environ, sys.argv[3] if len(sys.argv) > 3 else 'sampled')

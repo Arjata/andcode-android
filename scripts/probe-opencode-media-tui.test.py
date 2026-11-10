@@ -13,7 +13,7 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
 class Tests(unittest.TestCase):
     def test_isolation_mapping_render_and_rejections(self):
-        for mode in ['ok', 'baseline', 'replacement', 'failed', 'timeout', 'marker', 'maps',
+        for mode in ['ok', 'source-rules', 'source-approval', 'review-mutate', 'baseline', 'replacement', 'failed', 'timeout', 'marker', 'maps',
                      'render', 'extraction', 'mutate', 'copy-mutate', 'duplicate']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 stage = Path(tmp).resolve()
@@ -26,12 +26,20 @@ class Tests(unittest.TestCase):
                     rows.append('\t'.join([name, m.digest(path), str(len(data)), source]))
                 (stage / 'oc2-native.tsv').write_text('\n'.join(rows) + '\n')
                 output = stage / 'native-opentui-build'
-                replacement = output / 'media-object-relink/libopentui.so'
+                variant = 'source-rules' if mode in ['source-rules', 'source-approval'] else 'sampled'
+                parent = 'modified-media-source-relink' if variant == 'source-rules' else 'media-object-relink'
+                replacement = output / parent / 'libopentui.so'
                 replacement.parent.mkdir(parents=True); replacement.write_bytes(b'replacement')
                 (stage / 'native-opentui-build-review.json').write_text(json.dumps({
                     'mediaObjectRelink': {'files': [{'path': 'media-object-relink/libopentui.so',
                                                    'bytes': replacement.stat().st_size,
-                                                   'sha256': m.digest(replacement)}]}}))
+                                                    'sha256': m.digest(replacement)}]}}))
+                if variant == 'source-rules':
+                    (replacement.parent / 'review.json').write_text(json.dumps({
+                        'files': [{'path': parent + '/libopentui.so', 'bytes': replacement.stat().st_size,
+                                   'sha256': m.digest(replacement)}],
+                        'redistributionApproved': mode == 'source-approval', 'androidApproved': False,
+                        'relinkingApproved': False, 'fullCorrespondingSourceApproved': False}))
                 if mode == 'baseline': (native / 'opentui.so').write_bytes(b'changed')
                 if mode == 'replacement': replacement.write_bytes(b'changed')
                 if mode == 'duplicate': (stage / 'oc2-native.tsv').write_text('\n'.join(rows + rows) + '\n')
@@ -52,23 +60,28 @@ class Tests(unittest.TestCase):
                     if mode == 'extraction': (directory / 'tmp/extracted.so').write_bytes(b'\x7fELFbad')
                     if mode == 'mutate': exe.write_bytes(b'changed')
                     if mode == 'copy-mutate': (directory / 'native/other.so').write_bytes(b'changed')
+                    if mode == 'review-mutate': (stage / 'native-opentui-build-review.json').write_bytes(b'changed')
                     return subprocess.CompletedProcess(command, 1 if mode == 'failed' else 0,
                         b'' if mode == 'marker' else b'ANDCODE_SOURCE_TUI_NATIVE_OK (Linux CI only)\n', b'')
 
                 with patch.object(m.subprocess, 'run', side_effect=run):
-                    if mode == 'ok':
-                        report = m.probe(exe, stage, {'LD_PRELOAD': 'untrusted'})
+                    if mode in ['ok', 'source-rules']:
+                        report = m.probe(exe, stage, {'LD_PRELOAD': 'untrusted'}, variant)
+                        self.assertEqual(report['variant'], variant)
                         self.assertTrue(report['mappedReplacement'])
                         self.assertFalse(report['lookupManifestIsReleaseManifest'])
                         self.assertFalse(report['runtimeExtractedElf'])
                         self.assertNotEqual(report['replacementSha256'], report['originalSha256'])
                         self.assertTrue(all(not report[k] for k in ['redistributionApproved', 'androidApproved', 'relinkingApproved']))
                         self.assertEqual(json.loads((directory / 'review.json').read_text())['alias'], report['alias'])
-                        with self.assertRaises(FileExistsError): m.probe(exe, stage, {})
+                        with self.assertRaises(FileExistsError): m.probe(exe, stage, {}, variant)
                     else:
                         with self.assertRaises((ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired)):
-                            m.probe(exe, stage, {})
+                            m.probe(exe, stage, {}, variant)
                         self.assertFalse((directory / 'review.json').exists())
+
+    def test_invalid_selector_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'selector'): m.probe('unused', 'unused', {}, '../arbitrary')
 
 
 if __name__ == '__main__': unittest.main()
