@@ -22,7 +22,8 @@ class Tests(unittest.TestCase):
                  'build-fail', 'timeout', 'object-set', 'duplicate-object', 'empty-objects',
                  'dependency-gap', 'crc-source', 'crc-unchanged', 'object-elf',
                  'object-machine', 'object-type', 'object-version', 'source-mutation', 'baseline-mutation',
-                 'escape-output']
+                 'escape-output', 'swscale-installed-mutation', 'swscale-built-mutation',
+                 'swscale-dependency-mutation']
         for mode in modes:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve(); native = root / 'original'; output = root / 'output'
@@ -95,6 +96,9 @@ class Tests(unittest.TestCase):
                         built.parent.mkdir(parents=True, exist_ok=True); built.write_bytes(raw)
                     config = copied_cache / 'build/aarch64-linux/config.h'
                     config.parent.mkdir(parents=True, exist_ok=True); config.write_bytes(b'configuration')
+                    if mode == 'swscale-dependency-mutation':
+                        dependency['files'].append({'path': 'build/aarch64-linux/config.h',
+                            'sha256': m.digest(config), 'bytes': config.stat().st_size})
                     if mode == 'source-mutation': crc_source.write_bytes(b'changed')
                     if mode == 'baseline-mutation': (prefix / keys[1]).write_bytes(b'changed')
                     if mode == 'escape-output':
@@ -109,6 +113,15 @@ class Tests(unittest.TestCase):
                         'sourceSha256': hashlib.sha256(b'wrong' if mode == 'crc-source' else b'modified CRC').hexdigest()},
                         {'object': keys[1]}]}
 
+                def swscale(*args):
+                    if mode == 'swscale-installed-mutation':
+                        (copied_cache / 'prefix/aarch64-linux' / keys[0]).write_bytes(b'changed')
+                    elif mode == 'swscale-built-mutation':
+                        (copied_cache / 'build/aarch64-linux/libavutil/crc.o').write_bytes(b'changed')
+                    elif mode == 'swscale-dependency-mutation':
+                        (copied_cache / 'build/aarch64-linux/config.h').write_bytes(b'changed')
+                    return {'mockOnly': True}
+
                 with ExitStack() as stack:
                     stack.enter_context(patch.dict(m.media.pty.rust.sources.MEDIA_SOURCES, archives, clear=True))
                     stack.enter_context(patch.object(m.media, 'modified_crc_source', return_value=b'modified CRC'))
@@ -116,7 +129,7 @@ class Tests(unittest.TestCase):
                     stack.enter_context(patch.object(m.media, 'ffmpeg_configuration', return_value={'CONFIG_GPL': '0'}))
                     stack.enter_context(patch.object(m.media, 'ffmpeg_source_inputs', return_value=dependency))
                     stack.enter_context(patch.object(m.media, 'media_compile_commands', side_effect=compile_commands))
-                    stack.enter_context(patch.object(m, 'rebuild_swscale_macros', return_value={'mockOnly': True}))
+                    stack.enter_context(patch.object(m, 'rebuild_swscale_macros', side_effect=swscale))
                     stack.enter_context(patch.object(m.subprocess, 'run', side_effect=run))
                     if mode == 'ok':
                         result = m.rebuild(native, output, {'NODE_TLS_REJECT_UNAUTHORIZED': '0'})
@@ -138,7 +151,8 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'overlap'): m.rebuild(native, output, {})
 
     def test_swscale_macro_source_rule_and_rejections(self):
-        for mode in ['ok', 'preexisting', 'build', 'timeout', 'bad-elf', 'run', 'drift', 'mutation']:
+        for mode in ['ok', 'preexisting', 'build', 'timeout', 'bad-elf', 'run', 'drift', 'mutation',
+                     'elf-machine', 'elf-type', 'elf-version']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 directory = Path(tmp).resolve(); cache = directory / 'cache'
                 build = cache / 'build/aarch64-linux'; build.mkdir(parents=True)
@@ -153,7 +167,11 @@ class Tests(unittest.TestCase):
                         self.assertEqual(kwargs['cwd'], build)
                         self.assertEqual(command, ['make', 'V=1', 'libswscale/tests/sws_ops', 'ELIBS=-Wl,-z,max-page-size=16384'])
                         if mode == 'timeout': raise subprocess.TimeoutExpired(command, 300, stderr=b'partial')
-                        generator.write_bytes(b'new ELF')
+                        raw = bytearray(64); raw[:7] = b'\x7fELF\x02\x01\x01'
+                        raw[16:18] = (1 if mode == 'elf-type' else 3).to_bytes(2, 'little')
+                        raw[18:20] = (62 if mode == 'elf-machine' else 183).to_bytes(2, 'little')
+                        raw[20:24] = (0 if mode == 'elf-version' else 1).to_bytes(4, 'little')
+                        generator.write_bytes(raw)
                         return subprocess.CompletedProcess(command, 1 if mode == 'build' else 0, b'compile argv', b'')
                     self.assertEqual(command, [str(generator), '-macros'])
                     self.assertEqual(kwargs['cwd'], directory / 'swscale-generator-rebuild')

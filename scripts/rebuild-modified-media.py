@@ -103,7 +103,13 @@ def rebuild_swscale_macros(cache, directory, env):
 
     run(['make', 'V=1', 'libswscale/tests/sws_ops', 'ELIBS=-Wl,-z,max-page-size=16384'],
         work / 'build.log', build)
-    _, needed = media.pty.audit.elf(generator.read_bytes())
+    raw = generator.read_bytes()
+    if (len(raw) < 64 or raw[:7] != b'\x7fELF\x02\x01\x01'
+            or int.from_bytes(raw[16:18], 'little') not in [2, 3]
+            or int.from_bytes(raw[18:20], 'little') != 183
+            or int.from_bytes(raw[20:24], 'little') != 1):
+        raise ValueError('Swscale generator is not AArch64 ELF64 executable')
+    _, needed = media.pty.audit.elf(raw)
     checksum = digest(generator)
     generated = run([str(generator), '-macros'], work / 'run.log', work)
     (work / 'uops_macros.h').write_bytes(generated)

@@ -60,6 +60,7 @@ def probe(exe, stage, env, variant='sampled'):
     # not an asserted digest manifest for the deliberately aliased replacement.
     shutil.copyfile(manifest, directory / 'oc2-native.tsv')
     copies = {p: digest(p) for p in copied.iterdir()}
+    copies[directory / 'oc2-native.tsv'] = digest(directory / 'oc2-native.tsv')
     for name in ['home', 'tmp']:
         (directory / name).mkdir()
     child_env = dict(env, ANDCODE_EXE_DIR=str(copied), HOME=str(directory / 'home'),

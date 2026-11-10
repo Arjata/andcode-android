@@ -14,7 +14,7 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 class Tests(unittest.TestCase):
     def test_isolation_mapping_render_and_rejections(self):
         for mode in ['ok', 'source-rules', 'source-approval', 'review-mutate', 'baseline', 'replacement', 'failed', 'timeout', 'marker', 'maps',
-                     'render', 'extraction', 'mutate', 'copy-mutate', 'duplicate']:
+                      'render', 'extraction', 'mutate', 'copy-mutate', 'lookup-mutate', 'duplicate']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 stage = Path(tmp).resolve()
                 exe = stage / 'opencode'; exe.write_bytes(b'executable')
@@ -60,6 +60,7 @@ class Tests(unittest.TestCase):
                     if mode == 'extraction': (directory / 'tmp/extracted.so').write_bytes(b'\x7fELFbad')
                     if mode == 'mutate': exe.write_bytes(b'changed')
                     if mode == 'copy-mutate': (directory / 'native/other.so').write_bytes(b'changed')
+                    if mode == 'lookup-mutate': (directory / 'oc2-native.tsv').write_bytes(b'changed')
                     if mode == 'review-mutate': (stage / 'native-opentui-build-review.json').write_bytes(b'changed')
                     return subprocess.CompletedProcess(command, 1 if mode == 'failed' else 0,
                         b'' if mode == 'marker' else b'ANDCODE_SOURCE_TUI_NATIVE_OK (Linux CI only)\n', b'')

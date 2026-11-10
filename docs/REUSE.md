@@ -882,6 +882,9 @@ through this test build; the generator itself is guarded through execution.
 This adds test-program build/run evidence, not original preprocessing capture or
 full toolchain/source closure. Synthetic failure, timeout, output drift, ELF and
 mutation cases pass locally; real macro regeneration still awaits native CI.
+Additional rejection cases cover generator ELF type/version/machine, a test
+build changing a selected installed/build object or recorded configuration
+dependency, and TUI subprocess mutation of its copied lookup manifest.
 
 The next independent diagnostic starts from fresh copies of the fixed media
 archives, their complete byte-matched pristine source trees and the retained
@@ -902,6 +905,35 @@ escape/cycle rejection, matching the dereferenced upload manifest. In particular
 the FFmpeg build's `src/` alias must not silently omit its source-file evidence.
 Synthetic directory-alias/cycle tests cover this enumeration separately from
 actual source-rule execution.
+
+2026-11-10 independent source-rule artifact acceptance: native run
+`42788737498`, commit `0489a010a7c29b039a37302586a5454e08900ce8`, succeeded.
+Artifact `13753120400` contains 663224717 bytes with API-verified ZIP SHA-256
+`61c1aec87e8620bb32be3ec2a5f702f9dd358149e01c931c3ff2e687932ecf8a`.
+All six prior archive gates pass again: the complete manifest closes over
+65729 files, final-link evidence retains 446 inputs, post-build preprocessing
+binds 345 units / 945 snapshots / 755 media dependencies / 192 tool headers,
+the sampled-object replacement passes ABI/CRC and isolated TUI mapping/render
+bindings, and the two-mode zlib generator outputs still match. These prior
+sampled-object/TUI results do not describe the fresh source-rule library.
+The seventh independent gate separately checks all 10399 FFmpeg and 254 zlib
+pristine source files against the fixed official archives, the sole copied CRC
+source modification, all 345 fresh build/installed object pairs, source-rule
+commands, exact main-source paths, recorded dependencies, compiler wrapper and
+unchanged media configuration. Its 22318-file diagnostic review SHA-256 is
+`803623be051f120eae57746c79a34a1f45ea8983915ba91151884ffafdefb243`.
+The exact job `129736451311` log has SHA-256
+`c7068d2ac098293b00416a7bbd0ca7b50e764bf7b4ff38342985ce4b67ca88c7`.
+Parent semantic mutation tests reject twelve self-consistent manifest/evidence
+changes: approval, omitted inventory entry, changed source/wrapper, object
+machine/type/version, command/main-source binding, dependency target/escape and
+configuration drift. Python 3.12 and 3.13 both pass, with identical retained log
+SHA-256 `4844463f22e4a6e5025583bfea6aca7ac7dd6effb03b34d63ab7f6808b74f592`.
+This artifact predates fresh-source final relinking, its TUI gate, `trees.h`
+maintenance regeneration and swscale macro regeneration. No such results, all
+original preprocessing inputs, full toolchain/corresponding source, legal
+relinking/distribution approval or Android admission are inferred. All four
+approval flags remain false; formal APK inputs and device instances are unchanged.
 
 The subsequent isolated link diagnostic substitutes every fresh source-rule
 media object into the retained OpenTUI final-link command while preserving all
