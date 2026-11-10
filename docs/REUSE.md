@@ -1322,6 +1322,16 @@ is declared separately. Inventory SHA-256:
 No cargo resolution, actual target/features/build scripts, dependency license
 closure, practical relink or distribution/Android approval is established.
 
+A bounded parent review of Bun's pinned acquisition rules documents how
+vendored dependencies are declared to be fetched: GitHub tarballs cached by
+URL hash only, CRLF-normalized `git apply` patches with overlays, `.ref`
+stamps written last, and source identity `sha256(commit + patch contents)`
+that ignores disk edits. Notably, the fetch path declares no archive
+digest/signature verification, so any reproduction must pin dependency
+archive digests independently. No upstream script was executed. Review
+SHA-256:
+`accda93b66d05eb53870f4a42104447ef5c1e015e58ed7a39f522749c054107d`.
+
 The CI source collector now also retains the whole fixed Bun candidate source
 archive (`oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`, pinned
 SHA-256 `64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520`)
