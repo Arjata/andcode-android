@@ -158,6 +158,20 @@ and the CI tree report agree with these counts; the host did not independently
 walk ext4. The CI tree has one additional allowed empty `lost+found` directory.
 Canonical/PRoot review JSON SHA-256:
 `fc552d5a19f4814dd9b3d812498572344d6a307d9615571b778bc45b08fb5613`.
+An additional, separate host review subsequently verified all three retained
+InRelease signatures using Git for Windows `gpgv` 2.4.9, an explicit isolated
+home and the keyring downloaded with default TLS verification from
+`https://archive.ubuntu.com/ubuntu/project/ubuntu-archive-keyring.gpg`.
+Keyring SHA-256:
+`80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31`.
+All three signatures returned `VALIDSIG` for the pinned Ubuntu Archive 2018
+fingerprint `F6ECB3762474EDA9D21B7022871920D1991BC93C`, without a bad, revoked or
+expired-signature status. Altering the signed `Suite` field was rejected with
+`BADSIG`. Separate signature review JSON SHA-256:
+`781c6e28d25470c9ffb43607a29e6c75994f141be5bc420432e48e51e97be608`.
+These InRelease files do not declare `Valid-Until`; this review does not claim
+validation of that absent field, `.dsc` developer signatures or complete source
+licensing. Earlier digest-only reports retain their original limited scope.
 These results are
 not complete corresponding-source, redistribution approval or device installation
 acceptance. Existing device instances are unchanged.
