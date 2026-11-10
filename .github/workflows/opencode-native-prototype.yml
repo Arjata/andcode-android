@@ -44,6 +44,7 @@ jobs:
           python3 scripts/manifest-opencode-native.test.py
           python3 scripts/rebuild-zlib-generators.test.py
           python3 scripts/rebuild-modified-media.test.py
+          python3 scripts/relink-modified-media.test.py
       - name: Optional CA real TLS, bundled roots and hostname rejection
         timeout-minutes: 3
         run: python3 scripts/custom-ca-tls.test.py
@@ -83,6 +84,10 @@ jobs:
         run: |
           export PATH="$GITHUB_WORKSPACE/work/zig-opentui/zig-aarch64-linux-0.17.0:$PATH"
           python3 scripts/rebuild-modified-media.py work/native-prototype/native-opentui-build/source/opentui-9a09079c0c7ad0fb2d55404f66a5c453204328dd/packages/native work/native-prototype/native-opentui-build
+      - name: Fresh source-rule OpenTUI relink and CRC (diagnostic only)
+        run: |
+          export PATH="$GITHUB_WORKSPACE/work/zig-opentui/zig-aarch64-linux-0.17.0:$PATH"
+          python3 scripts/relink-modified-media.py work/native-prototype/native-opentui-build
       - name: Build experimental source V2 including Web assets
         env:
           OPENCODE_CHANNEL: beta
@@ -247,7 +252,9 @@ jobs:
         with:
           name: failed-modified-media-source-build
           include-hidden-files: true
-          path: work/native-prototype/native-opentui-build/modified-media-source-rebuild/
+          path: |
+            work/native-prototype/native-opentui-build/modified-media-source-rebuild/
+            work/native-prototype/native-opentui-build/modified-media-source-relink/
       - uses: actions/upload-artifact@v4
         with:
           name: opencode-native-prototype-diagnostic

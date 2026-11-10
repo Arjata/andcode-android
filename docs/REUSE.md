@@ -863,6 +863,18 @@ the FFmpeg build's `src/` alias must not silently omit its source-file evidence.
 Synthetic directory-alias/cycle tests cover this enumeration separately from
 actual source-rule execution.
 
+The subsequent isolated link diagnostic substitutes every fresh source-rule
+media object into the retained OpenTUI final-link command while preserving all
+non-media inputs. It requires exact source-review/input hashes, full media-set
+coverage, fixed Zig archive identity, map/extraction evidence, unchanged NEEDED,
+the OpenTUI ABI marker and the 2304-case/6912-call instrumented CRC probes.
+The fresh library and probe pass the existing AArch64/16K/glibc <=2.39 ELF gate;
+all source-rule and retained inputs remain mutation-guarded. Synthetic tests
+cover link failures/timeouts, object-set/input drift, missing map/ABI/CRC evidence
+and changed dependencies. Actual execution still requires native CI; this is
+not TUI/decoder coverage, original object equivalence, a full toolchain/source
+closure, LGPL relinking approval or Android admission. No baseline is replaced.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
