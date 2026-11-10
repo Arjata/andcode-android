@@ -627,6 +627,34 @@ macro behavior and this extra pass remain differences from original compilation;
 object equality and original-input equivalence are not assumed. Linux execution
 and independent artifact review are still required for the corrected attempt.
 
+Corrected source CI `42765618304` (`fa8962a`, job `129661311669`) and regular
+CI `42765593273` succeeded. Independent review of artifact `13740806776`
+(569629477 bytes) matched API ZIP SHA-256
+`743be72f9e9b07eb7efe4846eb6027fc378e37b02dee7b9c3b2426b8c1ea77fc`.
+The complete 43067-file manifest is closed. All 345 sampled media objects were
+recompiled as AArch64 relocatables; none is byte-identical to its baseline.
+All 345 final media linker positions are replaced (344 sampled recompilations
+plus the separately instrumented CRC). Independent review binds 698 diagnostic
+files, exact compile/link/probe commands, linker reports and ABI/CRC markers.
+The replacement library and CRC executable pass AArch64, 16K PT_LOAD and
+glibc <=2.39 checks; NEEDED remains libm/libc/libpthread/libdl. The CI logs record
+2304 reference cases and 6912 instrumented calls against the replacement.
+Media-object relink review JSON SHA-256:
+`63d84743bc57176ba9405fb2c922a6d5aa69fbc33c9f1a98bd5928f962d472b7`.
+Preprocessing and standalone-generator rebuild were independently rechecked;
+review JSON SHA-256s respectively:
+`c8defa0a8e66c7303a80e5245d56119ac3b2aaee1c531947be5e9d412569a9e1`,
+`ca7f0549ba138e6c66d2fabc6c5245c55800849036c48de0a155235987f4fbd8`.
+Job log SHA-256:
+`7673306a8a282819ce9fcbacf3a3d9141f072ae60b8560bd5f673e7dffb44623`;
+complete independent verification log SHA-256:
+`4ad8d43726dee9d179771a43170208118ecf31e06e279801374dddebe39effbe`.
+This accepts only the bounded sampled-object replacement and ABI/CRC diagnostic.
+The retained baseline TUI gate does not validate this replacement library's TUI
+or decoder behavior. Original compilation equivalence, complete modified-source
+rebuild, full corresponding source, notices, toolchain and Android/legal approval
+remain unproven. No replacement library was staged in the APK or on a device.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
