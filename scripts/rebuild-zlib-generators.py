@@ -16,6 +16,15 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def require_aarch64_elf(path, types):
+    raw = path.read_bytes()
+    if (len(raw) < 64 or raw[:7] != b'\x7fELF\x02\x01\x01'
+            or int.from_bytes(raw[16:18], 'little') not in types
+            or int.from_bytes(raw[18:20], 'little') != 183
+            or int.from_bytes(raw[20:24], 'little') != 1):
+        raise ValueError('Zlib generator output is not expected AArch64 ELF64 LE')
+
+
 def rebuild(source, output, env):
     source = Path(source).resolve(strict=True)
     output = Path(output).resolve(strict=True)
@@ -114,16 +123,16 @@ def rebuild(source, output, env):
             protected[preprocessed] = digest(preprocessed)
             run([str(compiler), '-O2', '-std=c17', '-c', str(preprocessed), '-o', str(obj)],
                 work, work / f'{index:04d}-compile.log')
-            if not obj.read_bytes().startswith(b'\x7fELF\x02\x01'):
-                raise ValueError('Zlib generator object is not ELF64 LE')
+            require_aarch64_elf(obj, {1})
+            protected[obj] = digest(obj)
             objects.append(str(obj))
             units.append({'source': name, 'preprocessed': preprocessed.relative_to(output).as_posix(),
                           'preprocessedSha256': protected[preprocessed], 'dependencies': dependencies,
-                          'object': obj.relative_to(output).as_posix(), 'objectSha256': digest(obj)})
+                          'object': obj.relative_to(output).as_posix(), 'objectSha256': protected[obj]})
         executable = work / 'generator'
         run([str(compiler), *objects, '-o', str(executable)], work, work / 'link.log')
-        if not executable.read_bytes().startswith(b'\x7fELF\x02\x01'):
-            raise ValueError('Zlib generator is not ELF64 LE')
+        require_aarch64_elf(executable, {2, 3})
+        protected[executable] = digest(executable)
         stdout = run([str(executable)], work, work / 'run.log')
         generated = work / filename
         if mode == 'makefixed':

@@ -765,6 +765,32 @@ directories. Failures/timeouts do not create an accepted review. This experiment
 does not change the baseline native directory, rebuild the compiled CLI, approve
 decoder coverage or provide a content-addressed release payload/Android approval.
 
+The replacement-library TUI diagnostic is now independently accepted for native
+CI run `42772789165`, commit
+`8f3be3f0514fad1a0dc48974b144ac621820b6f0`, artifact `13743357750`
+(584975016 bytes; ZIP SHA-256
+`e4b38c4becd00b93075dabc58d6dd18ac941ff43d53bffe0a3a11b31301732e2`).
+Five archive-only parent gates independently rechecked the complete 43078-file
+manifest, baseline native evidence, all 345 media substitutions, preprocessing,
+standalone media generators and the replacement TUI. The TUI evidence binds four
+native copies, ten diagnostic files, 365 rendered terminal bytes, the exact
+replacement/staged-runtime map paths and an empty runtime-ELF extraction result.
+The replacement SHA-256 is
+`f004627eeb3bb58e763ccd9f5b22237eff47cfc0db69a6fc7e8b53014fbd27fe`.
+Independent TUI review SHA-256:
+`b1bc5852d8c87502f2c770d71019c8368cf9c60fb1dfd57ac1216ad13a1a83cd`;
+object-relink, preprocessing and generator-rebuild review SHA-256s respectively:
+`bd994d9c7fbe390b42b2bf094696a737f11d853875062b405b2ae8ea7db8848c`,
+`d3be8c985c04008782a1756115652d11f837a39063b2e7e9baa6ae7ccbec3784`,
+`b84658b1b58002c77555ed4639cf5be39ffe1744a3e00ad50f80edbfc7634bf8`.
+The retained job `129684258391` log SHA-256 is
+`93d58412fc83215af31c26bdee18d0a67d3fe392919a8f82ca807331f314395a`;
+regular CI `42772733568` also succeeded at the exact same commit. This closes
+only the Linux replacement-library PTY/map/render experiment, not decoder
+coverage, original-object equivalence, a complete modified-source rebuild,
+corresponding-source/relinking approval, valid release packaging or Android
+application-domain admission. Formal APK inputs and device data remain unchanged.
+
 The isolated zlib maintenance-generator diagnostic copies the pristine zlib
 tree, then rebuilds `crc32.c` with `MAKECRCH` and `inftrees.c` / `zutil.c` with
 `MAKEFIXED`. Host GCC performs full-dependency preprocessing and compiles the
@@ -778,6 +804,13 @@ replaces configured media inputs or APK payloads. This covers only these two
 maintenance modes; `trees.h`, swscale maintenance generators, complete compiler
 and sysroot sources, original build provenance and legal/Android approval remain
 outside this diagnostic and require separate evidence.
+
+The follow-up hardening also checks ELF64 little-endian version 1, AArch64
+machine identity, ET_REL for compiled objects and ET_EXEC/ET_DYN for generators
+before running them. Objects and generator executables are mutation-guarded
+through the remainder of the diagnostic. Synthetic regressions reject wrong
+machine/type/version fields and link/run-time mutation; these local mocked tests
+do not execute GCC or establish a successful new Linux build.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

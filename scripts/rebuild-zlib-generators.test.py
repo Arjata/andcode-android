@@ -13,9 +13,11 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
 class Tests(unittest.TestCase):
     def test_generators_and_fail_closed(self):
-        for mode in ['ok', 'missing', 'source-elf', 'compiler', 'preprocess', 'compile', 'link',
+        for mode in ['ok', 'exec', 'missing', 'source-elf', 'compiler', 'preprocess', 'compile', 'link',
                      'timeout', 'dependency-target', 'external-header', 'missing-main', 'object-elf',
-                     'generator-elf', 'run', 'drift', 'mutate', 'compiler-mutate']:
+                     'generator-elf', 'object-machine', 'object-type', 'object-version',
+                     'generator-machine', 'generator-type', 'generator-version',
+                     'object-mutate', 'generator-mutate', 'run', 'drift', 'mutate', 'compiler-mutate']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve(); source = root / 'upstream'; source.mkdir()
                 output = root / 'output'; output.mkdir()
@@ -31,6 +33,13 @@ class Tests(unittest.TestCase):
                 if mode == 'source-elf': (source / 'extra.c').write_bytes(b'\x7fELFbad')
                 directory = output / 'zlib-generator-rebuild'
                 calls = []
+
+                def elf(kind, machine=183, version=1):
+                    raw = bytearray(64); raw[:7] = b'\x7fELF\x02\x01\x01'
+                    raw[16:18] = kind.to_bytes(2, 'little')
+                    raw[18:20] = machine.to_bytes(2, 'little')
+                    raw[20:24] = version.to_bytes(4, 'little')
+                    return bytes(raw)
 
                 def run(command, **kwargs):
                     calls.append(command)
@@ -52,13 +61,21 @@ class Tests(unittest.TestCase):
                     elif '-c' in command:
                         self.assertTrue(command[command.index('-c') + 1].endswith('.i'))
                         if mode == 'compile': return subprocess.CompletedProcess(command, 2, b'', b'failed')
-                        Path(command[-1]).write_bytes(b'invalid' if mode == 'object-elf' else b'\x7fELF\x02\x01object')
+                        raw = elf(3 if mode == 'object-type' else 1,
+                                  62 if mode == 'object-machine' else 183,
+                                  0 if mode == 'object-version' else 1)
+                        Path(command[-1]).write_bytes(b'invalid' if mode == 'object-elf' else raw)
                     elif '-o' in command:
                         if mode == 'link': return subprocess.CompletedProcess(command, 2, b'', b'failed')
-                        Path(command[-1]).write_bytes(b'invalid' if mode == 'generator-elf' else b'\x7fELF\x02\x01generator')
+                        raw = elf(1 if mode == 'generator-type' else 2 if mode == 'exec' else 3,
+                                  62 if mode == 'generator-machine' else 183,
+                                  0 if mode == 'generator-version' else 1)
+                        Path(command[-1]).write_bytes(b'invalid' if mode == 'generator-elf' else raw)
+                        if mode == 'object-mutate': Path(command[1]).write_bytes(elf(1) + b'changed')
                     else:
                         self.assertEqual(command, [str(work / 'generator')])
                         if mode == 'run': return subprocess.CompletedProcess(command, 2, b'', b'failed')
+                        if mode == 'generator-mutate': Path(command[0]).write_bytes(elf(3) + b'changed')
                         if work.name == 'makecrch':
                             (work / 'crc32.h').write_bytes(b'changed' if mode == 'drift' else files['crc32.h'])
                         else:
@@ -69,7 +86,7 @@ class Tests(unittest.TestCase):
 
                 with patch.object(m.shutil, 'which', return_value=None if mode == 'compiler' else str(compiler)), \
                      patch.object(m, 'SYSTEM_ROOT', system), patch.object(m.subprocess, 'run', side_effect=run):
-                    if mode == 'ok':
+                    if mode in ['ok', 'exec']:
                         result = m.rebuild(source, output, {'CPATH': 'untrusted'})
                         self.assertEqual(len(result['outputs']), 2)
                         self.assertEqual(len(result['systemHeaders']), 1)
