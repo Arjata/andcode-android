@@ -626,6 +626,35 @@ Parent flags-review JSON SHA-256:
 Actual allocator providers, symbol/liveness relationships and minimum-CPU
 compatibility remain unverified. No archive tool or binary was executed.
 
+Bounded Bun application-side relinking research now binds six additional
+official texts at Bun commit `38afee6c84fcf48c0edb2466aa4b27d287a59c30`
+(`bun.ts`, `compile.ts`, `tools.ts`, `ci-images/spec.ts`, `flags.ts` and
+`rust-toolchain.toml`). The parent independently fetched the same fixed raw URLs
+with TLS verification and matched all six retained byte counts and SHA-256s,
+then checked the material source excerpts. The declared toolchain pins LLVM
+23.1.1; the normal accepted major/minor range is `>=23.1.0 <23.1.99`, with an
+explicit-directory override. The build checks clang/rustc LLVM major parity;
+this is a build-policy declaration, not independently tested bitcode compatibility.
+The retained sysroot recipe declares Ubuntu 20.04, glibc 2.31 headers/runtime,
+and GCC 13 packages. Its equivalence to WebKit's separately named sysroot is
+unverified. The final-link rule uses clang++ with an object response file, lld
+selected via `--ld-path=`, and a separate lazy-object response file containing
+`--start-lib` / `--end-lib`. Actual Bun C++/Rust objects, generated application
+inputs, dependency objects/archives, linker-script/export inputs, toolchain and
+sysroot closure remain missing from the accepted relink material.
+
+Research revision 2 corrects the earlier over-strong bitcode, allocator and
+extractor claims; revision 1 is preserved as superseded external evidence.
+Neither archive symbol intersections nor a link-command-shape experiment
+without application inputs can prove actual Bun relinking, archive necessity,
+or live-code relationships. Revision 2 JSON SHA-256:
+`8b9b6db27b7d43cc5a8896239b895f958a68e1986f194d94b2a7091f110afd55`;
+parent binding-review JSON SHA-256:
+`63230b52378bfb20f55220d9ab3c7fbc914ba0e112b8bb49580fa196da928f4c`.
+No Bun/WebKit tool was executed or toolchain installed in this research;
+Android/Bionic assets remain excluded from the glibc candidate. No legal,
+relinking or Android approval follows from these source declarations.
+
 2026-11-09 固定原生包进一步源码定位(仅证据，**不批准分发**)：以下 commit
 来自对应精确版本的 npm registry `gitHead`，并读取该 commit 的文件；metadata
 关联不等于证明已下载 ELF 确由这些源码/配置构建，也不代替对应源码交付。
