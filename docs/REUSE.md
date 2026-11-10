@@ -838,6 +838,23 @@ Parent flags-review JSON SHA-256:
 Actual allocator providers, symbol/liveness relationships and minimum-CPU
 compatibility remain unverified. No archive tool or binary was executed.
 
+A subsequent bounded parent experiment disassembled the smallest bitcode member
+(byte count, then member ordinal) in each of the six bitcode-containing static
+archives, using the already-installed Windows LLVM 23.1.2 `llvm-dis`. Each of
+these six samples declares `target triple = "aarch64-unknown-linux-gnu"` and
+contains producer/`llvm.ident` text naming Ubuntu Clang 23.1.2 with package suffix
+`++20260910043923+069ef0e7cb36-1~exp1~20260910043934.72`. The original archive and
+ar-member SHA-256s were rechecked, and sample bytes, emitted IR, tool binary
+hash/version, exact commands and logs were retained outside the repository.
+Sample review SHA-256:
+`0eef5147ae6ee9fef2405ba7315436316f362b70c6e9fc46bc2a985d18781149`.
+This establishes readability and embedded metadata for those six samples only,
+not all 1023 bitcode modules or the exact producer executable. Five selected
+samples have no retained function target-attribute lines; no CPU minimum can be
+deduced from that absence. No downloaded object or archive executable was run,
+no target code was generated or linked, and no Bun library replacement or
+source/toolchain/license/Android approval follows.
+
 Bounded Bun application-side relinking research now binds six additional
 official texts at Bun commit `38afee6c84fcf48c0edb2466aa4b27d287a59c30`
 (`bun.ts`, `compile.ts`, `tools.ts`, `ci-images/spec.ts`, `flags.ts` and
