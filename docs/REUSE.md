@@ -567,6 +567,30 @@ complete inputs, reconstruction of the original objects, toolchain closure,
 complete corresponding source or license/Android approval. Generator and
 single-object relink diagnostics remain separate and all approvals remain false.
 
+Source CI `42759758740` (`31aab46`, job `129642428678`) and regular CI
+`42759727310` succeeded. Independent review of artifact `13737997725`
+(557139538 bytes) matched API ZIP SHA-256
+`18450178b3b6ca97fef0587e5fd90e4eac22bb7d097db5670f58c72d22d805fb`.
+The complete 42369-file manifest is closed. All 345 post-build preprocessing
+samples bind output bytes, constructed commands, logs and dependency files to
+755 media dependency paths and 192 fixed-Zig header paths, represented by 945
+distinct content snapshots. Tool-header snapshots match the retained official
+Zig library-resource manifest; configured `src/` aliases are bound to identical
+retained source bytes. These counts describe paths/content, not separate compiler
+executions or unique licenses. Independent preprocessing review JSON SHA-256:
+`03274271dca78712af5ff5d894bac14d46a31148cb1a01acf861e24fd9f318d9`.
+The standalone generator rebuild and both output matches also passed again;
+its review JSON SHA-256:
+`0edd598d48b36e37d7d60cdba98e944e6ce2eef034c6c327a71c919b7bcff9a8`.
+Existing object-command/notice candidates, original retained-input relink,
+single-CRC replacement and Linux runtime/PTY/TUI gates passed. Job log SHA-256:
+`fc36371b0f3e571b0c554227caf9063d5873df2ceae63f435a54a9df0ac049c2`;
+complete independent verification log SHA-256:
+`4ac3360f670f0d046477ac9d8b3deb958c7bc2c20189157386b53a2f701207eb`.
+This acceptance remains post-build sampling only: it does not establish original
+compile-time input capture, original-object reconstruction, complete modified
+media replacement, complete corresponding source or legal/Android approval.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
