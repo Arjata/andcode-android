@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import shlex
+from contextlib import ExitStack
 from pathlib import Path
 import subprocess
 import tarfile
@@ -869,27 +870,34 @@ class Tests(unittest.TestCase):
                     target.write_bytes(result.read_bytes())
                     return ['libc.so.6']
 
-                with patch.object(m.sys, 'platform', 'linux'), \
-                        patch.object(m.platform, 'machine', return_value='aarch64'), \
-                        patch.object(m, 'ORIGINAL', hashlib.sha256(b'original').hexdigest()), \
-                        patch.object(m, 'ZIG_SHA256', hashlib.sha256(b'tool archive').hexdigest()), \
-                        patch.object(m, 'retain_zig_resources', return_value={'archive': 'fixture'}), \
-                        patch.object(m.shutil, 'which', return_value=str(zig)), \
-                        patch.object(m.pty.rust.sources, 'download_archive', return_value=b'archive'), \
-                        patch.object(m.pty.rust.sources, 'inspect_archive', return_value={}), \
-                        patch.object(m.pty.rust, 'unpack_candidate', return_value=source), \
-                        patch.object(m, 'unpack_nested'), \
+                with ExitStack() as stack:
+                    # Register mocks dynamically to stay below Python 3.12's
+                    # static block limit while retaining LIFO cleanup on failure.
+                    mocks = [
+                        patch.object(m.sys, 'platform', 'linux'),
+                        patch.object(m.platform, 'machine', return_value='aarch64'),
+                        patch.object(m, 'ORIGINAL', hashlib.sha256(b'original').hexdigest()),
+                        patch.object(m, 'ZIG_SHA256', hashlib.sha256(b'tool archive').hexdigest()),
+                        patch.object(m, 'retain_zig_resources', return_value={'archive': 'fixture'}),
+                        patch.object(m.shutil, 'which', return_value=str(zig)),
+                        patch.object(m.pty.rust.sources, 'download_archive', return_value=b'archive'),
+                        patch.object(m.pty.rust.sources, 'inspect_archive', return_value={}),
+                        patch.object(m.pty.rust, 'unpack_candidate', return_value=source),
+                        patch.object(m, 'unpack_nested'),
                         patch.object(m, 'replay_media_generators', return_value={'outputs': ['lookup', 'neon']},
-                                     side_effect=ValueError('Generator replay failed') if failure == 'generator-replay' else None), \
+                                     side_effect=ValueError('Generator replay failed') if failure == 'generator-replay' else None),
                         patch.object(m, 'probe_ffmpeg_crc', return_value={'cases': 2304},
-                                     side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None), \
+                                     side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None),
                         patch.object(m, 'replay_link_inputs', return_value={'byteIdentical': True},
-                                     side_effect=ValueError('Replay failed') if failure == 'replay' else None), \
+                                     side_effect=ValueError('Replay failed') if failure == 'replay' else None),
                         patch.object(m, 'probe_modified_crc_relink', return_value={'modifiedCalls': 6912},
-                                     side_effect=ValueError('Modified relink failed') if failure == 'modified-relink' else None), \
-                        patch.object(m.subprocess, 'check_output', return_value='0.17.0'), \
-                        patch.object(m.subprocess, 'run', side_effect=run), \
-                        patch.object(m, 'validate', side_effect=validate) as probe:
+                                     side_effect=ValueError('Modified relink failed') if failure == 'modified-relink' else None),
+                        patch.object(m.subprocess, 'check_output', return_value='0.17.0'),
+                        patch.object(m.subprocess, 'run', side_effect=run),
+                    ]
+                    for mock in mocks:
+                        stack.enter_context(mock)
+                    probe = stack.enter_context(patch.object(m, 'validate', side_effect=validate))
                     if failure:
                         with self.assertRaises((ValueError, subprocess.CalledProcessError)):
                             m.build(upstream, stage)

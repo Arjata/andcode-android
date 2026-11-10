@@ -475,6 +475,16 @@ The baseline and modified CRC experiments and all approval fields stay unchanged
 Windows synthetic tests cover the replay and build failure gate; real Linux
 execution remains a separate CI requirement.
 
+The first replay candidate, source CI `42751634740` (`7bfe613`, job
+`129616365080`), failed before native compilation: the test's combined mock
+contexts exceeded Python 3.12's static block nesting limit. No generator replay
+or accepted diagnostic artifact resulted. Retained job log SHA-256:
+`219261fbdf894b44e1ea1fd88b77ef68db58955a474f3c88ee3c782f584da129`.
+The fixture now uses `contextlib.ExitStack` for dynamic mock registration and
+unchanged LIFO cleanup; all 32 OpenTUI synthetic tests pass on local Python 3.12
+and 3.13. Regular CI `42751608247` passed, but does not establish Linux generator
+acceptance. A new source CI run is required; no runtime or approval gate is relaxed.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
