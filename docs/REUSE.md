@@ -551,6 +551,22 @@ inputs, preprocessing of all media objects, other generators, complete source,
 modified-library replacement or license/Android approval. No experimental ELF
 has been added to the APK or installed on a device.
 
+The next diagnostic independently samples preprocessing for all recorded media
+translation units after the baseline build. It constructs a direct invocation
+of the fixed Zig compiler, verifies the retained wrapper and source/object
+hashes, permits only reviewed compiler flags and include paths inside the media
+cache, and never executes log text. Original compile/dependency output flags
+are removed; `-E -MD` emits isolated C `.i` / assembly `.s` output and a full
+observed dependency file. Each observed dependency must resolve inside the
+media cache or fixed Zig tool tree and is copied to a content-addressed snapshot.
+Commands, logs, output hashes and per-unit dependency mappings are retained;
+baseline objects, sources, wrapper and observed inputs must remain unchanged.
+Failure, timeout, unapproved options or external paths prevent staging. This
+is explicitly post-build sampling, not capture of the original compiler's
+complete inputs, reconstruction of the original objects, toolchain closure,
+complete corresponding source or license/Android approval. Generator and
+single-object relink diagnostics remain separate and all approvals remain false.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。

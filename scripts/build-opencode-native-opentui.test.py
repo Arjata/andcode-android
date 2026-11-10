@@ -300,6 +300,83 @@ class Tests(unittest.TestCase):
                     else:
                         with self.assertRaises(ValueError): m.rebuild_media_generator(native, output, env)
 
+    def test_post_build_media_preprocessing_samples_and_rejections(self):
+        for mode in ['c', 'assembly', 'zlib', 'flag', 'baseline', 'drift', 'timeout', 'failed',
+                     'missing-output', 'target', 'external-input', 'missing-source', 'snapshot']:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                native, output = root / 'native', root / 'output'
+                cache = native / '.cache/ffmpeg'
+                build = cache / 'build/aarch64-linux'
+                build.mkdir(parents=True); output.mkdir()
+                group = 'libz' if mode == 'zlib' else 'libavutil'
+                source = cache / ('sources/zlib-1.3.2/main.c' if mode == 'zlib' else
+                                  'sources/ffmpeg-9.0.2/main' + ('.S' if mode == 'assembly' else '.c'))
+                source.parent.mkdir(parents=True); source.write_bytes(b'source')
+                obj = cache / 'prefix/aarch64-linux/objects' / group / 'main.o'
+                obj.parent.mkdir(parents=True); obj.write_bytes(b'object')
+                wrapper = cache / 'toolchains/aarch64-linux/cc'
+                wrapper.parent.mkdir(parents=True)
+                wrapper.write_text('#!/bin/sh\nexec zig cc -target aarch64-linux-gnu.2.17 "$@"\n', newline='\n')
+                zig = root / 'zig/zig'; zig.parent.mkdir(); zig.write_bytes(b'zig')
+                header = zig.parent / 'lib/include/stdint.h'
+                header.parent.mkdir(parents=True); header.write_bytes(b'header')
+                outside = root / 'outside.h'; outside.write_bytes(b'external')
+                cwd = native if mode == 'zlib' else build
+                row = {'object': 'objects/' + group + '/main.o', 'source': source.relative_to(cache).as_posix(),
+                       'cwd': str(cwd), 'command': str(wrapper),
+                       'args': ['-O3', '-I' + str(source.parent), '-MMD', '-MF', 'original.d',
+                                '-MT', group + '/main.o', '-c', '-o', 'original.o', str(source)],
+                       'objectSha256': hashlib.sha256(b'object').hexdigest(),
+                       'sourceSha256': hashlib.sha256(b'source').hexdigest(),
+                       'compilerWrapperSha256': hashlib.sha256(wrapper.read_bytes()).hexdigest()}
+                if mode == 'flag': row['args'].insert(0, '-fplugin=untrusted')
+                if mode == 'baseline': row['sourceSha256'] = '0' * 64
+
+                def run(command, **kwargs):
+                    self.assertEqual(command[:4], [str(zig), 'cc', '-target', 'aarch64-linux-gnu.2.17'])
+                    self.assertEqual(kwargs['cwd'], cwd)
+                    self.assertNotIn('CPATH', kwargs['env'])
+                    self.assertNotIn('-c', command)
+                    self.assertNotIn('-MMD', command)
+                    self.assertIn('-MD', command)
+                    preprocessed = Path(command[command.index('-o') + 1])
+                    dep = Path(command[command.index('-MF') + 1])
+                    if mode == 'timeout': raise subprocess.TimeoutExpired(command, 120, stderr=b'partial')
+                    if mode == 'failed': return subprocess.CompletedProcess(command, 2, b'', b'failed')
+                    if mode != 'missing-output': preprocessed.write_bytes(b'preprocessed')
+                    deps = [str(header)]
+                    if mode != 'missing-source': deps.append(str(source))
+                    if mode == 'external-input': deps.append(str(outside))
+                    dep.write_text(('bad.o' if mode == 'target' else row['object']) + ': ' +
+                                   shlex.join(deps) + '\n', encoding='utf8')
+                    if mode == 'drift': source.write_bytes(b'changed')
+                    if mode == 'snapshot':
+                        # A source snapshot is written only after the compiler
+                        # returns; mutate the protected Zig tool instead.
+                        zig.write_bytes(b'changed')
+                    return subprocess.CompletedProcess(command, 0, b'', b'diagnostic')
+
+                with patch.object(m.shutil, 'which', return_value=str(zig)), \
+                        patch.object(m.subprocess, 'run', side_effect=run):
+                    env = {'CPATH': 'untrusted'}
+                    if mode in ['c', 'assembly', 'zlib']:
+                        report = m.preprocess_media_inputs(native, output, env, {'objects': [row]})
+                        self.assertEqual(len(report['objects']), 1)
+                        self.assertEqual(len(report['snapshots']), 2)
+                        self.assertEqual({d['kind'] for d in report['objects'][0]['dependencies']}, {'media-cache', 'zig-tool'})
+                        self.assertTrue(report['objects'][0]['preprocessed'].endswith('.s' if mode == 'assembly' else '.i'))
+                        self.assertFalse(report['redistributionApproved'])
+                        self.assertEqual(obj.read_bytes(), b'object')
+                        with self.assertRaises(FileExistsError): m.preprocess_media_inputs(native, output, env, {'objects': [row]})
+                    elif mode == 'failed':
+                        with self.assertRaises(subprocess.CalledProcessError): m.preprocess_media_inputs(native, output, env, {'objects': [row]})
+                    elif mode == 'timeout':
+                        with self.assertRaises(subprocess.TimeoutExpired): m.preprocess_media_inputs(native, output, env, {'objects': [row]})
+                        self.assertIn(b'partial', (output / 'media-preprocess/0000.log').read_bytes())
+                    else:
+                        with self.assertRaises(ValueError): m.preprocess_media_inputs(native, output, env, {'objects': [row]})
+
     def test_zlib_dependency_patch_is_exact_and_rejects_repeat(self):
         source = ('run(cc, [\n      `-I${zlibSource}`,\n      "-c",\n]);\n'
                   '  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })\n'
@@ -858,7 +935,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), b'new' if succeeds else b'original')
 
     def test_build_retains_inputs_and_does_not_approve_distribution(self):
-        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'generator-rebuild', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
+        for failure in [None, 'build', 'media-log', 'compile-command', 'objects', 'configuration', 'source-license', 'crc-object', 'missing-zlib-dependencies', 'generator-replay', 'generator-rebuild', 'preprocessing', 'crc-probe', 'link', 'link-output', 'replay', 'modified-relink', 'generated']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
                 upstream, stage, source = root / 'upstream', root / 'stage', root / 'source'
@@ -977,6 +1054,8 @@ class Tests(unittest.TestCase):
                                      side_effect=ValueError('Generator replay failed') if failure == 'generator-replay' else None),
                         patch.object(m, 'rebuild_media_generator', return_value={'outputMatches': 2},
                                      side_effect=ValueError('Generator rebuild failed') if failure == 'generator-rebuild' else None),
+                        patch.object(m, 'preprocess_media_inputs', return_value={'objects': ['fixture']},
+                                     side_effect=ValueError('Preprocessing failed') if failure == 'preprocessing' else None),
                         patch.object(m, 'probe_ffmpeg_crc', return_value={'cases': 2304},
                                      side_effect=ValueError('CRC probe failed') if failure == 'crc-probe' else None),
                         patch.object(m, 'replay_link_inputs', return_value={'byteIdentical': True},
@@ -1008,6 +1087,7 @@ class Tests(unittest.TestCase):
                         self.assertEqual(report['modifiedCrcRelink']['modifiedCalls'], 6912)
                         self.assertEqual(len(report['ffmpegGeneratorReplay']['outputs']), 2)
                         self.assertEqual(report['ffmpegGeneratorRebuild']['outputMatches'], 2)
+                        self.assertEqual(len(report['ffmpegPreprocessing']['objects']), 1)
                         self.assertEqual(len(report['ffmpegCompileCommands']['objects']), 1)
                         self.assertIs(report['zigGeneratedSources']['sourceAttributionApproved'], False)
                         self.assertEqual(target.read_bytes(), b'rebuilt')

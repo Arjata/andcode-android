@@ -564,6 +564,160 @@ def rebuild_media_generator(native, output, env):
             'scope': 'Isolated standalone host generator rebuild with observed full dependency snapshots and preprocessed TU; two output byte matches, not toolchain closure, reproducible generator ELF, other generators, complete source or legal approval'}
 
 
+def preprocess_media_inputs(native, output, env, compile_commands):
+    """Sample full preprocessing after the build; never execute compiler log argv."""
+    cache = (native / '.cache/ffmpeg').resolve(strict=True)
+    build = cache / 'build/aarch64-linux'
+    zig_name = shutil.which('zig')
+    if not zig_name:
+        raise ValueError('Missing fixed Zig for media preprocessing')
+    zig = Path(zig_name).resolve(strict=True)
+    if not zig.is_file():
+        raise ValueError('Missing fixed Zig for media preprocessing')
+    zig_digest = hashlib.sha256(zig.read_bytes()).hexdigest()
+    directory = output / 'media-preprocess'
+    directory.mkdir(exist_ok=False)
+    (directory / 'inputs').mkdir()
+    allowed = {
+        '-DHAVE_AV_CONFIG_H', '-DPIC', '-DZLIB_CONST', '-D_FILE_OFFSET_BITS=64',
+        '-D_ISOC11_SOURCE', '-D_LARGEFILE_SOURCE', '-D_POSIX_C_SOURCE=200112', '-D_XOPEN_SOURCE=600',
+        '-O3', '-Os', '-Oz', '-Qunused-arguments', '-Wall', '-Wdisabled-optimization',
+        '-Wempty-body', '-Werror=implicit-function-declaration', '-Werror=missing-prototypes',
+        '-Werror=return-type', '-Wimplicit-fallthrough', '-Wmissing-prototypes',
+        '-Wno-bool-operation', '-Wno-char-subscripts', '-Wno-format-zero-length',
+        '-Wno-implicit-const-int-float-conversion', '-Wno-microsoft-enum-forward-reference',
+        '-Wno-parentheses', '-Wno-pointer-sign', '-Wno-switch', '-Wno-unused-const-variable',
+        '-Wpointer-arith', '-Wredundant-decls', '-Wstrict-prototypes', '-Wtype-limits',
+        '-Wundef', '-Wunterminated-string-initialization', '-Wwrite-strings', '-fPIC',
+        '-fdata-sections', '-ffunction-sections', '-fno-math-errno', '-fno-signed-zeros',
+        '-fomit-frame-pointer', '-fvisibility=hidden', '-mstack-alignment=16', '-pthread', '-std=c17',
+    }
+    clean_env = dict(env)
+    for key in ['CPATH', 'C_INCLUDE_PATH', 'CPLUS_INCLUDE_PATH', 'OBJC_INCLUDE_PATH',
+                'GCC_EXEC_PREFIX', 'COMPILER_PATH', 'LIBRARY_PATH', 'DEPENDENCIES_OUTPUT',
+                'SUNPRO_DEPENDENCIES', 'LD_PRELOAD', 'LD_LIBRARY_PATH']:
+        clean_env.pop(key, None)
+    protected, snapshots, rows, objects = {}, {}, [], set()
+    commands = compile_commands['objects']
+    if not commands or len(commands) > 1000:
+        raise ValueError('Invalid media preprocessing command count')
+    for index, row in enumerate(commands):
+        item = row['object']
+        parts = PurePosixPath(item).parts
+        if (len(parts) < 3 or parts[0] != 'objects' or '..' in parts or '\\' in item
+                or item in objects):
+            raise ValueError('Invalid media preprocessing object')
+        objects.add(item)
+        original_object = (cache / 'prefix/aarch64-linux' / item).resolve(strict=True)
+        original_object.relative_to(cache)
+        source = (cache / row['source']).resolve(strict=True)
+        source.relative_to(cache)
+        if source.suffix not in ['.c', '.S']:
+            raise ValueError('Unexpected media preprocessing source type')
+        cwd = native.resolve(strict=True) if parts[1] == 'libz' else build.resolve(strict=True)
+        if Path(row['cwd']).resolve(strict=True) != cwd:
+            raise ValueError('Unexpected media preprocessing working directory')
+        wrapper = (cache / 'toolchains/aarch64-linux/cc').resolve(strict=True)
+        wrapper.relative_to(cache)
+        if (Path(row['command']).resolve(strict=True) != wrapper
+                or wrapper.read_text(encoding='utf8') != '#!/bin/sh\nexec zig cc -target aarch64-linux-gnu.2.17 "$@"\n'):
+            raise ValueError('Unexpected media compiler wrapper')
+        for path, digest in [(original_object, row['objectSha256']),
+                             (source, row['sourceSha256']), (wrapper, row['compilerWrapperSha256'])]:
+            if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                raise ValueError('Media preprocessing baseline digest differs')
+            protected[path] = digest
+        flags, source_args, removed = [], [], []
+        args = iter(row['args'])
+        for arg in args:
+            if arg in ['-o', '-MF', '-MT']:
+                value = next(args, None)
+                if value is None:
+                    raise ValueError('Missing media compiler option value')
+                removed.append((arg, value))
+                continue
+            if arg in ['-MMD', '-c']:
+                removed.append((arg, None))
+                continue
+            if arg.startswith('-I') and len(arg) > 2:
+                include = Path(arg[2:])
+                include = (include if include.is_absolute() else cwd / include).resolve(strict=True)
+                include.relative_to(cache)
+                flags.append(arg)
+            elif arg in allowed:
+                flags.append(arg)
+            elif arg.startswith('-'):
+                raise ValueError('Unapproved media preprocessing compiler option: ' + arg)
+            else:
+                candidate = Path(arg)
+                candidate = (candidate if candidate.is_absolute() else cwd / candidate).resolve(strict=True)
+                if candidate != source:
+                    raise ValueError('Unexpected media preprocessing positional argument')
+                source_args.append(arg)
+        if (len(source_args) != 1 or sorted(key for key, _ in removed) != ['-MF', '-MMD', '-MT', '-c', '-o']):
+            raise ValueError('Unexpected media compile/dependency option set')
+        stem = f'{index:04d}'
+        preprocessed = directory / (stem + ('.i' if source.suffix == '.c' else '.s'))
+        dependency, log = directory / (stem + '.d'), directory / (stem + '.log')
+        command = [str(zig), 'cc', '-target', 'aarch64-linux-gnu.2.17', *flags,
+                   '-MD', '-MF', str(dependency), '-MT', item, '-E',
+                   '-o', str(preprocessed), source_args[0]]
+        try:
+            done = subprocess.run(command, cwd=cwd, env=clean_env, capture_output=True, timeout=120)
+        except subprocess.TimeoutExpired as error:
+            log.write_bytes((shlex.join(command) + '\nTIMEOUT\n').encode()
+                            + (error.stdout or b'') + (error.stderr or b''))
+            raise
+        log.write_bytes((shlex.join(command) + '\n').encode() + done.stdout + done.stderr)
+        done.check_returncode()
+        if not preprocessed.is_file() or not preprocessed.stat().st_size:
+            raise ValueError('Missing media preprocessing output')
+        target, separator, body = dependency.read_text(encoding='utf8').replace('\\\n', ' ').partition(':')
+        if not separator or target.strip() != item:
+            raise ValueError('Unexpected media preprocessing dependency target')
+        dependencies = []
+        for name in shlex.split(body):
+            path = Path(name)
+            path = (path if path.is_absolute() else cwd / path).resolve(strict=True)
+            if path.is_relative_to(cache):
+                kind, relative = 'media-cache', path.relative_to(cache).as_posix()
+            elif path.is_relative_to(zig.parent):
+                kind, relative = 'zig-tool', path.relative_to(zig.parent).as_posix()
+            else:
+                raise ValueError('Media preprocessing input outside fixed source/tool trees')
+            content = path.read_bytes()
+            digest = hashlib.sha256(content).hexdigest()
+            if path in protected and protected[path] != digest:
+                raise ValueError('Media preprocessing dependency changed between units')
+            protected[path] = digest
+            if digest not in snapshots:
+                destination = directory / 'inputs' / digest
+                destination.write_bytes(content)
+                snapshots[digest] = {'path': destination.relative_to(output).as_posix(),
+                                     'bytes': len(content), 'sha256': digest}
+            dependencies.append({'kind': kind, 'path': relative, 'snapshot': digest,
+                                 'dependencySpelling': name})
+        if not dependencies or not any((cwd / d['dependencySpelling']).resolve(strict=True) == source
+                                       for d in dependencies):
+            raise ValueError('Empty media preprocessing dependencies or missing main source')
+        rows.append({'object': item, 'source': row['source'], 'command': command, 'cwd': str(cwd),
+                     'preprocessed': preprocessed.relative_to(output).as_posix(),
+                     'sha256': hashlib.sha256(preprocessed.read_bytes()).hexdigest(),
+                     'bytes': preprocessed.stat().st_size, 'dependencyFile': dependency.relative_to(output).as_posix(),
+                     'dependencySha256': hashlib.sha256(dependency.read_bytes()).hexdigest(),
+                     'log': log.relative_to(output).as_posix(), 'logSha256': hashlib.sha256(log.read_bytes()).hexdigest(),
+                     'dependencies': dependencies})
+    for path, digest in {**protected, zig: zig_digest}.items():
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError('Media preprocessing changed a protected input')
+    for digest, row in snapshots.items():
+        if hashlib.sha256((output / row['path']).read_bytes()).hexdigest() != digest:
+            raise ValueError('Media preprocessing snapshot changed')
+    return {'objects': rows, 'snapshots': sorted(snapshots.values(), key=lambda r: r['path']),
+            'zigSha256': zig_digest, 'redistributionApproved': False, 'androidApproved': False,
+            'scope': 'Post-build preprocessing samples and observed full dependencies only; not original compile-time capture, rebuilt media objects, full toolchain/source closure or legal approval'}
+
+
 def probe_ffmpeg_crc(prefix, output, env):
     """Exercise retained libavutil against an independent bitwise reference."""
     source, binary = output / 'crc-probe.c', output / 'crc-probe'
@@ -1066,6 +1220,7 @@ def build(upstream, stage):
     notices = retain_ffmpeg_notices(native, source_inputs, output)
     generator_replay = replay_media_generators(native, output, env)
     generator_rebuild = rebuild_media_generator(native, output, env)
+    preprocessed_inputs = preprocess_media_inputs(native, output, env, compile_commands)
     crc_probe = probe_ffmpeg_crc(prefix, output, env)
     link = retain_link_inputs((output / 'command-1.log').read_text(encoding='utf8'), native, output, env)
     result = native / 'lib/aarch64-linux/libopentui.so'
@@ -1093,6 +1248,7 @@ def build(upstream, stage):
         'ffmpegNoticeCandidates': notices,
         'ffmpegGeneratorReplay': generator_replay,
         'ffmpegGeneratorRebuild': generator_rebuild,
+        'ffmpegPreprocessing': preprocessed_inputs,
         'ffmpegCrcProbe': crc_probe,
         'finalLink': link,
         'finalLinkReplay': replay,
