@@ -878,6 +878,10 @@ The fresh library must differ from the retained baseline. Baseline library,
 fresh library and CRC probe bytes are guarded against mutation through probe
 completion; synthetic cases reject unchanged replacement bytes and mutation of
 each executable/library as well as retained inputs.
+Complete object substitution is checked against linker argv, not inferred from
+map liveness: garbage collection may discard entire unused media objects. The
+map must retain the explicitly exercised instrumented CRC object; no all-object
+or all-section liveness claim follows.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

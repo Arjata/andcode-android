@@ -96,8 +96,11 @@ def relink(output, env):
         if not (directory / name).is_file() or not (directory / name).stat().st_size:
             raise ValueError('Missing fresh source-relink map/extraction evidence')
     mapping = (directory / 'link.map').read_text(encoding='utf8')
-    if any(str(path) not in mapping for path in replacements.values()):
-        raise ValueError('Fresh source-rule object absent from linker map')
+    # Command substitution proves input coverage, not liveness of every section.
+    # --gc-sections can remove an entire media object legitimately. Require the
+    # instrumented CRC because the execution probe explicitly exercises it.
+    if str(replacements['objects/libavutil/crc.o']) not in mapping:
+        raise ValueError('Fresh source-rule CRC object absent from linker map')
     if not (directory / 'archive-extraction.tsv').read_bytes().startswith(b'reference\textracted\tsymbol\n'):
         raise ValueError('Unexpected fresh source-relink archive extraction report')
     _, needed = media.pty.audit.elf(binary.read_bytes())
