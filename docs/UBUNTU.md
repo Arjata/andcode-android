@@ -131,6 +131,36 @@ The optional job now has a bounded 80-minute build step within a 100-minute job,
 leaving time for failure diagnostics; the snapshot, authentication and required
 complete installed source-version set are unchanged. A successful rerun and
 independent source-archive review are still required.
+The subsequent optional run `42750180844` (`e82060a`, job `129611694402`)
+succeeded, including all 100 exact source-version downloads, canonical-to-PRoot
+conversion, original ext4 tree comparison and compatibility checks. Its Linux
+regressions passed without skips: 14 archive-validator, 14 tree-comparison,
+7 fail-closed recipe, 12 source-collector and 20 PRoot-converter tests.
+Job log SHA-256:
+`1897505b225face38bbb8cd735c72dfefc159fc14b11fdde241e13f0ccd1954b`.
+Regular CI `42750151736` and Docker Ubuntu push CI `42750151274` also succeeded.
+Artifact `13733088271` contains 1409398539 bytes; its API ZIP SHA-256 is
+`f0d42ad0e7ed199d92f663c86429535e34dda71917142b45078557a14487659d`.
+The complete download matches that API digest. Independent review matched all
+180 installed binary/source-version tuples against six binary Packages indexes
+and their InRelease hash records; review JSON SHA-256:
+`197e6ae1ca87ba48981fbc74a8845be5a7d422bc67abcf7cad6036e90bca92a2`.
+Separate source-input review bound all 100 exact source versions, 310 `.dsc` and
+archive files (740746325 bytes), complete archive sets and retained per-package
+commands/logs to six Sources indexes and their InRelease hash records. Source
+review JSON SHA-256:
+`03bdf935852a956e41f38f583a4e1de95ebc6cfcf54ddb5151842e32b158d6bf`.
+The host review did not independently verify PGP signatures or execute source
+build rules. Independent canonical/PRoot review also passed: 15167 entries,
+5 materialized hardlinks and 567215830 materialized file bytes, with all payload
+and 15 retained index-file hashes checked. The 4 GiB original ext4 header/size
+and the CI tree report agree with these counts; the host did not independently
+walk ext4. The CI tree has one additional allowed empty `lost+found` directory.
+Canonical/PRoot review JSON SHA-256:
+`fc552d5a19f4814dd9b3d812498572344d6a307d9615571b778bc45b08fb5613`.
+These results are
+not complete corresponding-source, redistribution approval or device installation
+acceptance. Existing device instances are unchanged.
 Missing exact versions,
 apt failures, existing output or unexpected download paths fail the candidate.
 This new acquisition path awaits Linux CI and independent archive verification.

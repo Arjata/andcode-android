@@ -203,6 +203,9 @@ jobs:
             work/native-prototype/native-opentui-build/crc-probe.log
             work/native-prototype/native-opentui-build/ffmpeg-config/
             work/native-prototype/native-opentui-build/ffmpeg-notice-candidates.json
+            work/native-prototype/native-opentui-build/media-generator-replay/*.log
+            work/native-prototype/native-opentui-build/media-generator-replay/*.c
+            work/native-prototype/native-opentui-build/media-generator-replay/*.S
             work/native-prototype/native-opentui-build/zig-generated-sources/
             work/native-prototype/native-opentui-build/link-replay/*.log
             work/native-prototype/native-opentui-build/link-replay/link.map
