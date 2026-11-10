@@ -656,6 +656,23 @@ glibc/kernel/LLVM revisions. No compiler was rebuilt or executed locally and
 source-build, full toolchain, per-file license and corresponding-source closure
 remain incomplete.
 
+The separately retained official Zig 0.17.0 bootstrap source archive is
+57030388 bytes, SHA-256
+`1e9e9b8e3c753b35dfb1d9ea48f097579fadbd3e5c1e724ab3fc5bce05477b71`,
+matching the same retained official download index. All 21913 regular files in
+its `zig/` subtree match the standalone source archive by path, size and SHA-256.
+Archive-only parent review SHA-256:
+`a631d8a5260a9076c4a952d1d5c0b0129a21e48e545552928f659c5bc5bb3584`.
+The bootstrap also retains Clang/LLVM/LLD sources, build rules, selected license
+files and zlib 1.3.1/zstd 1.5.2 declarations; its zlib is separate from the media
+experiment's zlib 1.3.2. Bootstrap `README.md` line 11 claims LLVM/LLD/Clang
+21.1.0, but `llvm/CMakeLists.txt` line 19 includes
+`cmake/Modules/LLVMVersion.cmake`, whose lines 3-10 default to LLVM 22.1.8.
+This declaration conflict is preserved, not resolved by trusting the README or
+by asserting the official binary's producer. No bootstrap/CMake build was run;
+upstream LLVM revisions/patches, generated headers, compiler reproduction and
+complete toolchain/license/corresponding-source closure remain unverified.
+
 The next bounded diagnostic compiles every retained post-build `.i` / `.s`
 sample with the same fixed Zig target and reviewed code-generation flags into
 separate AArch64 relocatable objects. Preprocessor include/definition options
