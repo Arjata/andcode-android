@@ -812,6 +812,21 @@ through the remainder of the diagnostic. Synthetic regressions reject wrong
 machine/type/version fields and link/run-time mutation; these local mocked tests
 do not execute GCC or establish a successful new Linux build.
 
+The next independent diagnostic starts from fresh copies of the fixed media
+archives, their complete byte-matched pristine source trees and the retained
+patched build script. It modifies only the copied pinned CRC translation unit,
+then runs that script's configure/make rules for all selected FFmpeg/zlib objects
+without copying any baseline build/prefix, generated headers, objects or sampled
+preprocessor outputs. Gates require the exact selected object set, recorded
+compiler sources/dependencies, the instrumented CRC source hash, changed CRC
+object and AArch64 relocatable objects. Original source/script/archive and
+baseline objects remain mutation-guarded. Local synthetic tests exercise success,
+archive/source drift, malformed objects, dependency gaps, mutation, failure and
+timeout handling; only native CI can establish an actual source-rule rebuild.
+The result does not itself relink OpenTUI, execute decoders/TUI, capture all
+original preprocessing inputs or establish full corresponding-source/toolchain,
+relinking, legal or Android approval; no formal APK inputs are replaced.
+
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`
 SHA-256 `362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd`。
@@ -887,6 +902,24 @@ samples have no retained function target-attribute lines; no CPU minimum can be
 deduced from that absence. No downloaded object or archive executable was run,
 no target code was generated or linked, and no Bun library replacement or
 source/toolchain/license/Android approval follows.
+
+The subsequent all-module pass now disassembles every one of the 1023 retained
+bitcode members using that same existing Windows LLVM 23.1.2 tool. All modules
+are readable and declare `aarch64-unknown-linux-gnu`; every module's embedded
+`llvm.ident` names the same Ubuntu Clang 23.1.2 package string quoted above.
+807 modules contain function definitions and function target-attribute lines;
+their 6669 retained attribute groups use `target-cpu="generic"` and
+`target-features="+crc,+fp-armv8,+neon,+outline-atomics,+v8a,-fmv"`.
+All-module review SHA-256:
+`748691669e6c5f697d15275a263ed819e39d6803d8e1fd43fa39df982bb6cf04`.
+Exact original member hashes, stdin bindings, tool binary hash/version, emitted
+IR sizes/hashes, producer text, attributes and stderr are retained; full emitted
+IR is hashed rather than persisted for this pass. The original bitcode remains
+in the verified archive. These embedded attributes do not prove final machine
+instructions, feature dispatch, retained sections, minimum CPU or allocator
+provision; the earlier compile-metadata ARMv8.1 mimalloc declaration is not
+silently treated as equivalent to these module attributes. No target generation,
+execution or Bun final link occurred, and all approval fields remain false.
 
 Bounded Bun application-side relinking research now binds six additional
 official texts at Bun commit `38afee6c84fcf48c0edb2466aa4b27d287a59c30`
