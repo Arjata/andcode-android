@@ -826,6 +826,11 @@ timeout handling; only native CI can establish an actual source-rule rebuild.
 The result does not itself relink OpenTUI, execute decoders/TUI, capture all
 original preprocessing inputs or establish full corresponding-source/toolchain,
 relinking, legal or Android approval; no formal APK inputs are replaced.
+Evidence enumeration follows internal directory aliases with explicit
+escape/cycle rejection, matching the dereferenced upload manifest. In particular,
+the FFmpeg build's `src/` alias must not silently omit its source-file evidence.
+Synthetic directory-alias/cycle tests cover this enumeration separately from
+actual source-rule execution.
 
 2026-11-10 Bun/JSC 固定版本声明定位：GitHub tag `bun-v1.4.4` 解析到
 `oven-sh/bun@38afee6c84fcf48c0edb2466aa4b27d287a59c30`，该提交 `LICENSE.md`

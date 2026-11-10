@@ -133,5 +133,18 @@ class Tests(unittest.TestCase):
             native = Path(tmp).resolve(); output = native / 'nested'; output.mkdir()
             with self.assertRaisesRegex(ValueError, 'overlap'): m.rebuild(native, output, {})
 
+    def test_evidence_directory_alias_and_cycle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp).resolve(); directory = output / 'evidence'; directory.mkdir()
+            source = directory / 'source'; source.mkdir(); (source / 'input.h').write_bytes(b'header')
+            alias = directory / 'src'
+            try: alias.symlink_to(source, target_is_directory=True)
+            except OSError: self.skipTest('Directory symlink fixture unavailable')
+            rows = m.evidence_files(directory, output)
+            self.assertEqual({r['path'] for r in rows}, {'evidence/source/input.h', 'evidence/src/input.h'})
+            self.assertEqual(rows[0]['sha256'], rows[1]['sha256'])
+            (source / 'cycle').symlink_to(directory, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'cycle'): m.evidence_files(directory, output)
+
 
 if __name__ == '__main__': unittest.main()

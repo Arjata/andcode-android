@@ -60,6 +60,27 @@ def copy_source(source, destination, protected):
         protected[target] = protected[path]
 
 
+def evidence_files(directory, output):
+    rows = []
+
+    def visit(path, ancestors):
+        resolved = path.resolve(strict=True)
+        resolved.relative_to(directory)
+        if resolved.is_dir():
+            if resolved in ancestors:
+                raise ValueError('Modified media output link cycle')
+            for child in sorted(path.iterdir()):
+                visit(child, ancestors | {resolved})
+        elif resolved.is_file():
+            rows.append({'path': path.relative_to(output).as_posix(),
+                         'bytes': path.stat().st_size, 'sha256': digest(path)})
+        else:
+            raise ValueError('Unexpected modified media output file')
+
+    visit(directory, set())
+    return rows
+
+
 def rebuild(native, output, env):
     native, output = Path(native).resolve(strict=True), Path(output).resolve(strict=True)
     directory = output / 'modified-media-source-rebuild'
@@ -143,15 +164,7 @@ def rebuild(native, output, env):
     for path, checksum in protected.items():
         if digest(path) != checksum:
             raise ValueError('Modified media rebuild changed protected source')
-    files = []
-    for path in sorted(directory.rglob('*')):
-        if path.is_symlink():
-            path.resolve(strict=True).relative_to(directory)
-        elif not path.is_dir() and not path.is_file():
-            raise ValueError('Unexpected modified media output file')
-        if path.is_file():
-            files.append({'path': path.relative_to(output).as_posix(),
-                          'bytes': path.stat().st_size, 'sha256': digest(path)})
+    files = evidence_files(directory, output)
     result = {'command': command, 'cwd': str(copied), 'log': log.relative_to(output).as_posix(),
               'files': files, 'configuration': configuration, 'sourceDependencies': dependencies,
               'compileCommands': compilation, 'modifiedCrcSha256': protected[crc],
