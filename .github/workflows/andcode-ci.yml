@@ -117,6 +117,14 @@ jobs:
           javac -encoding UTF-8 -d "$RUNNER_TEMP/ca-tests" \
             app/app/src/main/java/dev/andcode/app/CustomCa.java app/tests/CustomCaTest.java
           java -cp "$RUNNER_TEMP/ca-tests" dev.andcode.app.CustomCaTest
+      - name: Embedded rootfs installer safety regression
+        run: |
+          mkdir -p "$RUNNER_TEMP/rootfs-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/rootfs-tests" \
+            app/app/src/main/java/dev/andcode/app/RuntimePayload.java \
+            app/app/src/main/java/dev/andcode/app/RootfsInstaller.java \
+            app/tests/RootfsInstallerTest.java
+          java -cp "$RUNNER_TEMP/rootfs-tests" dev.andcode.app.RootfsInstallerTest
       - name: Native link farm and data safety regression
         run: |
           mkdir -p "$RUNNER_TEMP/runtime-tests"
