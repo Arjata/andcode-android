@@ -255,7 +255,14 @@ jobs:
 
       - name: 组装 bundle
         run: |
-          sudo apt-get install -y -qq musl-tools >/dev/null 2>&1 || true
+          # Runner DNS flaps silently broke installs hidden behind "|| true";
+          # retry visibly and fail early when the toolchain is unavailable.
+          for i in 1 2 3 4 5; do
+            sudo apt-get update -qq >/dev/null 2>&1 || true
+            sudo apt-get install -y -qq musl-tools >/dev/null 2>&1 && break
+            echo "musl-tools install retry $i"; sleep 15
+          done
+          command -v musl-gcc >/dev/null || { echo "musl-gcc unavailable"; exit 1; }
           musl-gcc -static -O2 -Wl,-z,max-page-size=16384 -o work/andcode-launcher bundle/launcher/launcher.c
           musl-gcc -static -O2 -Wl,-z,max-page-size=16384 -o work/stage/bin/opencode-pty bundle/launcher/pty-launcher.c
           file -b work/andcode-launcher | grep -q 'statically linked\|static-pie' || { echo "launcher 非静态"; exit 1; }
@@ -335,7 +342,13 @@ jobs:
 
       - name: Tier P 物理化路线甲(patchelf 重写,NAMING §6.3)
         run: |
-          command -v patchelf >/dev/null || sudo apt-get update -qq && sudo apt-get install -y -qq patchelf
+          for i in 1 2 3 4 5; do
+            command -v patchelf >/dev/null && break
+            sudo apt-get update -qq >/dev/null 2>&1 || true
+            sudo apt-get install -y -qq patchelf >/dev/null 2>&1 || true
+            echo "patchelf install retry $i"; sleep 15
+          done
+          command -v patchelf >/dev/null || { echo "patchelf unavailable"; exit 1; }
           # Keep the canonical Linux artifact unmodified. Fail closed on a new
           # glibc baseline rather than silently distribute unpatched Android ELF.
           mkdir -p work/android-bundle
