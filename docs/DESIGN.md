@@ -1,6 +1,29 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.51 (design draft) · Date: 2026-11-11
+> Version: v0.4.52 (design draft) · Date: 2026-11-11
+> v0.4.52 change: on-device probe of the Tier P terminal TUI extra keys and
+> clean exit (device 8c8da214, normal/idle state). First, a measurement caveat
+> that invalidates earlier negative conclusions: screencap PNGs are full
+> 1080x2340 device pixels while the analysis previews were 892x1992, so tap
+> coordinates derived from preview pixels missed the keys entirely (a
+> "left-arrow" tap actually landed on the TUI cwd line and opened its
+> Working-directory dialog). Earlier "ESC did not interrupt the retry state"
+> results are retracted as unproven, not negative. Second, IME interference:
+> with Fcitx5 pinyin active, `input text`/keyevents were captured by the
+> composition layer and the candidate bar overlaid the extra-key row; switching
+> the default IME to AOSP Latin (English) restored direct injection (probe done
+> with the IME hidden after switching). Verified with corrected device-pixel
+> coordinates (extra-key row 1 y≈2086 without IME; keys ≈136 px apart: ESC≈75,
+> TAB≈211, CTRL≈345, ALT≈481, ←≈616): hardware keyevents reach the TUI editor
+> ("abc"/"z"); the ← extra key moves the cursor ("abc" + two ← taps + "z" →
+> "azbc", cursor after z); the ESC extra key closes the TUI command menu
+> (opened via "/") — visible open/close contrast; the CTRL sticky key shows a
+> purple highlight and works (first Ctrl+C clears the editor line, a
+> subsequent Ctrl+C exits), and the TUI exits cleanly back to the shell prompt.
+> TAB in the empty editor produced no visible change (inconclusive, not a
+> failure). Conclusion: in the TUI normal state, the extra-key row and adb
+> key injection are fully reachable; the previous retry-state ESC probe must
+> be redone with device-pixel coordinates before claiming any negative result.
 > v0.4.51 change: complete the Bun release-profile build experiment. The
 > pinned-source Bun build (commit `38afee6c…`, pinned toolchain, pinned focal
 > glibc sysroot) now passes end to end on the native `ubuntu-24.04-arm` runner:
@@ -554,6 +577,11 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     底部两行附加键含 ESC/TAB/CTRL/ALT/四方向、HOME/END/PGUP/PGDN、`/`/`-`/
     回车/IME;CTRL/ALT 为高亮锁定键(再点解除),其它非文本键由 TerminalView
     按应用模式编码,触摸按键不抢终端焦点;键盘展开时随 adjustResize 保持在其上方。
+    附加键与注入在 TUI 正常态实机可达(v0.4.52 探针,见文件头 changelog):
+    ← 移动光标、ESC 关闭 TUI 弹层、CTRL 粘滞(紫色高亮)+ 硬件 c 组成 Ctrl+C
+    (编辑器内首次清行、空态重复按退出),TUI 可干净退回 shell 提示符;
+    坐标验证须用设备真实像素(screencap 全分辨率),预览缩放图坐标会整体脱靶;
+    拼音 IME 组合层会截走注入文本且候选栏遮挡附加键行,探针前先切英文 IME。
     Bash 依赖 libtinfo;基线 CI 收录二者版权与 GPLv3 文本并以 dpkg 实际版本登记。
     老内核的 faccessat2(439) TRAP 通过 libc 调用点合成 -ENOSYS 进入原生回退;
     补丁锁定 Ubuntu libc6 2.39-0ubuntu8.9 的字节/偏移,不匹配必须失败。
