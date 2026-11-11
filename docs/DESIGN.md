@@ -2,18 +2,20 @@
 
 > Version: v0.4.55 (design draft) · Date: 2026-11-11
 > v0.4.55 change: adopt the single-APK release goal. One CI-built canonical
-> rootfs archive (dev-complete Ubuntu 24.04 arm64, zstd + SHA-256 manifest)
-> becomes the shared BUILD artifact for chroot and PRoot; device instances
-> remain separate per tier (section 4.8 unchanged) and acceptance gates stay
-> dual. The release APK embeds the archive in assets, extracts on first launch
-> through a jniLibs-side extractor that enforces the existing rootfs-tar safety
-> checks, skips re-extraction on digest match and fails explicitly on error.
-> The legacy opencode v1 payload (libandcode-opencode.so) is removed from the
-> APK; the TUI already runs oc2 v2. Estimated release APK ~710-750 MB with
-> ~2 GB installed footprint; distribution is GitHub Release sideload only
-> (Play channels do not fit this form factor). Tier M may later adopt the
-> same archive as a directory-based chroot, pending device verification; the
-> existing ubuntu.img and all device instances stay untouched.
+> rootfs archive (dev-complete Ubuntu 24.04 arm64, gzip + SHA-256 + dpkg
+> manifest) becomes the shared BUILD artifact for chroot and PRoot; device
+> instances remain separate per tier (section 4.8 unchanged) and acceptance
+> gates stay dual. The release APK embeds the archive in assets; first launch
+> extracts it with a dependency-free in-app Java gzip/tar extractor that
+> enforces the existing rootfs-tar safety checks, skips re-extraction on
+> digest match and fails explicitly on error. No new third-party dependency
+> and no native extractor binary are introduced. The legacy opencode v1
+> payload (libandcode-opencode.so) is removed from the APK; the TUI already
+> runs oc2 v2 through the opencode() shell function. Distribution is GitHub
+> Release sideload only (Play channels do not fit this form factor). Tier M
+> may later adopt the same archive as a directory-based chroot, pending
+> device verification; the existing ubuntu.img and all device instances stay
+> untouched.
 > v0.4.54 change: add the explicit default-off `serve-proot-backend` preference.
 > Newly started managed servers run through PRoot and the Ubuntu guest loader;
 > missing APK payloads, runtime farm or guest instance fail without direct fallback.
@@ -653,14 +655,16 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   legacy packaging 让系统安装时提取到 nativeLibraryDir,保留 `libandcode-*`
   文件内容不 strip。此中间工件尚非 V2/PTY 完整闭包,未宣称可用的自包含 APK。
 - **单 APK 发布形态(v0.4.55,已决策,实施中)**:release APK 内嵌
-  `assets/andcode-rootfs.tar.zst`(canonical dev-complete rootfs,SHA-256
-  清单随档)。首启动提取到 `files/proot-rootfs`:提取器(zstd/tar)以
-  `libandcode-*` 形式放 nativeLibraryDir 后执行,应用自身不解压执行数据目录
-  ELF;提取前强制 §4.8 rootfs-tar 安全检查(路径/重复项/链接祖先/特殊文件/
-  setuid 位),摘要匹配则跳过(覆盖升级不重复提取),失败显式报错,
-  PRoot serve 门禁语义不变(缺失→明确失败不回退)。legacy opencode v1
-  (`libandcode-opencode.so`)从 APK 移除——TUI 已运行 oc2 v2,移除需回归
-  终端入口。体积预算:release APK 约 710–750 MB,安装后约 2 GB 存储;
+  `assets/andcode-rootfs/`(canonical dev-complete rootfs 的 gzip 档 +
+  SHA-256 + dpkg 版本清单)。首启动用应用内纯 Java gzip/tar 提取器落位
+  `files/proot-rootfs`——无新增第三方依赖、无新增原生提取器,应用自身不解压
+  执行数据目录 ELF(guest 二进制经 proot 已验证执行路径运行);提取前强制
+  §4.8 rootfs-tar 安全检查(路径/重复项/链接祖先/特殊文件/setuid 位),
+  摘要匹配则跳过(覆盖升级不重复提取),失败显式报错,PRoot serve 门禁语义
+  不变(缺失→明确失败不回退)。legacy opencode v1(`libandcode-opencode.so`
+  及其 wrapper)经 `pack-apk-libs.sh --exclude` 从 APK 排除——TUI 的
+  `opencode()` 函数与 serve 均运行 oc2 v2,移除需 CI 断言与终端入口回归。
+  体积预算:release APK 约 700–800 MB(以 CI 实测为准),安装后约 2 GB 存储;
   分发仅 GitHub Release 侧载,不进 Play 渠道。发布版本号随 bundle
   `--name` 参数统一 bump,消除硬编码。
 - 终端 UI 已改用内嵌的 Termux terminal-emulator/terminal-view 模块

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # pack-apk-libs.sh — 规范布局 bundle → Tier P jniLibs 物理化(NAMING §6.2/§6.3,路线甲)
 #
-# 用法: pack-apk-libs.sh --bundle <andcode-bundle.tar.gz> --out <jniLibs-dir> [--no-rewrite]
+# 用法: pack-apk-libs.sh --bundle <andcode-bundle.tar.gz> --out <jniLibs-dir>
+#                        [--no-rewrite] [--exclude <logical-path>]...
+#
+# --exclude 可重复:按逻辑路径(manifest 第 1 列,精确匹配)排除条目,使其不进
+# jniLibs、manifest.farm 与 assets/andcode-runtime/manifest(APK 侧瘦身;规范
+# bundle 本体不受影响)。用于单 APK 移除 legacy opencode v1(DESIGN v0.4.55)。 [--no-rewrite]
 #
 # 步骤:
 #   1. 解包,按 manifest 逐行把 root/... 映射为 libandcode-*.so 物理名;
@@ -13,22 +18,48 @@
 set -euo pipefail
 
 BUNDLE="" OUT="" REWRITE=1
+EXCLUDE=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --bundle) BUNDLE="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
     --no-rewrite) REWRITE=0; shift ;;
+    --exclude) [ -n "${2:-}" ] || { echo "--exclude 需要逻辑路径"; exit 2; }
+               EXCLUDE+=("$2"); shift 2 ;;
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
 [ -n "$BUNDLE" ] && [ -n "$OUT" ] || { grep '^# 用法' -A3 "$0"; exit 1; }
 command -v patchelf >/dev/null || { echo "需要 patchelf"; exit 1; }
 
+is_excluded() {
+  local lp
+  for lp in "${EXCLUDE[@]}"; do
+    [ "$lp" = "$1" ] && return 0
+  done
+  return 1
+}
+
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 tar -xzf "$BUNDLE" -C "$WORK"
 B="$WORK/andcode"
 LIBS="$OUT/arm64-v8a"
 mkdir -p "$LIBS"
+
+# 可选排除清单文件供 awk 过滤两份输出清单;空数组时不创建文件。
+EXC_FILE=""
+if [ "${#EXCLUDE[@]}" -gt 0 ]; then
+  EXC_FILE="$WORK/exclude.txt"
+  printf '%s\n' "${EXCLUDE[@]}" > "$EXC_FILE"
+fi
+# 输出清单必须与 jniLibs 实际产物一致,否则首启动 farm 校验失败(RuntimePayload)。
+filter_manifest() {
+  awk -F'\t' -v exclfile="$EXC_FILE" '
+    BEGIN { if (exclfile != "") { while ((getline l < exclfile) > 0) e[l] = 1 } }
+    ($1 in e) { next }
+    { print }
+  ' "$1"
+}
 
 # ── 1+2+3. 映射与重写 ─────────────────────────────────────────────────────
 TPL="$(dirname "$0")/wrapper.sh.tpl"
@@ -44,6 +75,7 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
     glibc-lib|preload-lib|elf-exec|wrapper-sh|launcher|script|alias) ;;
     *) echo "[FAIL] manifest 未知 kind: $kind($lp)"; exit 1 ;;
   esac
+  is_excluded "$lp" && continue   # APK 侧排除(如 legacy v1);规范 bundle 不受影响
   # 物理名门禁(NAMING §8)
   if ! printf '%s' "$phys" | grep -qE '^libandcode-[a-z0-9-]+\.so$' || [ ${#phys} -gt 64 ]; then
     echo "[FAIL] 物理名不合规: '$phys' ← $lp"; exit 1
@@ -142,12 +174,13 @@ done
 [ $bad -eq 0 ] || exit 1
 
 # ── 5. link-farm 清单(逻辑路径 → 物理名;data 类排除,物理为 "-")────────
-awk -F'\t' '$1 !~ /^#/ && $1 != "" && $2 != "-" {print $1 "\t" $2}' "$B/manifest" > "$OUT/manifest.farm"
+# 与 jniLibs 产物保持一致:被 --exclude 的行不出现(RuntimePayload 交叉校验)。
+filter_manifest "$B/manifest" | awk -F'\t' '$1 !~ /^#/ && $1 != "" && $2 != "-" {print $1 "\t" $2}' > "$OUT/manifest.farm"
 # Package only declared data, not a runtime-extracted executable archive.
 ASSETS="$OUT/assets/andcode-runtime"
 mkdir -p "$ASSETS"
 cp "$OUT/manifest.farm" "$ASSETS/manifest.farm"
-cp "$B/manifest" "$ASSETS/manifest"
+filter_manifest "$B/manifest" > "$ASSETS/manifest"
 while IFS=$'\t' read -r lp phys kind lic ver up; do
   [ "$kind" = data ] || continue
   case "$lp" in etc/*) ;; *) echo "[FAIL] unsupported data path: $lp"; exit 1 ;; esac

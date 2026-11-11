@@ -344,12 +344,50 @@ jobs:
           sha256sum dist/andcode-bundle-android-arm64-v0.1.1.tar.gz \
             > dist/andcode-bundle-android-arm64-v0.1.1.tar.gz.sha256
           mkdir -p work/jni
+          # Single-APK release (DESIGN v0.4.55): drop the legacy opencode v1
+          # payload and its wrapper; the terminal TUI and serve both run oc2 v2.
           bash bundle/pack-apk-libs.sh \
             --bundle dist/andcode-bundle-android-arm64-v0.1.1.tar.gz \
-            --out work/jni
+            --out work/jni \
+            --exclude bin/opencode \
+            --exclude bin/opencode.bin
           bash baseline/check-compat.sh --page-align work/jni/arm64-v8a
           test -s work/jni/arm64-v8a/libandcode-ld-linux.so
           test -s work/jni/arm64-v8a/libandcode-libc.so
+          test ! -e work/jni/arm64-v8a/libandcode-opencode.so
+
+      - name: Canonical dev rootfs archive (single-APK install payload, DESIGN v0.4.55)
+        run: |
+          # One CI-built canonical rootfs shared as build artifact by chroot and
+          # PRoot (device instances stay per-tier). Dev-complete package set
+          # matches the on-device acceptance evidence: gcc/make/binutils,
+          # python3, git, zlib/ssl dev headers on the existing base rootfs.
+          # Plain gzip keeps the APK-side first-launch extractor dependency-free.
+          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          docker start $CID && sleep 1
+          docker cp work/rootfs/. $CID:/
+          mkdir -p work/canonical-rootfs
+          docker exec $CID bash -c \
+            "apt-get update -qq && apt-get install -y -qq build-essential git python3 zlib1g-dev libssl-dev >/dev/null"
+          docker exec $CID dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' \
+            > work/canonical-rootfs/packages.txt
+          docker export $CID | gzip -9 > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz
+          docker rm -f $CID
+          sha256sum work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
+            > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
+          # Sanity gates: the verified toolchain entries must be present.
+          tar -tzf work/canonical-rootfs/andcode-rootfs-arm64.tar.gz | grep -qx './usr/bin/gcc'
+          tar -tzf work/canonical-rootfs/andcode-rootfs-arm64.tar.gz | grep -qx './usr/bin/python3'
+          tar -tzf work/canonical-rootfs/andcode-rootfs-arm64.tar.gz | grep -qx './usr/bin/git'
+          test -s work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
+          test -s work/canonical-rootfs/packages.txt
+          # Embed into the Tier P payload; sourceSets picks assets/ into the APK.
+          mkdir -p work/jni/assets/andcode-rootfs
+          cp work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
+             work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256 \
+             work/canonical-rootfs-packages.txt \
+             work/jni/assets/andcode-rootfs/
+          ls -la work/jni/assets/andcode-rootfs/
 
       - uses: actions/upload-artifact@v4
         with:

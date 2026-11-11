@@ -43,6 +43,7 @@
 | `dev.andcode.app`(占位,可随发布组织调整) | APK applicationId | `app/build.gradle` |
 | `.sh` 后缀 | **仅限仓库内开发脚本**(`scripts/`);bundle 与 PATH 内命令一律无扩展名 | `scripts/deploy-adb.sh` |
 | `andcode-terminal-ime.js` | APK assets 内自有 Web 终端输入法适配脚本(非 PATH 命令) | `app/app/src/main/assets/andcode-terminal-ime.js` |
+| `assets/andcode-rootfs/` | APK assets 内 canonical dev rootfs 安装载荷:`andcode-rootfs-arm64.tar.gz` + `.sha256` + `packages.txt`(dpkg 版本清单);首启动经专用提取器落位 `files/proot-rootfs`,数据目录无 exec | `pack-apk-libs.sh` 产物/CI canonical rootfs 步骤,消费方为首启动提取器 |
 | `andcode-terminal-ime.test.mjs` | 上述脚本的 Node 内置测试(开发期,不进 APK) | `app/tests/andcode-terminal-ime.test.mjs` |
 | `projects`、`import-<随机值>` | APK filesDir 项目目录与导入暂存目录;仅数据,不作为可执行入口 | `files/projects/<项目名>`、`files/import-<随机值>` |
 | `andcode-settings` | APK 私有 SharedPreferences 名,保存终端/导出偏好与选中项目 | 不保存 API key |
