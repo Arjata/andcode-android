@@ -419,9 +419,14 @@ jobs:
           sha256sum work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
             > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
           # Sanity gates: the verified toolchain entries must be present.
-          tar -tzf work/canonical-rootfs/andcode-rootfs-arm64.tar.gz | grep -qx './usr/bin/gcc'
-          tar -tzf work/canonical-rootfs/andcode-rootfs-arm64.tar.gz | grep -qx './usr/bin/python3'
-          tar -tzf work/canonical-rootfs/andcode-rootfs-arm64.tar.gz | grep -qx './usr/bin/git'
+          A=work/canonical-rootfs/andcode-rootfs-arm64.tar.gz
+          for tool in gcc python3 git; do
+            tar -tzf "$A" | grep -q "usr/bin/$tool$" || {
+              echo "$tool missing from the archive; listing sample:"
+              tar -tzf "$A" | head -5
+              exit 1
+            }
+          done
           test -s work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
           test -s work/canonical-rootfs/packages.txt
           # Embed into the Tier P payload; sourceSets picks assets/ into the APK.
