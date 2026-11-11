@@ -17,8 +17,17 @@
 > environment cleanup, strips outer PRoot preload/trust overrides and prevents stale
 > stdout from restoring stopped-process credentials. New password lines are no
 > longer written to the serve log. Other devices remain pending P0/P3 verification.
-> The device acceptance above preceded the final CA and password-handling review;
-> the reviewed build has not yet been installed or retested on the device.
+> Reinstall retest (same day, device 8c8da214): the reviewed build was installed
+> over the previous one with data preserved; all three opt-ins (PRoot backend,
+> loopback proxy, custom CA) survived, the PRoot process chain and binds matched
+> the reviewed argv, the Web UI answered 200, and new serve-log lines contain no
+> password record. The managed serve reported the same opencode 2.2.6 payload.
+> A fresh-session API probe reproduced both boundaries exactly: the plain-text
+> reply succeeded (`ANDCODE_REVIEW_OK`), the shell tool executed with a completed
+> state, and the provider rejected the tool-result continuation with HTTP 400
+> `openai_error`; three further fresh sessions failed the same way (400, 503,
+> 400). The 400/503 is therefore reproducible with the reviewed build, not
+> introduced by this change, and its cause remains unresolved.
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound

@@ -67,7 +67,11 @@ Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页�
   On device `8c8da214`, Web/API, a plain-text model response, Ubuntu shell commands,
   Web PTY, home writeback and manual stop/restart passed. Tool commands exited 0,
   but provider continuation still returned HTTP 400/503; full model/tool round trips
-  remain unresolved. Other devices and locked delivery remain pending P0/P3.
+  remain unresolved. Overwrite-install retest of the reviewed build preserved the
+  opt-ins and reproduced the same boundary set (plain reply OK, tool executed,
+  continuation 400/503 in 4/4 fresh sessions), confirming the provider error is
+  not introduced by the review changes. Other devices and locked delivery remain
+  pending P0/P3.
   See [Ubuntu acceptance](docs/UBUNTU.md#managed-opencode-serve-in-ubuntu-proot) and
   [DESIGN §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态).
 - 项目/设置导航配齐图标;独立终端支持双指展开/捏合调整字号(10–28 sp),

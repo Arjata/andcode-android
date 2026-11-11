@@ -543,9 +543,19 @@ returned HTTP 400 `openai_error` or HTTP 503. Full model/tool round trips remain
 unresolved; no protocol workaround, history deletion or default direct-network
 success is claimed. Root Ubuntu instances, `ubuntu.img` and the active runtime
 farm are preserved. Other devices and abnormal-stop recovery remain pending
-P0/P3 on-device verification. Device tests preceded the final CA and password
-handling review; the reviewed build has not yet been retested on device. See
-DESIGN v0.4.54 section 4.4 for evidence scope.
+P0/P3 on-device verification.
+
+Same-day reinstall retest of the reviewed build (overwrite install, data
+preserved): the three opt-ins survived, the PRoot chain and binds matched the
+reviewed argv, the Web UI answered 200, new serve-log lines contained no
+password record, and the payload stayed opencode 2.2.6. A fresh-session API
+probe reproduced the boundary set exactly — plain-text reply succeeded
+(`ANDCODE_REVIEW_OK`), the shell tool executed to a completed state, and the
+provider rejected the tool-result continuation with HTTP 400 `openai_error`;
+three more fresh sessions failed the same way (400, 503, 400). The provider
+error is reproducible with the reviewed build, not introduced by the review
+changes, and remains unresolved. See DESIGN v0.4.54 section 4.4 for evidence
+scope.
 
 ## 必须通过的实机门禁
 
