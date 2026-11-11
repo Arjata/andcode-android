@@ -405,8 +405,15 @@ jobs:
             "apt-get update -qq && apt-get install -y -qq build-essential git python3 zlib1g-dev libssl-dev >/dev/null"
           docker exec $CID dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' \
             > work/canonical-rootfs/packages.txt
-          docker export $CID | gzip -9 > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz
+          # Stop before export: docker's /etc bind mounts go away, avoiding the
+          # "unlinkat /etc/hostname: device or resource busy" export race seen
+          # on running containers.
+          docker stop $CID
+          docker export $CID -o work/canonical-rootfs/rootfs.tar
           docker rm -f $CID
+          gzip -9 < work/canonical-rootfs/rootfs.tar \
+            > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz
+          rm work/canonical-rootfs/rootfs.tar
           sha256sum work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
             > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
           # Sanity gates: the verified toolchain entries must be present.
@@ -419,7 +426,7 @@ jobs:
           mkdir -p work/jni/assets/andcode-rootfs
           cp work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
              work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256 \
-             work/canonical-rootfs-packages.txt \
+             work/canonical-rootfs/packages.txt \
              work/jni/assets/andcode-rootfs/
           ls -la work/jni/assets/andcode-rootfs/
 
