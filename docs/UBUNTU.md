@@ -554,7 +554,18 @@ probe reproduced the boundary set exactly — plain-text reply succeeded
 provider rejected the tool-result continuation with HTTP 400 `openai_error`;
 three more fresh sessions failed the same way (400, 503, 400). The provider
 error is reproducible with the reviewed build, not introduced by the review
-changes, and remains unresolved. See DESIGN v0.4.54 section 4.4 for evidence
+changes, and remains unresolved.
+
+Cross-model isolation (same day, same PRoot backend and build) attributes the
+defect to the provider's gpt-oss-120b tool path: a two-turn plain conversation
+resending turn-1 history with `reasoning_content` succeeds, and a complete
+agentic tool round trip passes on `arjata/glm-5.2` — the shell tool executed,
+the tool result was resent, and the model replied `ANDCODE_MODEL_TOOL_OK` with
+outcome succeeded. This is the first verified full model/tool round trip on the
+managed PRoot backend. gpt-oss-120b failed the same tool continuation in 5/5
+fresh sessions (HTTP 400/503) while plain replies stayed fine. Use a model with
+a working tool path (glm-5.2) for agentic sessions until the provider fixes the
+gpt-oss-120b route. See DESIGN v0.4.54 section 4.4 for evidence
 scope.
 
 ## 必须通过的实机门禁
@@ -567,6 +578,6 @@ scope.
 | 普通用户 gcc 编译并运行，写 `/etc` 被拒 | UID 60000 通过，LOAD 0x4000 | 待 P0/P3 |
 | libc 更新后继续运行（不可盲用旧偏移补丁） | 2.39-0ubuntu8.7 → 8.9 通过 | 同版本更新后执行通过,未修改 ELF |
 | 项目访问范围、停止/异常退出无遗留挂载 | 待 P0/P3 | 单项目 bind/写回/错误路径拒绝通过；不是沙箱，异常停止待 P0/P3 |
-| OpenCode tools and Web PTY use the selected backend without host root | Pending integration | Device 8c8da214: opt-in managed PRoot serve, guest shell/PTY and app-UID execution passed; provider tool-result continuation still HTTP 400/503, full round trip unresolved; other devices pending P0/P3 |
+| OpenCode tools and Web PTY use the selected backend without host root | Pending integration | Device 8c8da214: opt-in managed PRoot serve, guest shell/PTY and app-UID execution passed; full tool round trip verified on `arjata/glm-5.2` (plain two-turn with history `reasoning_content` also passed); `arjata/gpt-oss-120b` tool-result continuation fails provider-side (HTTP 400/503, 5/5 fresh sessions) while its plain replies pass; other devices pending P0/P3 |
 
 PRoot 失败时必须保留为“受限/不可用”，不能借助 root relabel 后声称 locked 支持。

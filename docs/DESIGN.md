@@ -27,7 +27,17 @@
 > state, and the provider rejected the tool-result continuation with HTTP 400
 > `openai_error`; three further fresh sessions failed the same way (400, 503,
 > 400). The 400/503 is therefore reproducible with the reviewed build, not
-> introduced by this change, and its cause remains unresolved.
+> introduced by this change, and its cause remains unresolved. Follow-up
+> isolation on the same day narrows the defect to the provider's
+> gpt-oss-120b tool path: a two-turn plain-text conversation that resends
+> turn-1 history containing `reasoning_content` succeeds, and a full agentic
+> tool round trip (shell tool executed, result resent, model replied
+> `ANDCODE_MODEL_TOOL_OK`, outcome succeeded) passes on `arjata/glm-5.2`
+> through the same PRoot backend and opencode serialization. gpt-oss-120b
+> keeps failing the tool-result continuation (5/5 fresh sessions, 400/503)
+> while its plain replies stay fine. Agentic work on this gateway should use
+> a model whose tool path works (e.g. glm-5.2) until the provider fixes the
+> gpt-oss-120b route.
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound
