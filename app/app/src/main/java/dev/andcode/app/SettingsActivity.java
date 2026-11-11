@@ -140,6 +140,13 @@ public class SettingsActivity extends UtilityActivity {
             + "代理环境变量；默认关闭，需设备自行提供本地代理（如 VPN 客户端混合端口）；"
             + "不关闭 TLS 校验，证书信任仍由上方自定义 CA 控制。更改后请在主页手动停止并重新启动服务。", "serve-loopback-proxy",
             AppSettings.serveLoopbackProxy(this));
+        divider(trust);
+        toggle(trust, "OpenCode 服务进入 Ubuntu PRoot（实验）",
+            "仅新启动的 OpenCode 后端经 PRoot 在 Ubuntu 开发实例内运行，"
+            + "会话工具链（bash/git 等）来自 guest；需先安装 PRoot 实例，"
+            + "未安装时启动服务会明确报错。网络代理与自定义 CA 需按所用网络另行开启。"
+            + "更改后请在主页手动停止并重新启动服务。", "serve-proot-backend",
+            AppSettings.serveProotBackend(this));
         refreshCa();
 
         section("导出与隐私", "ZIP 归档");

@@ -509,7 +509,43 @@ stdin/退出码 42、空项目回 `/root`、错误路径/链接拒绝与自有�
   **不要只删锁后再次挂载**。进程死亡、设备重启等异常恢复仍待验证。
 - chroot 暂不映射 APK 私有项目，也不接入 OpenCode。待认证 root 服务完成后，
   再将选择的项目映射至 `/workspace/<项目名>`，默认模型执行必须降权。
-  PRoot 已提供单项目开发映射，但尚未接入 OpenCode/Web PTY。
+  PRoot terminal project mapping is separate from the managed backend described below.
+
+## Managed OpenCode serve in Ubuntu PRoot
+
+The network-trust settings offer **OpenCode 服务进入 Ubuntu PRoot（实验）**
+(`serve-proot-backend`, default off). Install the PRoot instance and the complete
+APK native payload first, enable the setting, then manually stop and restart the
+managed service. Missing guest/payload/farm fails explicitly without direct fallback.
+The terminal-backend preference remains independent; selected terminal projects
+are not automatically bound into this managed guest.
+
+The backend runs through PRoot and the guest loader, with APK payloads bound at
+`/mnt/andcode-exe`, the farm at `/mnt/andcode-farm`, and `files/home` at `/root`.
+Configuration, sessions and guest `/root` writes therefore persist in app home.
+The imported CA directory is bound at `/mnt/andcode-ca` only after explicit CA
+enablement and validation. Loopback proxy use is a separate default-off opt-in;
+TLS verification stays enabled. Guest temporary files and PTY sockets use `/tmp`.
+Web/TUI retain `127.0.0.1:4096`. PRoot's apparent root remains the Android app UID;
+binds are writable and this is not a sandbox or a root chroot integration.
+
+On 2026-11-11 device `8c8da214`, the app-spawned untrusted_app process chain
+proot -> guest loader -> oc2 serve passed Web HTTP 200, authenticated API and
+`arjata/gpt-oss-120b` plain-text response `ANDCODE_PROOT_SERVE_OK`. Agent shell
+commands returned `ANDCODE_PROOT_TOOL_OK`, exit 0, Ubuntu 24.04.4 and
+`/usr/bin/bash`. A Web PTY executed `id`, OS and marker commands and exited 0;
+guest `/root` writes were readable in host `files/home`. The diagnostic PTY was
+deleted. Manual stop left no serve PRoot/loader tree, listener or env fragment;
+restart restored the service. Device PRoot/proxy/CA opt-ins remain enabled.
+
+Tool execution passed, but provider continuation after the tool result still
+returned HTTP 400 `openai_error` or HTTP 503. Full model/tool round trips remain
+unresolved; no protocol workaround, history deletion or default direct-network
+success is claimed. Root Ubuntu instances, `ubuntu.img` and the active runtime
+farm are preserved. Other devices and abnormal-stop recovery remain pending
+P0/P3 on-device verification. Device tests preceded the final CA and password
+handling review; the reviewed build has not yet been retested on device. See
+DESIGN v0.4.54 section 4.4 for evidence scope.
 
 ## 必须通过的实机门禁
 
@@ -521,6 +557,6 @@ stdin/退出码 42、空项目回 `/root`、错误路径/链接拒绝与自有�
 | 普通用户 gcc 编译并运行，写 `/etc` 被拒 | UID 60000 通过，LOAD 0x4000 | 待 P0/P3 |
 | libc 更新后继续运行（不可盲用旧偏移补丁） | 2.39-0ubuntu8.7 → 8.9 通过 | 同版本更新后执行通过,未修改 ELF |
 | 项目访问范围、停止/异常退出无遗留挂载 | 待 P0/P3 | 单项目 bind/写回/错误路径拒绝通过；不是沙箱，异常停止待 P0/P3 |
-| OpenCode 工具与 Web PTY 使用所选后端且非 root | 待集成 | 待集成 |
+| OpenCode tools and Web PTY use the selected backend without host root | Pending integration | Device 8c8da214: opt-in managed PRoot serve, guest shell/PTY and app-UID execution passed; provider tool-result continuation still HTTP 400/503, full round trip unresolved; other devices pending P0/P3 |
 
 PRoot 失败时必须保留为“受限/不可用”，不能借助 root relabel 后声称 locked 支持。

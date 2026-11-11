@@ -45,6 +45,11 @@ public final class AppSettings {
         return prefs(context).getBoolean("serve-loopback-proxy", false);
     }
 
+    /** Opt-in PRoot backend: run the managed OpenCode serve inside the Ubuntu guest (default off). */
+    static boolean serveProotBackend(Context context) {
+        return prefs(context).getBoolean("serve-proot-backend", false);
+    }
+
     static boolean ubuntuAvailable(Context context) {
         String nat = context.getApplicationInfo().nativeLibraryDir;
         if (nat != null && new File(nat, "libandcode-ld-linux.so").isFile()) {

@@ -21,8 +21,8 @@ import java.util.Map;
  *
  * - 二进制执行走 bundle 的补丁 loader(seccomp 兼容,见 scripts/patch-seccomp.sh):
  *   <LD> --library-path <LIB> --inhibit-cache <OC2> serve --port 4096 --hostname 127.0.0.1
- * - server password 从 serve 的 stdout 解析("server password <PW>");
- *   stdout 全量落盘 files/oc2-serve.log 以防管道阻塞并留证。
+ * - Parse the server password from stdout; drain output to files/oc2-serve.log
+ *   without writing password lines to the log.
  * - 就绪判定:GET http://127.0.0.1:4096/ 返回 200。
  * - 兼容两种部署:jniLibs(nativeLibraryDir/libandcode-oc2.so + 同目录补丁 loader)
  *   或开发期 /data/local/tmp(与 scripts/app-launch-oc.sh 同环境)。
@@ -94,7 +94,8 @@ public final class ServeManager {
             sProcess = null;
         }
         try {
-            new ProcessBuilder("pkill", "-f", "oc2 serve").start();
+            // Match direct and PRoot command lines, including the embedded guest argv.
+            new ProcessBuilder("pkill", "-f", "oc2.*serve").start();
         } catch (IOException ignored) {
         }
         sPassword = null;
@@ -173,9 +174,48 @@ public final class ServeManager {
             if (srcCfg.exists()) copy(srcCfg, dstCfg);
         }
 
-        Paths p = resolvePaths(app);
-        if (p == null) return "opencode V2 二进制或补丁 loader 未部署";
+        // The opt-in PRoot backend uses the guest toolchain (DESIGN sections 4.4/4.8).
+        // Missing payloads or instances fail explicitly; never fall back to direct execution.
+        ProcessBuilder pb = AppSettings.serveProotBackend(app)
+            ? prootServe(app, files, runtime)
+            : directServe(app, files, runtime, demo, tmp, home);
+        if (pb == null) return "opencode V2 二进制或补丁 loader 未部署";
 
+        final Process proc = pb.redirectErrorStream(true).start();
+        synchronized (ServeManager.class) { sProcess = proc; sPassword = null; }
+        // Drain stdout continuously so a full pipe cannot stall the backend.
+        final File log = new File(files, "oc2-serve.log");
+        new Thread(() -> {
+            try (InputStream in = proc.getInputStream();
+                 OutputStream out = new FileOutputStream(log, true)) {
+                BufferedReader r = new BufferedReader(new InputStreamReader(in), 8192);
+                String line;
+                while ((line = r.readLine()) != null) {
+                    if (line.startsWith("server password ")) {
+                        synchronized (ServeManager.class) {
+                            if (sProcess != proc) continue;
+                            sPassword = line.substring("server password ".length()).trim();
+                            // Publish only for the current process; stop must not leave stale credentials.
+                            writeServeEnv(files, sPassword);
+                        }
+                        continue;
+                    }
+                    out.write((line + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    out.flush();
+                }
+            } catch (IOException ignored) {
+            }
+        }, "oc2-serve-stdout").start();
+        return null;
+    }
+
+    /**
+     * Default direct backend using the patched loader. Null means missing binaries.
+     */
+    private static ProcessBuilder directServe(Context app, File files, File runtime,
+                                              File demo, File tmp, File home) throws IOException {
+        Paths p = resolvePaths(app);
+        if (p == null) return null;
         List<String> cmd = Arrays.asList(
             p.ld, "--library-path", p.lib, "--inhibit-cache", p.oc2,
             "serve", "--port", String.valueOf(PORT), "--hostname", "127.0.0.1");
@@ -223,32 +263,96 @@ public final class ServeManager {
             env.put("HTTPS_PROXY", proxy);
         }
         CustomCa.apply(env, files.toPath(), AppSettings.customCaEnabled(app), AppSettings.customCaDigest(app));
+        return pb;
+    }
 
-        final Process proc = pb.redirectErrorStream(true).start();
-        synchronized (ServeManager.class) { sProcess = proc; sPassword = null; }
-        // 持续消费 stdout:解析 password + 全量落盘(不消费会撑满管道导致 serve 卡死)
-        final File log = new File(files, "oc2-serve.log");
-        new Thread(() -> {
-            try (InputStream in = proc.getInputStream();
-                 OutputStream out = new FileOutputStream(log, true)) {
-                BufferedReader r = new BufferedReader(new InputStreamReader(in), 8192);
-                String line;
-                while ((line = r.readLine()) != null) {
-                    out.write((line + "\n").getBytes());
-                    out.flush();
-                    if (line.startsWith("server password ")) {
-                        synchronized (ServeManager.class) {
-                            sPassword = line.substring("server password ".length()).trim();
-                        }
-                        // Terminal TUI connects to the managed serve: write the URL/password
-                        // env fragment so the TUI never spawns itself under loader semantics.
-                        writeServeEnv(files, getPassword());
-                    }
-                }
-            } catch (IOException ignored) {
-            }
-        }, "oc2-serve-stdout").start();
-        return null;
+    /**
+     * Opt-in PRoot backend: proot -> guest loader -> oc2 serve (DESIGN sections 4.4/4.8).
+     * Bind native payloads, the runtime farm, optional CA data and app home into the guest
+     * (NAMING section 3). Guest /root persists configuration and sessions in files/home.
+     * Rebuild the guest environment with env -i; preserve TLS verification and share loopback
+     * with Web/TUI clients. Bun extraction and PTY sockets use writable guest /tmp.
+     */
+    private static ProcessBuilder prootServe(Context app, File files, File runtime) throws IOException {
+        Paths p = resolvePaths(app);
+        if (p == null || runtime == null || !new File(p.lib, "libandcode-oc2.so").isFile())
+            throw new IOException("opencode V2 APK 载荷或 runtime farm 未部署");
+        File prootBin = new File(runtime, "usr/lib/proot/proot");
+        File prootLoader = new File(runtime, "usr/lib/proot/loader");
+        if (!prootBin.isFile() || !prootLoader.isFile()) throw new IOException("PRoot 载荷未部署");
+        File rootfs = new File(files, "proot-rootfs");
+        if (!new File(rootfs, "usr/bin/bash").isFile()) throw new IOException("Ubuntu PRoot 实例未安装");
+
+        String exe = p.lib;
+        String farm = runtime.getAbsolutePath();
+        List<String> cmd = new ArrayList<>(Arrays.asList(
+            prootBin.getAbsolutePath(),
+            "--kill-on-exit", "-l", "-0",
+            "-w", "/root",
+            "-r", rootfs.getAbsolutePath(),
+            "-b", "/dev", "-b", "/proc",
+            "-b", exe + ":/mnt/andcode-exe",
+            "-b", farm + ":/mnt/andcode-farm",
+            "-b", new File(files, "home").getAbsolutePath() + ":/root"));
+        List<String> guest = new ArrayList<>(Arrays.asList(
+            "/usr/bin/env", "-i",
+            "HOME=/root", "USER=root", "LOGNAME=root", "SHELL=/bin/bash",
+            "TERM=xterm-256color", "LANG=C.UTF-8",
+            "GLIBC_TUNABLES=glibc.pthread.rseq=0", // Avoid rseq SIGSYS under zygote seccomp.
+            "ANDCODE_IN_PROOT=1",
+            "LD_LIBRARY_PATH=/mnt/andcode-farm/lib:/mnt/andcode-exe", // Prebuilt glibc helpers.
+            "TMPDIR=/tmp", "BUN_TMPDIR=/tmp", // Bun requires writable guest storage.
+            "OPENCODE_PTY_SOCKET_DIR=/tmp",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"));
+        if (new File(exe, "libandcode-opencode-pty.so").isFile()) {
+            guest.add("OPENCODE_PTY_BIN=/mnt/andcode-exe/libandcode-opencode-pty.so");
+        }
+        if (AppSettings.serveLoopbackProxy(app)) {
+            String proxy = "http://127.0.0.1:7890";
+            guest.add("http_proxy=" + proxy);
+            guest.add("https_proxy=" + proxy);
+            guest.add("HTTP_PROXY=" + proxy);
+            guest.add("HTTPS_PROXY=" + proxy);
+        }
+        String caPath = customCaFile(app, files);
+        if (caPath != null) {
+            cmd.add("-b");
+            cmd.add(new File(caPath).getParent() + ":/mnt/andcode-ca");
+            guest.add("NODE_EXTRA_CA_CERTS=/mnt/andcode-ca/" + new File(caPath).getName());
+        }
+        cmd.addAll(guest);
+        cmd.add("/lib/ld-linux-aarch64.so.1");
+        cmd.add("--library-path");
+        cmd.add("/mnt/andcode-farm/lib:/mnt/andcode-exe");
+        cmd.add("/mnt/andcode-exe/libandcode-oc2.so");
+        cmd.add("serve");
+        cmd.add("--port");
+        cmd.add(String.valueOf(PORT));
+        cmd.add("--hostname");
+        cmd.add("127.0.0.1");
+
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(new File(files, "tmp"));
+        Map<String, String> env = pb.environment();
+        // The outer process is Bionic; do not inherit glibc preload or trust overrides.
+        env.remove("LD_PRELOAD");
+        for (String key : new String[]{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                "ALL_PROXY", "all_proxy"}) env.remove(key);
+        CustomCa.apply(env, files.toPath(), false, "");
+        env.put("PROOT_LOADER", prootLoader.getAbsolutePath());
+        env.put("LD_LIBRARY_PATH", exe); // Resolve renamed Bionic dependencies such as libtalloc.
+        env.put("PROOT_TMP_DIR", new File(files, "tmp").getAbsolutePath());
+        env.put("GLIBC_TUNABLES", "glibc.pthread.rseq=0");
+        return pb;
+    }
+
+    /**
+     * Resolve explicitly enabled CA data for its guest bind; never disable TLS verification.
+     */
+    private static String customCaFile(Context app, File files) throws IOException {
+        java.util.Map<String, String> ca = new java.util.HashMap<>();
+        CustomCa.apply(ca, files.toPath(), AppSettings.customCaEnabled(app), AppSettings.customCaDigest(app));
+        return ca.get("NODE_EXTRA_CA_CERTS");
     }
 
     /**

@@ -46,8 +46,9 @@
 | `andcode-terminal-ime.test.mjs` | 上述脚本的 Node 内置测试(开发期,不进 APK) | `app/tests/andcode-terminal-ime.test.mjs` |
 | `projects`、`import-<随机值>` | APK filesDir 项目目录与导入暂存目录;仅数据,不作为可执行入口 | `files/projects/<项目名>`、`files/import-<随机值>` |
 | `andcode-settings` | APK 私有 SharedPreferences 名,保存终端/导出偏好与选中项目 | 不保存 API key |
-| `terminal-backend`, `ubuntu-loopback-proxy`, `serve-loopback-proxy` | Private preferences: new terminals select `bash`/`ubuntu-proot`; Ubuntu and managed-serve loopback proxies are separate explicit opt-ins, both default off. Existing processes are unchanged; restart serve manually to apply its preference. | APK SharedPreferences |
-| `http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY` | Standard proxy variables: Tier P managed serve injects `http://127.0.0.1:7890` only when `serve-loopback-proxy` is enabled. TLS verification remains enabled; additional trust uses `NODE_EXTRA_CA_CERTS`. | ServeManager child environment |
+| `terminal-backend`, `ubuntu-loopback-proxy`, `serve-loopback-proxy`, `serve-proot-backend` | Private preferences: new terminals select `bash`/`ubuntu-proot`; Ubuntu and managed-serve loopback proxies are separate explicit opt-ins, both default off; `serve-proot-backend` (default off) runs a newly started managed serve inside the Ubuntu PRoot guest. Existing processes are unchanged; restart serve manually to apply its preference. | APK SharedPreferences |
+| `http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY` | Standard proxy variables: Tier P managed serve injects `http://127.0.0.1:7890` only when `serve-loopback-proxy` is enabled, in both direct and PRoot modes. TLS verification remains enabled; additional trust uses `NODE_EXTRA_CA_CERTS`. | ServeManager child environment |
+| `/mnt/andcode-exe`, `/mnt/andcode-farm`, `/mnt/andcode-ca`, `/root` | PRoot guest bind targets for the managed serve: nativeLibraryDir, the runtime farm root, the imported custom-CA directory (bound only when CA trust is enabled) and the app home (config/sessions persist on the host side). Binds are writable; PRoot is not a sandbox. | ServeManager proot argv |
 | `ProjectsActivity.java`、`SettingsActivity.java`、`AppSettings.java`、`ProjectArchive.java`、`ProjectArchiveTest.java`、`UtilityActivity.java` | APK 项目/设置组件、共享页面及 ZIP 安全测试(Java 类文件遵循类名) | `dev.andcode.app` |
 | `ic_more.xml` | APK 项目卡的更多操作矢量图标(Android resource 采用现有 snake_case 风格) | `res/drawable/ic_more.xml` |
 | `ic_nav_projects.xml`、`ic_nav_settings.xml` | APK 共享抽屉的项目/设置矢量图标(沿用 Android resource snake_case) | `res/drawable/` |
@@ -229,7 +230,7 @@
 | `ANDCODE_BUNDLE_VERSION` | bundle 语义化版本 | `1.2.0` |
 | `ANDCODE_LOG` | 日志级别 | `debug\|info\|error` |
 | `OPENCODE_PTY_BIN` | 上游 v2 预置 PTY 可执行路径覆盖;跳过缓存安装/校验 | Tier P = `nativeLibraryDir/libandcode-opencode-pty.so`;开发期 `/data/local/tmp/andcode/lib/opencode-pty` |
-| `OPENCODE_PTY_SOCKET_DIR` | 上游 process-daemon v0.4.0 socket 基目录覆盖;实际追加 `opencode-pty-<uid>/<32 hex>.sock`,保留普通目录/uid/0700 校验 | APK `Context.getFilesDir()`(不用可被清理的 cacheDir);完整 socket 路径 UTF-8 长度须 <104 字节 |
+| `OPENCODE_PTY_SOCKET_DIR` | Upstream process-daemon v0.4.0 socket base override; appends `opencode-pty-<uid>/<32 hex>.sock` and checks directory/uid/0700 | Direct APK backend: `Context.getFilesDir()`; managed Ubuntu PRoot backend: guest `/tmp`. Complete socket path must be <104 UTF-8 bytes. |
 
 - 透传规则:`OPENCODE_*` 等上游变量允许用户透传,但包装器只设置自己登记的
   `ANDCODE_*` 与必需的运行时变量(`HOME`、`TMPDIR`、`PATH`、`LD_PRELOAD`、

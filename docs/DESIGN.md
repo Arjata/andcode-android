@@ -1,6 +1,24 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.53 (design draft) · Date: 2026-11-11
+> Version: v0.4.54 (design draft) · Date: 2026-11-11
+> v0.4.54 change: add the explicit default-off `serve-proot-backend` preference.
+> Newly started managed servers run through PRoot and the Ubuntu guest loader;
+> missing APK payloads, runtime farm or guest instance fail without direct fallback.
+> Bind native payloads, farm, optional imported CA and app home into the guest;
+> rebuild the guest environment, preserve TLS verification and share loopback 4096.
+> On device 8c8da214, the app-spawned untrusted_app backend served Web/API, returned
+> `ANDCODE_PROOT_SERVE_OK` from arjata/gpt-oss-120b, executed shell commands in
+> Ubuntu 24.04.4 with /usr/bin/bash and completed a Web PTY command/exit-0 probe.
+> Guest /root writes persisted in files/home. Stop removed the serve process tree,
+> env fragment and listener; the service was restarted with PRoot/proxy/CA enabled.
+> Tool commands returned exit 0, but provider continuation still failed with HTTP
+> 400 openai_error or 503. Full model/tool round trips remain unresolved; no protocol
+> workaround or session deletion is claimed. Review restores direct-backend CA
+> environment cleanup, strips outer PRoot preload/trust overrides and prevents stale
+> stdout from restoring stopped-process credentials. New password lines are no
+> longer written to the serve log. Other devices remain pending P0/P3 verification.
+> The device acceptance above preceded the final CA and password-handling review;
+> the reviewed build has not yet been installed or retested on the device.
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound
@@ -764,6 +782,33 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     静默修改旧会话。结束后 PID8198 已终止、诊断转发已移除;PID20163 可用且
     无 CA/TLS bypass,保留 CA 文件、全部会话、项目与 Ubuntu 实例。其它设备、
     网络、IME及旧会话恢复仍待 P0/P3 实机验证。
+- **Managed Ubuntu PRoot serve (v0.4.54)**: `serve-proot-backend` is an independent,
+  default-off setting for newly started managed servers. Manually stop and restart
+  after changing it. The app requires the APK payload, runtime farm and installed
+  `files/proot-rootfs`; failures never fall back to direct execution. PRoot starts
+  `/lib/ld-linux-aarch64.so.1` inside Ubuntu to run the prebuilt oc2 payload.
+  Native payloads and farm are bound at `/mnt/andcode-exe` and `/mnt/andcode-farm`;
+  `files/home` is bound at `/root`, preserving existing configuration and sessions.
+  Only explicitly enabled, revalidated CA data is bound at `/mnt/andcode-ca`.
+  Guest `env -i` reconstructs PATH/HOME and optional proxy/CA variables; TLS
+  verification remains enabled. Bun temporary files and PTY sockets use guest `/tmp`.
+  Web/TUI still connect to shared loopback `127.0.0.1:4096`; the terminal-backend
+  preference and its selected-project bind are separate and are not inherited here.
+  PRoot's apparent root is the Android app UID, not host root; binds are writable
+  and PRoot is not a sandbox. It does not modify root chroot instances or images.
+  Device `8c8da214` passed Web HTTP 200, authenticated API, plain-text model reply,
+  guest shell execution (Ubuntu 24.04.4, `/usr/bin/bash`, marker and exit 0), Web PTY
+  `id`/OS/marker commands and exit 0, and `/root` writeback to `files/home`.
+  The observed process chain was proot -> guest loader -> oc2 serve in untrusted_app,
+  with explicit proxy/CA and no TLS bypass. Stop removed the process tree, port and
+  terminal env fragment; restart restored service. Shell results were recorded,
+  but model continuation returned provider HTTP 400 `openai_error` or 503; full
+  tool round trips remain unresolved. Local evidence: `b-1.png` through `b-9.png`,
+  `b-proot-evidence.json`, `b-proot-tool3.json`, `b-proot-osprobe2.json`.
+  Review also preserves direct-backend inherited-trust cleanup and strips outer
+  Bionic PRoot preload/trust overrides; current-process password handling omits
+  password lines from new log entries. Historical logs are not rewritten.
+  Other devices, locked delivery and abnormal-stop recovery remain pending P0/P3.
 - UI:主页仪表盘 + 终端 + 桌面 Web + 项目 + 设置;sshd 管理/phantom-killer
   引导等扩展设置仍待实现,不把规划当作已经交付。
 
@@ -867,7 +912,9 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
   不打补丁。此结果是开发准入,不是默认直连或 locked 自包含交付认证。
 - APK 终端提供 `andcode-ubuntu-proot [loopback-proxy] [命令...]` 显式开发入口;
   无参数启动交互 Bash,退出返回轻量 Bash,缺实例明确报错。不自动安装、不 su,
-  不改变 OpenCode/Web PTY 后端;仍使用 `/data/local/tmp` PRoot。
+  This terminal entry is separate from the managed OpenCode/Web PTY backend.
+  APK native payloads use the runtime farm; payload-free development uses
+  `/data/local/tmp` PRoot.
   设置页可为新终端选择轻量 Bash(默认)或 Ubuntu PRoot,独立代理开关默认关闭。
   不重启已有会话;新会话快照选中项目名,入口仅绑定 `files/projects/<项目名>` 至
   `/workspace/<项目名>` 并从该目录起步,未选项目则 `/root`。拒绝项目根/父目录链接、
@@ -884,9 +931,9 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
     (`opencode v2.2.6`); shared loopback TCP reached the managed serve at
     `127.0.0.1:4096`. Guest DNS (1.1.1.1, use-vc) resolved public names but
     not the provider's VPN-only domain. The loopback proxy at `127.0.0.1:7890`
-    reached that endpoint over TLS (401 without credentials). This is a
-    feasibility probe, not product wiring: permanent binds, a PRoot-managed
-    serve and an Ubuntu-backed agent shell are not implemented.
+    reached that endpoint over TLS (401 without credentials). This initial
+    feasibility probe is superseded by the opt-in managed PRoot serve integration
+    and bounded on-device acceptance recorded in section 4.4 / v0.4.54.
 - CI 为 Tier P 单独复制标准 bundle,执行 seccomp 七处字节校验/修改,再执行一次并
   验证 loader/libc SHA-256 不变,之后才重打包和物理化。标准 Linux bundle 保持原样;
   新基线字节不匹配时构建失败,不把补丁用于 PRoot guest 或 apt 更新后的 libc。
