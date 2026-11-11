@@ -269,13 +269,14 @@ final class RootfsInstaller {
     private static void applyMode(Path dst, long mode) throws IOException {
         long bits = mode & 0777;
         Set<PosixFilePermission> perms = new HashSet<>();
+        // Octal digit order: lowest = others, middle = group, highest = owner.
         PosixFilePermission[][] classes = {
-            {PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
-                PosixFilePermission.OWNER_EXECUTE},
-            {PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE,
-                PosixFilePermission.GROUP_EXECUTE},
             {PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE,
                 PosixFilePermission.OTHERS_EXECUTE},
+            {PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE,
+                PosixFilePermission.GROUP_EXECUTE},
+            {PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE},
         };
         for (int shift = 0; shift < 3; shift++) {
             long tri = (bits >> (shift * 3)) & 7;

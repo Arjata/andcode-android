@@ -153,7 +153,8 @@ jobs:
       - name: 生成基线 rootfs(docker export ubuntu:24.04,arm64 原生)
         run: |
           docker pull --platform linux/arm64 ubuntu:24.04
-          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          # Runner DNS has flapped repeatedly; pin public resolvers as fallback.
+          CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           # 基线必须含 ca-certificates(git/https)与 zstd;纯净镜像没有
           docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq ca-certificates zstd bash libtinfo6 >/dev/null"
@@ -193,7 +194,8 @@ jobs:
       - name: 获取静态 busybox(Alpine busybox-static 包,musl 静态;来源记入 manifest)
         run: |
           # 注意: alpine:3.19 的 /bin/busybox 是动态链接 musl;busybox-static 包提供 /bin/busybox.static
-          docker run --rm --platform linux/arm64 -v "$PWD/work:/out" alpine:3.19 \
+          docker run --rm --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 \
+            -v "$PWD/work:/out" alpine:3.19 \
             sh -c "apk update -q && apk add -q busybox-static && cp /bin/busybox.static /out/busybox-arm64"
           cp work/busybox-arm64 work/stage/bin/busybox
           file -b work/stage/bin/busybox | grep -q 'statically linked\|static-pie' \
@@ -216,7 +218,7 @@ jobs:
 
       - name: 获取 git 前缀(容器内复制,保 GIT_EXEC_PATH 结构)
         run: |
-          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq git >/dev/null"
           # 只取 git 家族二进制(/usr/bin/git 与 git-* 助手);/usr/bin 全量拷贝会带入 apt/dpkg
@@ -371,7 +373,7 @@ jobs:
           # matches the on-device acceptance evidence: gcc/make/binutils,
           # python3, git, zlib/ssl dev headers on the existing base rootfs.
           # Plain gzip keeps the APK-side first-launch extractor dependency-free.
-          CID=$(docker create --platform linux/arm64 ubuntu:24.04 sleep infinity)
+          CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           docker cp work/rootfs/. $CID:/
           mkdir -p work/canonical-rootfs
