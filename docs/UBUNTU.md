@@ -608,6 +608,12 @@ entries and libm was instead verified through the runtime `dlopen` path.
 Dynamic linking resolution for multiple object libraries therefore works in
 the guest, including model-driven build failure recovery.
 
+Canonical rootfs unification (DESIGN v0.4.55): the CI-built canonical rootfs
+archive becomes the shared build artifact for both the chroot and PRoot
+backends. Device instances stay separate per tier and both acceptance gates
+remain in effect; the release APK will embed this archive for first-launch
+extraction, with existing device instances untouched.
+
 ## 必须通过的实机门禁
 
 | 验证 | chroot | PRoot（真实应用域） |
