@@ -399,7 +399,16 @@ jobs:
           # Plain gzip keeps the APK-side first-launch extractor dependency-free.
           CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
-          docker cp work/rootfs/. $CID:/
+          # Docker manages /etc/hostname, /etc/hosts and /etc/resolv.conf
+          # as bind mounts in running containers; copying the base tree
+          # verbatim races those mounts (unlinkat EBUSY) in cp or export.
+          # Use a scratch tree without the three managed files.
+          rm -rf work/canonical-tree
+          cp -a work/rootfs work/canonical-tree
+          rm -f work/canonical-tree/etc/hostname \
+            work/canonical-tree/etc/hosts \
+            work/canonical-tree/etc/resolv.conf
+          docker cp work/canonical-tree/. $CID:/
           mkdir -p work/canonical-rootfs
           docker exec $CID bash -c \
             "apt-get update -qq && apt-get install -y -qq build-essential git python3 zlib1g-dev libssl-dev >/dev/null"
