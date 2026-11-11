@@ -565,7 +565,18 @@ outcome succeeded. This is the first verified full model/tool round trip on the
 managed PRoot backend. gpt-oss-120b failed the same tool continuation in 5/5
 fresh sessions (HTTP 400/503) while plain replies stayed fine. Use a model with
 a working tool path (glm-5.2) for agentic sessions until the provider fixes the
-gpt-oss-120b route. See DESIGN v0.4.54 section 4.4 for evidence
+gpt-oss-120b route.
+
+Full agentic toolchain dispatch (same day, `arjata/glm-5.2`, same PRoot
+backend): the model planned and dispatched a five-step chain in one session —
+shell `uname -m` (aarch64), write `/root/hello.c`, `gcc` compile (exit 0),
+run the binary (`HELLO_ARM64_OK`), `readelf -h | grep Machine`
+(`AArch64`) — with every tool call completed and exit 0 and a successful final
+continuation. Guest inventory via the session shell API: Ubuntu 24.04.4, bash
+5.2.21 (aarch64-unknown-linux-gnu), git 2.43.0, gcc/cc/python3/make/readelf
+present. Availability notes: glm-5.2 returned transient 503 "no available
+channel" twice, recovering on retry; every other listed gateway model answers
+`provider.no-route` (unavailable), so only gpt-oss-120b and glm-5.2 are routed. See DESIGN v0.4.54 section 4.4 for evidence
 scope.
 
 ## 必须通过的实机门禁

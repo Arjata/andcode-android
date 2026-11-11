@@ -74,6 +74,9 @@ Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页�
   defect to the gpt-oss-120b tool path: a full agentic tool round trip (shell
   executed, result resent, reply received) passed on `arjata/glm-5.2` through the
   same PRoot backend — use a model with a working tool path for agentic sessions.
+  A five-step toolchain chain (write C file, gcc compile, run, readelf-verify
+  AArch64) then passed end to end on glm-5.2; the guest also exposes
+  python3/make/git 2.43.0, and other gateway models are currently unrouted.
   Other devices and locked delivery remain pending P0/P3.
   See [Ubuntu acceptance](docs/UBUNTU.md#managed-opencode-serve-in-ubuntu-proot) and
   [DESIGN §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态).

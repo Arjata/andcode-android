@@ -37,7 +37,10 @@
 > keeps failing the tool-result continuation (5/5 fresh sessions, 400/503)
 > while its plain replies stay fine. Agentic work on this gateway should use
 > a model whose tool path works (e.g. glm-5.2) until the provider fixes the
-> gpt-oss-120b route.
+> gpt-oss-120b route. A five-step agentic toolchain chain then passed end to
+> end on glm-5.2 through the same backend: write hello.c, gcc compile, run the
+> aarch64 binary and readelf-verify Machine: AArch64, all tools exit 0 with a
+> successful continuation; other gateway models answer provider.no-route.
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound
