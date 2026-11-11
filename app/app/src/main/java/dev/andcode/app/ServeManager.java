@@ -281,7 +281,20 @@ public final class ServeManager {
         File prootLoader = new File(runtime, "usr/lib/proot/loader");
         if (!prootBin.isFile() || !prootLoader.isFile()) throw new IOException("PRoot 载荷未部署");
         File rootfs = new File(files, "proot-rootfs");
-        if (!new File(rootfs, "usr/bin/bash").isFile()) throw new IOException("Ubuntu PRoot 实例未安装");
+        if (!new File(rootfs, "usr/bin/bash").isFile()) {
+            // 单 APK(DESIGN v0.4.55):实例缺失时先从内置 canonical rootfs 归档
+            // 提取(本线程即 oc2-serve-starter 后台线程,主页处于"启动中"状态);
+            // 无内置载荷的开发构建保留原报错。
+            try {
+                RootfsInstaller.install(files.toPath(),
+                    name -> app.getAssets().open("andcode-rootfs/" + name), null);
+            } catch (IOException e) {
+                throw new IOException("Ubuntu PRoot 实例未安装且内置归档提取失败: " + e.getMessage(), e);
+            }
+            if (!new File(rootfs, "usr/bin/bash").isFile()) {
+                throw new IOException("Ubuntu PRoot 实例未安装");
+            }
+        }
 
         String exe = p.lib;
         String farm = runtime.getAbsolutePath();

@@ -143,8 +143,9 @@ public class SettingsActivity extends UtilityActivity {
         divider(trust);
         toggle(trust, "OpenCode 服务进入 Ubuntu PRoot（实验）",
             "仅新启动的 OpenCode 后端经 PRoot 在 Ubuntu 开发实例内运行，"
-            + "会话工具链（bash/git 等）来自 guest；需先安装 PRoot 实例，"
-            + "未安装时启动服务会明确报错。网络代理与自定义 CA 需按所用网络另行开启。"
+            + "会话工具链（bash/git 等）来自 guest；实例缺失时首次启动服务会自动"
+            + "从内置归档提取（需数分钟与足够存储），失败则明确报错。"
+            + "网络代理与自定义 CA 需按所用网络另行开启。"
             + "更改后请在主页手动停止并重新启动服务。", "serve-proot-backend",
             AppSettings.serveProotBackend(this));
         refreshCa();
