@@ -140,6 +140,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Harden runner DNS against known flaps
+        run: |
+          # The arm runner pool had multi-hour DNS outages; containers with
+          # pinned resolvers kept working while host apt hung. Only override
+          # when name resolution is actually broken.
+          if ! getent hosts ports.ubuntu.com >/dev/null; then
+            echo "runner DNS broken; pinning public resolvers"
+            printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' | sudo tee /etc/resolv.conf
+            getent hosts ports.ubuntu.com
+          fi
+
       - name: 仓库卫生(LFS 规则,docs/LFS.md §4)
         run: bash scripts/lfs-check.sh "$GITHUB_WORKSPACE"
 
