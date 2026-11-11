@@ -395,23 +395,16 @@ jobs:
           # One CI-built canonical rootfs shared as build artifact by chroot and
           # PRoot (device instances stay per-tier). Dev-complete package set
           # matches the on-device acceptance evidence: gcc/make/binutils,
-          # python3, git, zlib/ssl dev headers on the existing base rootfs.
+          # python3, git, zlib/ssl dev headers plus the base rootfs packages.
           # Plain gzip keeps the APK-side first-launch extractor dependency-free.
+          # Mirrors the proven base pattern exactly: fresh container, apt inside,
+          # stop, export. Never docker cp a whole tree into / — the imported
+          # /tmp state breaks apt and the tree races docker's /etc bind mounts.
           CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
-          # Docker manages /etc/hostname, /etc/hosts and /etc/resolv.conf
-          # as bind mounts in running containers; copying the base tree
-          # verbatim races those mounts (unlinkat EBUSY) in cp or export.
-          # Use a scratch tree without the three managed files.
-          rm -rf work/canonical-tree
-          cp -a work/rootfs work/canonical-tree
-          rm -f work/canonical-tree/etc/hostname \
-            work/canonical-tree/etc/hosts \
-            work/canonical-tree/etc/resolv.conf
-          docker cp work/canonical-tree/. $CID:/
-          mkdir -p work/canonical-rootfs
           docker exec $CID bash -c \
-            "apt-get update -qq && apt-get install -y -qq build-essential git python3 zlib1g-dev libssl-dev >/dev/null"
+            "apt-get update -qq && apt-get install -y -qq ca-certificates zstd bash libtinfo6 build-essential git python3 zlib1g-dev libssl-dev >/dev/null"
+          mkdir -p work/canonical-rootfs
           docker exec $CID dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' \
             > work/canonical-rootfs/packages.txt
           # Stop before export: docker's /etc bind mounts go away, avoiding the
