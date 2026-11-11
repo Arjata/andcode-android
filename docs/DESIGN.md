@@ -1,6 +1,19 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.50 (design draft) · Date: 2026-11-11
+> Version: v0.4.51 (design draft) · Date: 2026-11-11
+> v0.4.51 change: complete the Bun release-profile build experiment. The
+> pinned-source Bun build (commit `38afee6c…`, pinned toolchain, pinned focal
+> glibc sysroot) now passes end to end on the native `ubuntu-24.04-arm` runner:
+> the release profile links `build/release/bun-profile` (244 MB, symbols) and
+> strips to `build/release/bun` (107.6 MB, ELF aarch64, PT_INTERP
+> `/lib/ld-linux-aarch64.so.1`, symbol-version floor GNU/Linux 3.7.0 — within
+> the ≤2.39 red line); smoke runs `bun --version` → 1.4.4 and a JS eval
+> (`andcode-bun-release-smoke-ok 42`). Earlier failure was a workflow bug: the
+> smoke step expected a nonexistent `bun-release` artifact name (upstream names
+> the plain release link `bun-profile` and the stripped copy `bun`); the
+> smoke/evidence/upload paths now target `bun`. This experiment does not by
+> itself claim ELF-correspondence with the shipped payload, license closure or
+> redistribution approval (see the diagnostic-only header of the workflow).
 > v0.4.50 change: fix the Tier P terminal TUI startup chain (three defects, all
 > verified on device). (1) The interactive bash session died with SIGSEGV
 > (session toast "exit -11"): the newly created `~/.bashrc` sourced
