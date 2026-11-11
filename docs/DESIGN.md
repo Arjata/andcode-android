@@ -41,6 +41,10 @@
 > end on glm-5.2 through the same backend: write hello.c, gcc compile, run the
 > aarch64 binary and readelf-verify Machine: AArch64, all tools exit 0 with a
 > successful continuation; other gateway models answer provider.no-route.
+> External arm64 executables then ran in the guest: an adb-staged musl-static
+> busybox (applets identified by argv[0]), the APK musl-static pty launcher
+> and the glibc oc2 via the guest loader, all exit 0, including
+> model-dispatched execution of the first two.
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound

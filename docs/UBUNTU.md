@@ -579,6 +579,20 @@ channel" twice, recovering on retry; every other listed gateway model answers
 `provider.no-route` (unavailable), so only gpt-oss-120b and glm-5.2 are routed. See DESIGN v0.4.54 section 4.4 for evidence
 scope.
 
+External arm64 executable execution (same day, same backend): three external
+binary classes ran inside the guest, all exit 0. First, an externally
+downloaded musl-static busybox (Alpine 1.36.1-r21, staged via adb into
+`files/home` and seen at guest `/root/busybox`) ran `echo`, `uname -m`
+(aarch64) and its banner; multi-call binaries identify applets by `argv[0]`,
+so the file must be named `busybox`. Second, the APK payload musl-static
+`libandcode-opencode-pty.so --version` reported
+`opencode-pty 0.4.0 (protocol 7)`. Third, the glibc `libandcode-oc2.so
+--version` ran via the guest loader with farm/native library paths and printed
+`opencode v2.2.6`. The model then dispatched both the external busybox and the
+APK pty launcher through the shell tool in one agentic session, with exact
+outputs and a successful continuation. The farm's Termux proot is
+bionic-linked and correctly remains host-only, not guest-executable.
+
 ## 必须通过的实机门禁
 
 | 验证 | chroot | PRoot（真实应用域） |
