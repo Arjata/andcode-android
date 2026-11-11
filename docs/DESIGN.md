@@ -1,6 +1,44 @@
 # andcode — 将 opencode 移植到 Android arm64 的设计方案
 
-> Version: v0.4.52 (design draft) · Date: 2026-11-11
+> Version: v0.4.53 (design draft) · Date: 2026-11-11
+> v0.4.53 change: two Tier P networking closures, both probed on device
+> 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
+> directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound
+> into the guest, oc2 runs directly under the guest's own
+> /lib/ld-linux-aarch64.so.1 with --library-path farm/lib:nativeLibraryDir —
+> `opencode v2.2.6` prints without the patched loader (Ubuntu glibc 2.39
+> satisfies the symbol floor). The guest reaches the managed serve over the
+> shared loopback (TCP probe to 127.0.0.1:4096 OK), so a TUI/serve split
+> across the PRoot boundary is viable. Guest DNS (nameserver 1.1.1.1, use-vc)
+> resolves public names but not the provider domain, which exists only in the
+> device VPN's DNS view; through the loopback proxy 127.0.0.1:7890 the
+> endpoint answers 401 over TLS. The endpoint certificate is issued by the
+> private "Arjata Fundamental Public Endpoint Issuer" CA with 8-day rotating
+> leaf certificates, confirming that CA trust must come from the imported-CA
+> mechanism. Second, productize the previously diagnostic-only proxy path:
+> the managed serve now honors a new explicit opt-in preference
+> `serve-loopback-proxy` (default off) that injects
+> http(s)_proxy=http://127.0.0.1:7890 into the serve environment instead of
+> stripping proxy variables unconditionally; TLS verification is never
+> disabled (NODE_TLS_REJECT_UNAUTHORIZED stays stripped) and CA trust remains
+> with the existing CustomCa NODE_EXTRA_CA_CERTS mechanism. Preference key and
+> env names registered in NAMING.md. On device 8c8da214, SAF import and explicit
+> CA enablement followed by a manual serve restart produced the expected TUI
+> reply `ANDCODE_PROXY_CA_OK` from `arjata/gpt-oss-120b` (3.7 seconds shown).
+> The app-spawned serve had all four proxy variables and NODE_EXTRA_CA_CERTS,
+> no NODE_TLS_REJECT_UNAUTHORIZED, UID10356, Seccomp=2 and untrusted_app under
+> enforcing SELinux. A subsequent shell tool returned its expected marker,
+> but the provider rejected the tool-result continuation with HTTP 400
+> (provider.invalid-request/openai_error); a separate fresh-session tool probe
+> reproduced the same failure. Plain-text model traffic passed;
+> full tool round trips remain unresolved. PC-side debugging of the
+> managed serve needs no new port: `adb forward tcp:<host> tcp:4096` reached
+> the loopback serve with HTTP 200. Re-verified on device 8c8da214 after the
+> v0.4.53 reinstall: the serve publishes the OpenCode 2.0 web GUI at `/`,
+> the JSON API lives under `/api/*`, and API calls require HTTP Basic auth
+> (any username, password = the `OPENCODE_PASSWORD` recorded in the managed
+> serve env file; Bearer tokens are rejected with 401). The credential must
+> never be echoed into shared logs or transcripts.
 > v0.4.52 change: on-device probe of the Tier P terminal TUI extra keys and
 > clean exit (device 8c8da214, normal/idle state). First, a measurement caveat
 > that invalidates earlier negative conclusions: screencap PNGs are full
@@ -683,6 +721,30 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     得到 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`,启用后 `arjata/gpt-oss-120b` 返回预期
     文本,并观察到 SSE 增量文本、中断事件和同会话恢复成功。不把代理成功冒称直连
     成功,也不把诊断代理写成产品默认值。
+  - v0.4.53 exposes that diagnostic proxy path as an explicit preference:
+    `serve-loopback-proxy` defaults off in the network-trust settings card.
+    A newly started managed serve receives `http_proxy`, `https_proxy`,
+    `HTTP_PROXY` and `HTTPS_PROXY`, each set to `http://127.0.0.1:7890`.
+    Inherited proxy variables are removed first; `NODE_TLS_REJECT_UNAUTHORIZED`
+    remains stripped and trust still uses CustomCa / `NODE_EXTRA_CA_CERTS`.
+    Changing the preference requires manually stopping and restarting serve;
+    it does not configure a proxy service or change existing terminal sessions.
+    On 2026-11-11 device `8c8da214`, SAF import of the independently supplied
+    PEM digest `b842e18328d07799669a7286e266701951bc0cf7b5356c81926e12b6eb5e10dd`
+    left trust disabled, as intended. Explicitly enabling CA trust and manually
+    restarting serve produced `ANDCODE_PROXY_CA_OK` in the TUI (GPT-OSS 120B,
+    3.7 seconds). The API confirmed `arjata/gpt-oss-120b`; the app-spawned
+    backend had UID10356, Seccomp=2, untrusted_app and enforcing SELinux,
+    all four proxy variables plus the digest-named CA file, and no TLS bypass.
+    The next prompt executed `printf ANDCODE_PROXY_TOOL_OK` successfully, but
+    the provider rejected the tool-result continuation with HTTP 400
+    (`provider.invalid-request/openai_error`). A fresh-session API probe
+    (`ses_e36211fc5ffeFH6xY2pRdXl5AL`) reproduced that failure after the shell
+    executed its requested marker command. This verifies ordinary model
+    traffic, not full tool round trips, direct DNS, other devices or networks
+    (those remain pending P0/P3 on-device verification). This device retains
+    both opt-ins enabled; the product defaults remain off. Evidence: local
+    `a-33.png`, `a-34.png`, session `ses_e3626d3fdffeQ01kUkHNqN80Fi`.
   - 模型调用的无副作用 shell 命令返回预期标记,但工具结果回传后的 provider 请求
     HTTP 400(`provider.invalid-request/openai_error`);完整工具往返未通过,根因待查。
     验收后停止诊断后端、恢复设置 CA 关闭,手动重启的默认后端 PID20163 无
@@ -815,6 +877,16 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
   旧设备应用域已验证项目写回/参数保真/stdin/退出码与拒绝错误项目。
   UDP 公共 DNS 超时,TCP DNS 返回正常答案;`use-vc` 后无显式代理的 HTTPS、严格
   apt update 与 Git HTTPS 成功,仍依赖设备现有 VPN/网络,不是 VPN 关闭后的测试。
+  - On 2026-11-11 device `8c8da214`, a PRoot feasibility probe bound
+    nativeLibraryDir (`libandcode-oc2.so`), the glibc farm and
+    `files/term-serve.env` into the guest. The guest's unpatched
+    `/lib/ld-linux-aarch64.so.1 --library-path farm/lib:exe` ran oc2 directly
+    (`opencode v2.2.6`); shared loopback TCP reached the managed serve at
+    `127.0.0.1:4096`. Guest DNS (1.1.1.1, use-vc) resolved public names but
+    not the provider's VPN-only domain. The loopback proxy at `127.0.0.1:7890`
+    reached that endpoint over TLS (401 without credentials). This is a
+    feasibility probe, not product wiring: permanent binds, a PRoot-managed
+    serve and an Ubuntu-backed agent shell are not implemented.
 - CI 为 Tier P 单独复制标准 bundle,执行 seccomp 七处字节校验/修改,再执行一次并
   验证 loader/libc SHA-256 不变,之后才重打包和物理化。标准 Linux bundle 保持原样;
   新基线字节不匹配时构建失败,不把补丁用于 PRoot guest 或 apt 更新后的 libc。

@@ -23,7 +23,7 @@ Tier P 当前提供交互 Bash 终端(手动输入 `opencode`,同进程内保留
 终端首次进入即显示提示符,下方提供两行附加键(ESC/TAB/CTRL/ALT/方向与翻页等);
 CTRL/ALT 点击锁定、再次点击解除,IME 键切换软键盘。未部署 Bash 时明确提示回退系统 sh。
 Web PTY 创建及命令回显已在旧设备应用域验证;预置可执行副本和 socket 指路见
-[DESIGN v0.4.42 §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态)。
+[DESIGN v0.4.53 §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态)。
 Web 终端已适配 Android LatinIME 的逐字输入、退格与回车;其它输入法仍待验证。
 Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页面延迟任务并释放视图。
 抽屉新增 **项目 · 导入 / 导出** 与 **设置**:
@@ -40,7 +40,22 @@ Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页�
   首轮工具结果回传后 provider HTTP 400；2026-11-10 同设备/显式代理+CA 下，新会话
   连续两轮完整工具往返成功，旧验收会话仍 400，历史回放根因未闭环，未删除会话或
   修改协议。默认直连此前仍 DNS `EAI_AGAIN`，本轮未复测，未声称默认联网已修复。
-  诊断后端已终止，原默认后端仍 CA 关闭；详见上述 DESIGN 的实际验收边界。
+  The earlier diagnostic backend was stopped with CA trust off; see the newer
+  managed-backend verification below and DESIGN for the exact acceptance scope.
+- Managed-backend loopback proxy (default off): explicitly opt into
+  `http://127.0.0.1:7890` in network-trust settings, then manually stop and
+  restart the service. The device must provide that proxy separately; direct
+  networking does not require a third-party host app. TLS verification stays
+  enabled and private CA trust is a separate opt-in. On 2026-11-11 device
+  `8c8da214`, SAF CA import + both opt-ins + restart produced the expected TUI
+  reply from `arjata/gpt-oss-120b`. A subsequent shell command succeeded, but
+  its tool-result continuation received provider HTTP 400 (`openai_error`);
+  full tool round trips remain unresolved. This device retains both opt-ins
+  enabled; other devices/networks remain pending P0/P3 verification.
+  PC debugging uses `adb -s 8c8da214 forward tcp:14096 tcp:4096`; the Web GUI
+  is served at `/` and authenticated JSON endpoints at `/api/*` use HTTP Basic
+  with the managed password. Never publish that password or expose the port
+  to the LAN. See [DESIGN §4.4](docs/DESIGN.md#44-tier-p--自研最小-apklocked-设备的面向用户形态).
 - Material 3 分组卡片布局;项目卡更多菜单提供复制/导出,设置支持字号即时预览。
 - 项目/设置导航配齐图标;独立终端支持双指展开/捏合调整字号(10–28 sp),
   自动保存并同步设置页,不会重建终端会话。

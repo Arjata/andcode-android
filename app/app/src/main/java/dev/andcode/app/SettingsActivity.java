@@ -135,6 +135,11 @@ public class SettingsActivity extends UtilityActivity {
             refreshCa();
             caMessage("已清除选择；旧副本保留供运行中服务读取。重启后端后不再追加信任。");
         }), new LinearLayout.LayoutParams(-1, -2));
+        divider(trust);
+        toggle(trust, "后端使用设备回环代理", "仅新启动的 OpenCode 后端向 http://127.0.0.1:7890 注入"
+            + "代理环境变量；默认关闭，需设备自行提供本地代理（如 VPN 客户端混合端口）；"
+            + "不关闭 TLS 校验，证书信任仍由上方自定义 CA 控制。更改后请在主页手动停止并重新启动服务。", "serve-loopback-proxy",
+            AppSettings.serveLoopbackProxy(this));
         refreshCa();
 
         section("导出与隐私", "ZIP 归档");

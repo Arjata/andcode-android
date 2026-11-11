@@ -40,6 +40,11 @@ public final class AppSettings {
         return prefs(context).getBoolean("ubuntu-loopback-proxy", false);
     }
 
+    /** Opt-in loopback proxy for the managed OpenCode serve (default off). */
+    static boolean serveLoopbackProxy(Context context) {
+        return prefs(context).getBoolean("serve-loopback-proxy", false);
+    }
+
     static boolean ubuntuAvailable(Context context) {
         String nat = context.getApplicationInfo().nativeLibraryDir;
         if (nat != null && new File(nat, "libandcode-ld-linux.so").isFile()) {

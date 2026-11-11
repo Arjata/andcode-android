@@ -46,7 +46,8 @@
 | `andcode-terminal-ime.test.mjs` | 上述脚本的 Node 内置测试(开发期,不进 APK) | `app/tests/andcode-terminal-ime.test.mjs` |
 | `projects`、`import-<随机值>` | APK filesDir 项目目录与导入暂存目录;仅数据,不作为可执行入口 | `files/projects/<项目名>`、`files/import-<随机值>` |
 | `andcode-settings` | APK 私有 SharedPreferences 名,保存终端/导出偏好与选中项目 | 不保存 API key |
-| `terminal-backend`、`ubuntu-loopback-proxy` | 上述偏好键;新终端选择 `bash`/`ubuntu-proot`,代理默认关闭且显式选择,不影响已有会话或 Web | APK SharedPreferences |
+| `terminal-backend`, `ubuntu-loopback-proxy`, `serve-loopback-proxy` | Private preferences: new terminals select `bash`/`ubuntu-proot`; Ubuntu and managed-serve loopback proxies are separate explicit opt-ins, both default off. Existing processes are unchanged; restart serve manually to apply its preference. | APK SharedPreferences |
+| `http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY` | Standard proxy variables: Tier P managed serve injects `http://127.0.0.1:7890` only when `serve-loopback-proxy` is enabled. TLS verification remains enabled; additional trust uses `NODE_EXTRA_CA_CERTS`. | ServeManager child environment |
 | `ProjectsActivity.java`、`SettingsActivity.java`、`AppSettings.java`、`ProjectArchive.java`、`ProjectArchiveTest.java`、`UtilityActivity.java` | APK 项目/设置组件、共享页面及 ZIP 安全测试(Java 类文件遵循类名) | `dev.andcode.app` |
 | `ic_more.xml` | APK 项目卡的更多操作矢量图标(Android resource 采用现有 snake_case 风格) | `res/drawable/ic_more.xml` |
 | `ic_nav_projects.xml`、`ic_nav_settings.xml` | APK 共享抽屉的项目/设置矢量图标(沿用 Android resource snake_case) | `res/drawable/` |

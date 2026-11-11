@@ -206,9 +206,22 @@ public final class ServeManager {
         // v0.4.0 默认把 socket 放在 /tmp(忽略 TMPDIR),Android 下不可写。
         env.put("OPENCODE_PTY_SOCKET_DIR", ptySocketDir(app));
 
-        // Do not ship the development proxy or inherit a disabled TLS verifier.
+        // Never inherit a disabled TLS verifier from the surrounding app process.
         for (String key : new String[]{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
                 "ALL_PROXY", "all_proxy", "NODE_TLS_REJECT_UNAUTHORIZED"}) env.remove(key);
+        // Opt-in loopback proxy (serve-loopback-proxy, default off): provider
+        // domains may only resolve through the device VPN's local DNS view
+        // (direct getaddrinfo fails with EAI_AGAIN, DESIGN §4.4). When the user
+        // explicitly enables the setting, point outbound traffic at the device's
+        // local mixed-port proxy; TLS verification is never disabled and CA
+        // trust stays with the CustomCa NODE_EXTRA_CA_CERTS mechanism below.
+        if (AppSettings.serveLoopbackProxy(app)) {
+            String proxy = "http://127.0.0.1:7890";
+            env.put("http_proxy", proxy);
+            env.put("https_proxy", proxy);
+            env.put("HTTP_PROXY", proxy);
+            env.put("HTTPS_PROXY", proxy);
+        }
         CustomCa.apply(env, files.toPath(), AppSettings.customCaEnabled(app), AppSettings.customCaDigest(app));
 
         final Process proc = pb.redirectErrorStream(true).start();
