@@ -316,7 +316,8 @@ jobs:
       - name: Smoke-run the release binary
         working-directory: work/src
         run: |
-          BIN=$(ls build/release/bun-release)
+          # Plain release builds link `bun-profile` and strip to `bun`; there is no `bun-release`.
+          BIN=$(ls build/release/bun)
           file "$BIN" | tee smoke.log
           "$BIN" --version 2>&1 | tee -a smoke.log
           echo 'console.log("andcode-bun-release-smoke-ok", 6*7)' | "$BIN" run - 2>&1 | tee -a smoke.log
@@ -328,8 +329,8 @@ jobs:
           cd work
           {
             echo '== binary =='
-            ls -la src/build/release/bun-release 2>/dev/null || true
-            sha256sum src/build/release/bun-release 2>/dev/null || true
+            ls -la src/build/release/bun src/build/release/bun-profile 2>/dev/null || true
+            sha256sum src/build/release/bun 2>/dev/null || true
             echo '== objects =='
             find src/build/release -name '*.o' 2>/dev/null | wc -l
             echo '== smoke =='
@@ -347,7 +348,7 @@ jobs:
             work/source-sha256.txt
             work/release-evidence.txt
             work/src/smoke.log
-            work/src/build/release/bun-release
+            work/src/build/release/bun
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
