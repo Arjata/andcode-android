@@ -593,6 +593,21 @@ APK pty launcher through the shell tool in one agentic session, with exact
 outputs and a successful continuation. The farm's Termux proot is
 bionic-linked and correctly remains host-only, not guest-executable.
 
+Multi-library dynamic executable (same day, `arjata/glm-5.2`, same backend):
+the guest links against `libm`, `libpthread`, `libdl`, `libz` (plus
+`libcrypto.so.3` and `libtinfo.so.6` present). The model wrote a C program
+using sqrt, pthread create/join, `dlopen`/`dlsym` of `libm.so.6` at runtime
+and zlib `compress2`; the first gcc run failed on the missing `zlib.h` dev
+header, and the model recovered autonomously by installing the dev package
+via apt through the explicit proxy before recompiling (exit 0). The binary
+ran with exit 0 (marker, sqrt, pthread ok, `dlsym(sqrt)=1`, zlib 15 -> 23
+bytes) and `readelf -d` listed `libz.so.1`, `libc.so.6`,
+`ld-linux-aarch64.so.1` as DT_NEEDED: on glibc >= 2.34 the math/pthread/dl
+libraries are merged into libc, so they no longer produce separate NEEDED
+entries and libm was instead verified through the runtime `dlopen` path.
+Dynamic linking resolution for multiple object libraries therefore works in
+the guest, including model-driven build failure recovery.
+
 ## 必须通过的实机门禁
 
 | 验证 | chroot | PRoot（真实应用域） |

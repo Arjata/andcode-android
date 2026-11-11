@@ -44,7 +44,11 @@
 > External arm64 executables then ran in the guest: an adb-staged musl-static
 > busybox (applets identified by argv[0]), the APK musl-static pty launcher
 > and the glibc oc2 via the guest loader, all exit 0, including
-> model-dispatched execution of the first two.
+> model-dispatched execution of the first two. A model-driven multi-library
+> dynamic build then passed: gcc -lm -lpthread -ldl -lz, runtime dlopen of
+> libm, zlib compression and a DT_NEEDED list of libz + libc + loader, with
+> the model recovering from a missing zlib.h header via apt on its own
+> (glibc 2.34+ merges math/pthread/dl into libc, hence no separate NEEDED).
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound
