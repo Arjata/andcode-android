@@ -96,7 +96,8 @@ final class RootfsInstaller {
             if (!stage.toFile().renameTo(files.resolve(ROOTFS_DIR).toFile())) {
                 throw new IOException("Cannot publish rootfs directory");
             }
-            Files.writeString(files.resolve(DIGEST_FILE), expected + "\n");
+            Files.write(files.resolve(DIGEST_FILE),
+                (expected + "\n").getBytes(StandardCharsets.UTF_8));
             if (progress != null) progress.onPhase("installed(" + extracted + "B)");
         } catch (IOException e) {
             deleteTree(stage);
@@ -209,7 +210,7 @@ final class RootfsInstaller {
                     }
                     Path dst = root.resolve(name);
                     Files.createDirectories(dst.getParent());
-                    Files.createSymbolicLink(dst, Path.of(target));
+                    Files.createSymbolicLink(dst, java.nio.file.Paths.get(target));
                     symlinks.add(name);
                     published.add(name);
                     break;
@@ -249,7 +250,7 @@ final class RootfsInstaller {
             throw new IOException("Duplicate tar entry: " + name);
         }
         // 链接祖先检查:任何父级组件若是符号链接则拒绝。
-        Path current = Path.of("");
+        Path current = java.nio.file.Paths.get("");
         for (String part : name.split("/")) {
             current = current.resolve(part);
             if (symlinks.contains(current.toString()) && !current.toString().equals(name)) {
