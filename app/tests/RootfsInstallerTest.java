@@ -170,7 +170,7 @@ public class RootfsInstallerTest {
         MapAssets assets = new MapAssets();
         assets.put(RootfsInstaller.ARCHIVE_ASSET, archive);
         assets.put(RootfsInstaller.SHA_ASSET,
-            (sha256(archive) + "  andcode-rootfs-arm64.tar.gz\n").getBytes(StandardCharsets.UTF_8));
+            (sha256(archive) + "  andcode-rootfs-arm64.tgz\n").getBytes(StandardCharsets.UTF_8));
         assets.put("andcode-rootfs/packages.txt",
             "bash\t5.2\tarm64\n".getBytes(StandardCharsets.UTF_8));
         return assets;

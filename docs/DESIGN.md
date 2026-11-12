@@ -655,8 +655,10 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   legacy packaging 让系统安装时提取到 nativeLibraryDir,保留 `libandcode-*`
   文件内容不 strip。此中间工件尚非 V2/PTY 完整闭包,未宣称可用的自包含 APK。
 - **单 APK 发布形态(v0.4.55,已决策,实施中)**:release APK 内嵌
-  `assets/andcode-rootfs/`(canonical dev-complete rootfs 的 gzip 档 +
-  SHA-256 + dpkg 版本清单)。首启动用应用内纯 Java gzip/tar 提取器落位
+  `assets/andcode-rootfs/`(canonical dev-complete rootfs 的 gzip 档,以
+  `.tgz` 后缀嵌入——AGP 资产合并会自动解压 `.gz` 后缀资产,`noCompress tgz`
+  保证档案原样进 APK + SHA-256 + dpkg 版本清单)。首启动用应用内纯 Java
+  gzip/tar 提取器落位
   `files/proot-rootfs`——无新增第三方依赖、无新增原生提取器,应用自身不解压
   执行数据目录 ELF(guest 二进制经 proot 已验证执行路径运行);提取前强制
   §4.8 rootfs-tar 安全检查(路径/重复项/链接祖先/特殊文件/setuid 位),

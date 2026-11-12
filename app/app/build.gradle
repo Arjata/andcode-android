@@ -10,8 +10,8 @@ if (nativePayload.isPresent()) {
     if (!new File(payload, "arm64-v8a/libandcode-ld-linux.so").isFile()
             || !new File(payload, "arm64-v8a/libandcode-bash.so").isFile()
             || !new File(payload, "assets/andcode-runtime/manifest.farm").isFile()
-            || !new File(payload, "assets/andcode-rootfs/andcode-rootfs-arm64.tar.gz").isFile()
-            || !new File(payload, "assets/andcode-rootfs/andcode-rootfs-arm64.tar.gz.sha256").isFile()
+            || !new File(payload, "assets/andcode-rootfs/andcode-rootfs-arm64.tgz").isFile()
+            || !new File(payload, "assets/andcode-rootfs/andcode-rootfs-arm64.tgz.sha256").isFile()
             || !new File(payload, "assets/andcode-rootfs/packages.txt").isFile()) {
         throw new GradleException("andcodeNativeDir is not a complete Tier P native intermediate artifact")
     }
@@ -50,6 +50,11 @@ android {
         // Explicit-path exec needs files in nativeLibraryDir, not only ZIP mmap.
         jniLibs.useLegacyPackaging = true
         jniLibs.keepDebugSymbols += ["**/libandcode-*.so"]
+    }
+    androidResources {
+        // The embedded canonical rootfs archive is already gzip-compressed;
+        // store it verbatim instead of deflating it again in the APK.
+        noCompress += "tgz"
     }
     if (nativePayload.isPresent()) {
         sourceSets.main.jniLibs.srcDir(file(nativePayload.get()))

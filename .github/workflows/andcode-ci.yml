@@ -414,12 +414,12 @@ jobs:
           docker export $CID -o work/canonical-rootfs/rootfs.tar
           docker rm -f $CID
           gzip -9 < work/canonical-rootfs/rootfs.tar \
-            > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz
+            > work/canonical-rootfs/andcode-rootfs-arm64.tgz
           rm work/canonical-rootfs/rootfs.tar
-          sha256sum work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
-            > work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
+          sha256sum work/canonical-rootfs/andcode-rootfs-arm64.tgz \
+            > work/canonical-rootfs/andcode-rootfs-arm64.tgz.sha256
           # Sanity gates: the verified toolchain entries must be present.
-          A=work/canonical-rootfs/andcode-rootfs-arm64.tar.gz
+          A=work/canonical-rootfs/andcode-rootfs-arm64.tgz
           for tool in gcc python3 git; do
             tar -tzf "$A" | grep -q "usr/bin/$tool$" || {
               echo "$tool missing from the archive; listing sample:"
@@ -427,12 +427,12 @@ jobs:
               exit 1
             }
           done
-          test -s work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256
+          test -s work/canonical-rootfs/andcode-rootfs-arm64.tgz.sha256
           test -s work/canonical-rootfs/packages.txt
           # Embed into the Tier P payload; sourceSets picks assets/ into the APK.
           mkdir -p work/jni/assets/andcode-rootfs
-          cp work/canonical-rootfs/andcode-rootfs-arm64.tar.gz \
-             work/canonical-rootfs/andcode-rootfs-arm64.tar.gz.sha256 \
+          cp work/canonical-rootfs/andcode-rootfs-arm64.tgz \
+             work/canonical-rootfs/andcode-rootfs-arm64.tgz.sha256 \
              work/canonical-rootfs/packages.txt \
              work/jni/assets/andcode-rootfs/
           ls -la work/jni/assets/andcode-rootfs/

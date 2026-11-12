@@ -20,7 +20,7 @@ import java.util.zip.GZIPInputStream;
 /**
  * First-launch installer for the embedded canonical rootfs (DESIGN v0.4.55).
  *
- * Extracts assets/andcode-rootfs/andcode-rootfs-arm64.tar.gz into
+ * Extracts assets/andcode-rootfs/andcode-rootfs-arm64.tgz into
  * files/proot-rootfs with the section 4.8 rootfs-tar safety checks: path
  * traversal, duplicate files, symlink ancestors, special files and
  * setuid/setgid bits are rejected. Skips work when the installed instance
@@ -32,8 +32,8 @@ import java.util.zip.GZIPInputStream;
  */
 final class RootfsInstaller {
 
-    static final String ARCHIVE_ASSET = "andcode-rootfs/andcode-rootfs-arm64.tar.gz";
-    static final String SHA_ASSET = "andcode-rootfs/andcode-rootfs-arm64.tar.gz.sha256";
+    static final String ARCHIVE_ASSET = "andcode-rootfs/andcode-rootfs-arm64.tgz";
+    static final String SHA_ASSET = "andcode-rootfs/andcode-rootfs-arm64.tgz.sha256";
     static final String ROOTFS_DIR = "proot-rootfs";
     static final String DIGEST_FILE = "proot-rootfs.digest";
     static final String GATE_FILE = "usr/bin/bash";
