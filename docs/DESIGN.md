@@ -64,6 +64,15 @@
 > libm, zlib compression and a DT_NEEDED list of libz + libc + loader, with
 > the model recovering from a missing zlib.h header via apt on its own
 > (glibc 2.34+ merges math/pthread/dl into libc, hence no separate NEEDED).
+> Single-APK first-launch validation (device 8c8da214, over WiFi adb after
+> a USB flap): the CI artifact APK (640.5 MB, v1 payloads absent, the
+> 193 MB .tgz stored verbatim) was installed with no prior data; the first
+> start tap auto-extracted the embedded archive into a 566 MB proot-rootfs
+> with the digest marker, published it, and brought up the proot -> guest
+> loader -> oc2 serve chain with Web 200. Guest sanity via the session
+> shell API: uname aarch64, gcc 13.3.0, git 2.43.0 and an /usr/bin/mawk
+> alternatives symlink all resolved (exit 0). App storage after install is
+> roughly 2.2 GB (APK + extracted native libs + rootfs).
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound

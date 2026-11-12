@@ -611,8 +611,14 @@ the guest, including model-driven build failure recovery.
 Canonical rootfs unification (DESIGN v0.4.55): the CI-built canonical rootfs
 archive becomes the shared build artifact for both the chroot and PRoot
 backends. Device instances stay separate per tier and both acceptance gates
-remain in effect; the release APK will embed this archive for first-launch
-extraction, with existing device instances untouched.
+remain in effect. The single-APK flow is now validated on device
+8c8da214: a fresh install of the CI artifact APK (640.5 MB, no prior data)
+auto-extracted the embedded 193 MB archive into a 566 MB proot-rootfs on
+the first serve start, published the digest marker, and brought up the
+PRoot serve chain (Web 200; guest sanity aarch64, gcc 13.3.0, git 2.43.0,
+mawk alternatives symlink all exit 0). Existing device instances were not
+touched by this path. Extraction diagnostics are surfaced via logcat
+(tag andcode) because the failure reason otherwise only flashes in the UI.
 
 ## 必须通过的实机门禁
 

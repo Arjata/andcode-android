@@ -79,7 +79,10 @@ Web/终端抽屉“主页”显式返回应用仪表盘;Web 退出时取消页�
   python3/make/git 2.43.0, and other gateway models are currently unrouted.
   Externally built arm64 executables (adb-staged musl-static busybox, the APK
   pty launcher, glibc oc2 via the guest loader) all ran exit 0, including
-  model-dispatched execution. A model-driven multi-library dynamic build
+  model-dispatched execution. Single-APK first-launch flow validated on
+  device: a fresh install auto-extracts the embedded 193 MB canonical
+  rootfs (digest marker published, PRoot serve up, guest gcc/git/mawk
+  sanity all green). A model-driven multi-library dynamic build
   (gcc -lm -lpthread -ldl -lz with runtime dlopen and zlib) also passed, with
   the model recovering from a missing dev header via apt on its own.
   Other devices and locked delivery remain pending P0/P3.
