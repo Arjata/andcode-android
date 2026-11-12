@@ -126,7 +126,7 @@ public class WebActivity extends AppCompatActivity {
         // FGS 承接常驻(DESIGN §4.4):应用切后台后 serve 存活
         startForegroundService(new Intent(this, SessionService.class));
 
-        mStatus.setText("正在启动 opencode 服务…");
+        mStatus.setText(getString(R.string.s_starting_web));
         ServeManager.ensureStarted(this, new ServeManager.ReadyCallback() {
             @Override public void onReady(String password) {
                 if (!hasLiveWebView()) return;
@@ -142,7 +142,7 @@ public class WebActivity extends AppCompatActivity {
             }
             @Override public void onFailed(String reason) {
                 if (!hasLiveWebView()) return;
-                mStatus.setText("启动失败:" + reason);
+        mStatus.setText(getString(R.string.s_web_failed) + reason);
             }
         });
     }

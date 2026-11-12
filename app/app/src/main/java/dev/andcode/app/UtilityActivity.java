@@ -22,6 +22,10 @@ public abstract class UtilityActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        android.util.Log.i("andcode", "config locales="
+            + getResources().getConfiguration().getLocales()
+            + " appLocales=" + androidx.appcompat.app.AppCompatDelegate
+                .getApplicationLocales());
         drawer = new DrawerLayout(this);
         LinearLayout page = column();
         toolbar = new MaterialToolbar(this);
