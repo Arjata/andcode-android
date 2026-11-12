@@ -72,7 +72,13 @@
 > loader -> oc2 serve chain with Web 200. Guest sanity via the session
 > shell API: uname aarch64, gcc 13.3.0, git 2.43.0 and an /usr/bin/mawk
 > alternatives symlink all resolved (exit 0). App storage after install is
-> roughly 2.2 GB (APK + extracted native libs + rootfs).
+> roughly 2.2 GB (APK + extracted native libs + rootfs). Terminal
+> auto-entry and storage bind (same day): the terminal backend defaults
+> to the Ubuntu rootfs when the canonical instance is ready (a missing
+> instance auto-extracts in the background with an in-session wait), and
+> both the serve guest and the terminal session bind /storage/emulated/0
+> at /mnt/sdcard (Download verified read-write from the guest; the FUSE
+> permission view governs visibility).
 > v0.4.53 change: two Tier P networking closures, both probed on device
 > 8c8da214. First, an Ubuntu PRoot feasibility probe: with the native payload
 > directory (libandcode-oc2.so), the glibc farm and files/term-serve.env bound

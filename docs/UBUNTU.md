@@ -617,7 +617,11 @@ auto-extracted the embedded 193 MB archive into a 566 MB proot-rootfs on
 the first serve start, published the digest marker, and brought up the
 PRoot serve chain (Web 200; guest sanity aarch64, gcc 13.3.0, git 2.43.0,
 mawk alternatives symlink all exit 0). Existing device instances were not
-touched by this path. Extraction diagnostics are surfaced via logcat
+touched by this path. The terminal backend now defaults to this Ubuntu
+rootfs automatically (a missing instance auto-extracts in the background
+with an in-session wait), and device storage is bound at /mnt/sdcard in
+both the serve guest and the terminal session — Download verified
+read-write from the guest. Extraction diagnostics are surfaced via logcat
 (tag andcode) because the failure reason otherwise only flashes in the UI.
 
 ## 必须通过的实机门禁
