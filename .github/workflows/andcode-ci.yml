@@ -403,7 +403,7 @@ jobs:
           CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           docker exec $CID bash -c \
-            "apt-get update -qq && apt-get install -y -qq ca-certificates zstd bash libtinfo6 build-essential git python3 zlib1g-dev libssl-dev >/dev/null"
+            "apt-get update -qq && apt-get install -y -qq ca-certificates zstd bash libtinfo6 build-essential git python3 zlib1g-dev libssl-dev curl wget iputils-ping procps psmisc >/dev/null"
           mkdir -p work/canonical-rootfs
           docker exec $CID dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' \
             > work/canonical-rootfs/packages.txt
