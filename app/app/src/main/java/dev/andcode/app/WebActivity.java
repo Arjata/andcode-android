@@ -11,6 +11,9 @@ import android.view.WindowManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.net.Uri;
+import android.webkit.WebChromeClient;
+import android.webkit.ValueCallback;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -37,6 +40,8 @@ public class WebActivity extends AppCompatActivity {
 
     private WebView mWebView;
     private TextView mStatus;
+    private ValueCallback<Uri[]> mPendingFileChooser;
+    private static final int FILE_CHOOSER_REQUEST = 4101;
     private String mPassword;
     private DrawerLayout mDrawer;
     private String mTerminalImeScript;
@@ -92,6 +97,29 @@ public class WebActivity extends AppCompatActivity {
             mTerminalImeScript = new String(out.toByteArray(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             android.util.Log.e("andcode", "无法加载 Web 终端输入法适配", e);
+        }
+        // opencode 附件按钮最终触发 <input type=file>;WebView 没有
+        // WebChromeClient.onShowFileChooser 时该点击静默无响应。
+        mWebView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(
+                    WebView view, ValueCallback<Uri[]> callback,
+                    FileChooserParams params) {
+                try {
+                    startActivityForResult(
+                        params.createIntent(), FILE_CHOOSER_REQUEST);
+                } catch (android.content.ActivityNotFoundException e) {
+                    android.util.Log.i("andcode", "no file picker activity");
+                    callback.onReceiveValue(null);
+                    return true;
+                }
+                mPendingFileChooser = callback;
+                return true;
+            }
+        });
+        // Debuggable installs expose the WebView for CDP inspection.
+        if ((getApplicationInfo().flags
+                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true);
         }
         mWebView.setWebViewClient(new Client());
 
@@ -159,6 +187,18 @@ public class WebActivity extends AppCompatActivity {
 
     private boolean hasLiveWebView() {
         return !isFinishing() && !isDestroyed() && mWebView != null;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != FILE_CHOOSER_REQUEST || mPendingFileChooser == null) return;
+        Uri[] out = null;
+        if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+            out = new Uri[]{data.getData()};
+        }
+        mPendingFileChooser.onReceiveValue(out);
+        mPendingFileChooser = null;
     }
 
     @Override protected void onResume() {
