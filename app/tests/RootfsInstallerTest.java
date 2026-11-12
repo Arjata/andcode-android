@@ -16,6 +16,7 @@ import java.util.zip.GZIPOutputStream;
 
 /** Platform JDK test: embedded rootfs installer safety gates (no Android). */
 public class RootfsInstallerTest {
+    private static final String fileSep = java.io.File.separator;
     private static int checks;
 
     private static void check(boolean ok) {
@@ -255,17 +256,68 @@ public class RootfsInstallerTest {
         rejectInstall(files, assetsFor(gzip(tar(dotdot))));
         deleteRecursively(files);
 
-        // 5. Escaping symlinks are rejected (absolute and relative).
+        // 5. Absolute targets that stay inside the root are legal (Debian
+        // alternatives style) and keep their original target text.
         List<Entry> absLink = new ArrayList<>();
-        absLink.add(link("./usr/escape", "/etc"));
+        absLink.add(dir("./usr"));
+        absLink.add(dir("./usr/bin"));
+        absLink.add(file("./usr/bin/bash", 0755, "bash"));
+        absLink.add(dir("./etc"));
+        absLink.add(file("./usr/bin/mawk", 0755, "mawk"));
+        absLink.add(link("./etc/alternatives", "usr/bin"));
+        absLink.add(link("./etc/awk", "/usr/bin/mawk"));
         files = Files.createTempDirectory("rootfs-test-abslink");
-        rejectInstall(files, assetsFor(gzip(tar(absLink))));
+        RootfsInstaller.install(files, assetsFor(gzip(tar(absLink))), null);
+        Path rootfsAbs = files.resolve(RootfsInstaller.ROOTFS_DIR);
+        String awkTarget = Files.readSymbolicLink(rootfsAbs.resolve("etc/awk"))
+            .toString();
+        check(awkTarget.endsWith("usr" + fileSep + "bin" + fileSep + "mawk"));
         deleteRecursively(files);
 
         List<Entry> relLink = new ArrayList<>();
         relLink.add(link("./usr/escape", "../../../etc"));
         files = Files.createTempDirectory("rootfs-test-rellink");
         rejectInstall(files, assetsFor(gzip(tar(relLink))));
+        deleteRecursively(files);
+
+        // 5a-bis. Relative targets resolve against the link directory
+        // (Debian font-config pattern: conf.d/x -> ../conf.avail/y).
+        List<Entry> relInside = new ArrayList<>();
+        relInside.add(dir("./etc"));
+        relInside.add(dir("./etc/fonts"));
+        relInside.add(dir("./etc/fonts/conf.avail"));
+        relInside.add(dir("./etc/fonts/conf.d"));
+        relInside.add(file("./etc/fonts/conf.avail/10.conf", 0644, "conf"));
+        relInside.add(file("./usr/bin/bash", 0755, "bash"));
+        relInside.add(link("./etc/fonts/conf.d/10.conf", "../conf.avail/10.conf"));
+        files = Files.createTempDirectory("rootfs-test-relin");
+        RootfsInstaller.install(files, assetsFor(gzip(tar(relInside))), null);
+        check(Files.isSymbolicLink(files.resolve(RootfsInstaller.ROOTFS_DIR)
+            .resolve("etc/fonts/conf.d/10.conf")));
+        check(Files.readString(files.resolve(RootfsInstaller.ROOTFS_DIR)
+            .resolve("etc/fonts/conf.avail/10.conf")).equals("conf"));
+        deleteRecursively(files);
+
+        // 5b. Absolute targets that escape via .. are rejected.
+        List<Entry> absDotDot = new ArrayList<>();
+        absDotDot.add(link("./usr/escape", "/../etc"));
+        files = Files.createTempDirectory("rootfs-test-absdotdot");
+        rejectInstall(files, assetsFor(gzip(tar(absDotDot))));
+        deleteRecursively(files);
+
+        // 5c. usrmerge dir symlinks write through: bin -> usr/bin then a file
+        // created at bin/ls lands in usr/bin/ls, both guest paths valid.
+        List<Entry> usrmerge = new ArrayList<>();
+        usrmerge.add(dir("./usr"));
+        usrmerge.add(dir("./usr/bin"));
+        usrmerge.add(file("./usr/bin/bash", 0755, "bash"));
+        usrmerge.add(link("./bin", "usr/bin"));
+        usrmerge.add(file("./bin/ls", 0755, "ls"));
+        files = Files.createTempDirectory("rootfs-test-usrmerge");
+        RootfsInstaller.install(files, assetsFor(gzip(tar(usrmerge))), null);
+        Path rootfsUm = files.resolve(RootfsInstaller.ROOTFS_DIR);
+        check(Files.isSymbolicLink(rootfsUm.resolve("bin")));
+        check(Files.readString(rootfsUm.resolve("usr/bin/ls")).equals("ls"));
         deleteRecursively(files);
 
         // 6. Symlink ancestors are rejected.
@@ -277,13 +329,15 @@ public class RootfsInstallerTest {
         rejectInstall(files, assetsFor(gzip(tar(ancestor))));
         deleteRecursively(files);
 
-        // 7. setuid/setgid bits are rejected.
+        // 7. setuid/setgid bits are stripped, not applied.
         List<Entry> suid = new ArrayList<>();
         suid.add(dir("./usr"));
         suid.add(dir("./usr/bin"));
-        suid.add(file("./usr/bin/bash", 04755, "x"));
+        suid.add(file("./usr/bin/bash", 04755, "bash"));
         files = Files.createTempDirectory("rootfs-test-suid");
-        rejectInstall(files, assetsFor(gzip(tar(suid))));
+        RootfsInstaller.install(files, assetsFor(gzip(tar(suid))), null);
+        check(Files.isRegularFile(files.resolve(RootfsInstaller.ROOTFS_DIR)
+            .resolve("usr/bin/bash")));
         deleteRecursively(files);
 
         // 8. Special files (fifo/device) are rejected.

@@ -102,16 +102,19 @@ public class HomeActivity extends AppCompatActivity {
 
     /** 启动 serve:走 SessionService FGS 承接常驻,再确保进程拉起 */
     private void requestStart() {
+        android.util.Log.i("andcode", "requestStart: start button clicked");
         mWaitingStart = true;
         render(null, getString(R.string.state_starting));
         startForegroundService(new Intent(this, SessionService.class));
         ServeManager.ensureStarted(this, new ServeManager.ReadyCallback() {
             @Override public void onReady(String password) {
+                android.util.Log.i("andcode", "serve onReady");
                 mWaitingStart = false;
                 render(true, null);
                 resumePoll();
             }
             @Override public void onFailed(String reason) {
+                android.util.Log.i("andcode", "serve onFailed: " + reason);
                 mWaitingStart = false;
                 render(false, reason);
                 resumePoll();

@@ -661,7 +661,8 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   gzip/tar 提取器落位
   `files/proot-rootfs`——无新增第三方依赖、无新增原生提取器,应用自身不解压
   执行数据目录 ELF(guest 二进制经 proot 已验证执行路径运行);提取前强制
-  §4.8 rootfs-tar 安全检查(路径/重复项/链接祖先/特殊文件/setuid 位),
+  §4.8 rootfs-tar 安全检查(路径/重复项/逃逸符号链接/特殊文件;setuid/setgid
+  位剥离计数,Debian alternatives 与 usrmerge 符号链接按 proot 翻译语义保留),
   摘要匹配则跳过(覆盖升级不重复提取),失败显式报错,PRoot serve 门禁语义
   不变(缺失→明确失败不回退)。legacy opencode v1(`libandcode-opencode.so`
   及其 wrapper)经 `pack-apk-libs.sh --exclude` 从 APK 排除——TUI 的

@@ -11,9 +11,12 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
@@ -22,8 +25,10 @@ import java.util.zip.GZIPInputStream;
  *
  * Extracts assets/andcode-rootfs/andcode-rootfs-arm64.tgz into
  * files/proot-rootfs with the section 4.8 rootfs-tar safety checks: path
- * traversal, duplicate files, symlink ancestors, special files and
- * setuid/setgid bits are rejected. Skips work when the installed instance
+ * traversal, duplicate files and special files are rejected, escaping
+ * symlinks are rejected while in-root absolute/relative targets and
+ * usrmerge dir symlinks are kept (proot translates them guest-side), and
+ * setuid/setgid bits are stripped. Skips work when the installed instance
  * digest marker matches the embedded archive; failures never touch the
  * previously published instance and leave their staging directory for
  * diagnosis. Pure JDK: gzip + manual ustar/pax parsing, no third-party code
@@ -45,6 +50,17 @@ final class RootfsInstaller {
     interface Progress {
         void onPhase(String phase);
         void onBytes(long extractedBytes);
+    }
+
+    /**
+     * Diagnostic sink, kept free of android imports so host JVM tests can run
+     * this class directly. The app wires it to logcat; default is a no-op.
+     */
+    static volatile java.util.function.Consumer<String> logger = message -> {
+    };
+
+    private static void log(String message) {
+        logger.accept(message);
     }
 
     private RootfsInstaller() {}
@@ -69,7 +85,14 @@ final class RootfsInstaller {
      */
     static void install(Path files, RuntimePayload.Assets assets, Progress progress)
             throws IOException {
-        String expected = readExpectedDigest(assets);
+        String expected;
+        try {
+            expected = readExpectedDigest(assets);
+            log("digest=" + expected);
+        } catch (IOException e) {
+            log("digest read failed: " + e);
+            throw e;
+        }
         if (isInstalled(files, assets)) {
             if (progress != null) progress.onPhase("already-installed");
             return;
@@ -113,13 +136,14 @@ final class RootfsInstaller {
     private static long extractTar(InputStream in, Path root, Progress progress)
             throws IOException {
         Set<String> published = new HashSet<>();
-        Set<String> symlinks = new HashSet<>();
+        Map<String, String> symlinks = new HashMap<>();
         String pendingName = null;
         String pendingLink = null;
         List<String> pendingPax = null;
         byte[] header = new byte[BLOCK];
         long total = 0;
         long reported = 0;
+        int specialModes = 0;
         while (true) {
             int got = readFull(in, header);
             if (got == 0) break;
@@ -167,9 +191,10 @@ final class RootfsInstaller {
             switch (type.isEmpty() ? "0" : type) {
                 case "0": case "7": case "\0": {
                     requireSafe(name, published, symlinks, false);
-                    if ((mode & 07000) != 0) {
-                        throw new IOException("setuid/setgid bit rejected: " + name);
-                    }
+                    // Real Ubuntu trees carry setuid/setgid binaries (su, sudo,
+                    // chage...). They are inert under proot as the app UID and
+                    // applyMode only keeps the low 9 bits, so strip and count.
+                    if ((mode & 07000) != 0) specialModes++;
                     Path dst = root.resolve(name);
                     Files.createDirectories(dst.getParent());
                     try (java.io.FileOutputStream out = new java.io.FileOutputStream(dst.toFile())) {
@@ -199,25 +224,31 @@ final class RootfsInstaller {
                 }
                 case "2": {
                     requireSafe(name, published, symlinks, false);
-                    String target = normalize(linkname);
-                    if (target.startsWith("../") || target.equals("..") || target.startsWith("/")) {
-                        throw new IOException("Escaping symlink rejected: " + name + " -> " + linkname);
-                    }
-                    // 链接祖先检查:目录符号链接会让后续条目落到 root 之外。
-                    Path resolved = root.resolve(target).normalize();
-                    if (!resolved.startsWith(root)) {
+                    // Ubuntu trees legitimately use absolute targets
+                    // (etc/alternatives/*) and dir symlinks (bin -> usr/bin).
+                    // proot translates absolute targets in the guest namespace,
+                    // so keep the original target text; only reject targets that
+                    // lexically resolve outside the rootfs root.
+                    // Relative targets resolve against the link directory.
+                    String dir = name.contains("/")
+                        ? name.substring(0, name.lastIndexOf('/')) : "";
+                    String target = linkname.startsWith("/")
+                        ? linkname.substring(1) : linkname;
+                    String combined = dir.isEmpty() ? target : dir + "/" + target;
+                    if (resolveWithinRoot(normalize(combined), symlinks) == null) {
                         throw new IOException("Escaping symlink rejected: " + name + " -> " + linkname);
                     }
                     Path dst = root.resolve(name);
                     Files.createDirectories(dst.getParent());
-                    Files.createSymbolicLink(dst, java.nio.file.Paths.get(target));
-                    symlinks.add(name);
+                    Files.createSymbolicLink(dst, java.nio.file.Paths.get(linkname));
+                    symlinks.put(name, target);
                     published.add(name);
                     break;
                 }
                 case "1": {
                     requireSafe(name, published, symlinks, false);
-                    String from = normalize(linkname);
+                    String from = normalize(linkname.startsWith("/")
+                        ? linkname.substring(1) : linkname);
                     if (!published.contains(from)) {
                         throw new IOException("Hardlink source missing: " + name + " -> " + linkname);
                     }
@@ -233,11 +264,13 @@ final class RootfsInstaller {
                     throw new IOException("Special tar entry rejected: type=" + type + " " + name);
             }
         }
+        if (specialModes > 0) log("stripped setuid/setgid bits on " + specialModes + " files");
         return total;
     }
 
-    /** Duplicate-file, path-traversal and symlink-ancestor gates. */
-    private static void requireSafe(String name, Set<String> published, Set<String> symlinks,
+    /** Duplicate-file, path-traversal and symlink-escape gates. */
+    private static void requireSafe(String name, Set<String> published,
+                                    Map<String, String> symlinks,
                                     boolean isDir) throws IOException {
         if (name.isEmpty() || name.equals(".") || name.startsWith("/")
                 || name.endsWith("/")) throw new IOException("Invalid tar path: " + name);
@@ -249,14 +282,46 @@ final class RootfsInstaller {
         if (!isDir && published.contains(name)) {
             throw new IOException("Duplicate tar entry: " + name);
         }
-        // 链接祖先检查:任何父级组件若是符号链接则拒绝。
-        Path current = java.nio.file.Paths.get("");
-        for (String part : name.split("/")) {
-            current = current.resolve(part);
-            if (symlinks.contains(current.toString()) && !current.toString().equals(name)) {
-                throw new IOException("Symlink ancestor rejected: " + name);
-            }
+        // 链接祖先解析:Ubuntu 树存在 bin -> usr/bin 等目录符号链接;解析整条
+        // 祖先链,只要最终落点仍在 root 内就放行(逃逸或环路才拒绝)。
+        if (resolveWithinRoot(name, symlinks) == null) {
+            throw new IOException("Escaping symlink ancestor rejected: " + name);
         }
+    }
+
+    /**
+     * Lexically resolve path against the recorded symlink table. Returns the
+     * root-relative resolved path, or null when the chain escapes the root or
+     * exceeds the hop budget.
+     */
+    private static String resolveWithinRoot(String path, Map<String, String> symlinks) {
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<>(
+            java.util.Arrays.asList(path.split("/")));
+        List<String> out = new ArrayList<>();
+        int hops = 0;
+        while (!queue.isEmpty()) {
+            String part = queue.pollFirst();
+            if (part.isEmpty() || part.equals(".")) continue;
+            if (part.equals("..")) {
+                if (out.isEmpty()) return null;
+                out.remove(out.size() - 1);
+                continue;
+            }
+            String current = String.join("/", out) + "/" + part;
+            String target = symlinks.get(current.substring(1));
+            if (target == null) {
+                out.add(part);
+                continue;
+            }
+            if (++hops > 40) return null;
+            if (target.startsWith("/")) {
+                out.clear();
+                target = target.substring(1);
+            }
+            String[] tparts = target.split("/");
+            for (int i = tparts.length - 1; i >= 0; i--) queue.addFirst(tparts[i]);
+        }
+        return String.join("/", out);
     }
 
     private static String normalize(String name) throws IOException {
@@ -293,23 +358,40 @@ final class RootfsInstaller {
     }
 
     private static List<String> readPax(InputStream in, long size) throws IOException {
-        String text = readString(in, size);
+        // pax lengths are in BYTES while values may contain multi-byte UTF-8;
+        // parse on the raw bytes and decode each value separately.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1 << 16];
+        long left = size;
+        while (left > 0) {
+            int chunk = in.read(buffer, 0, (int) Math.min(buffer.length, left));
+            if (chunk < 0) throw new IOException("Truncated pax data");
+            out.write(buffer, 0, chunk);
+            left -= chunk;
+        }
+        skipPadding(in, size);
+        byte[] data = out.toByteArray();
         List<String> records = new ArrayList<>();
         int i = 0;
-        while (i < text.length()) {
-            int sp = text.indexOf(' ', i);
-            if (sp < 0) break;
+        while (i < data.length && data[i] != 0) {
+            int sp = i;
+            while (sp < data.length && data[sp] != (byte) (32 & 0xff)) sp++;
+            if (sp >= data.length) break;
             int len;
             try {
-                len = Integer.parseInt(text.substring(i, sp));
+                len = Integer.parseInt(new String(data, i, sp - i,
+                    java.nio.charset.StandardCharsets.US_ASCII));
             } catch (NumberFormatException e) {
-                throw new IOException("Invalid pax record length");
+                throw new IOException("Invalid pax record length at " + i);
             }
             int end = i + len;
-            if (end > text.length()) throw new IOException("Invalid pax record");
-            String record = text.substring(sp + 1, end);
-            if (record.endsWith("\n")) record = record.substring(0, record.length() - 1);
-            records.add(record);
+            if (len <= 0 || end > data.length) {
+                throw new IOException("Invalid pax record len=" + len + " at=" + i);
+            }
+            int stop = end;
+            if (stop > sp + 1 && data[stop - 1] == (byte) (10 & 0xff)) stop--;
+            records.add(new String(data, sp + 1, stop - (sp + 1),
+                java.nio.charset.StandardCharsets.UTF_8));
             i = end;
         }
         return records;

@@ -134,6 +134,7 @@ public final class ServeManager {
         }
         final Context app = ctx.getApplicationContext();
         new Thread(() -> {
+            android.util.Log.i("andcode", "ensureStarted: starter thread running");
             // 初始探测也在后台做(ping 是网络调用,禁止主线程)
             if (ping()) {
                 synchronized (ServeManager.class) { sStarting = false; }
@@ -144,6 +145,7 @@ public final class ServeManager {
             try {
                 err = spawn(app);
             } catch (Exception e) {
+                android.util.Log.e("ServeManager", "spawn failed", e);
                 err = "spawn failed: " + e;
             }
             final String failure = err;
@@ -176,6 +178,8 @@ public final class ServeManager {
 
         // The opt-in PRoot backend uses the guest toolchain (DESIGN sections 4.4/4.8).
         // Missing payloads or instances fail explicitly; never fall back to direct execution.
+        android.util.Log.i("andcode", "spawn: serveProotBackend="
+            + AppSettings.serveProotBackend(app));
         ProcessBuilder pb = AppSettings.serveProotBackend(app)
             ? prootServe(app, files, runtime)
             : directServe(app, files, runtime, demo, tmp, home);
@@ -281,14 +285,28 @@ public final class ServeManager {
         File prootLoader = new File(runtime, "usr/lib/proot/loader");
         if (!prootBin.isFile() || !prootLoader.isFile()) throw new IOException("PRoot 载荷未部署");
         File rootfs = new File(files, "proot-rootfs");
+        android.util.Log.i("andcode", "prootServe: rootfs gate=" + rootfs);
         if (!new File(rootfs, "usr/bin/bash").isFile()) {
             // 单 APK(DESIGN v0.4.55):实例缺失时先从内置 canonical rootfs 归档
             // 提取(本线程即 oc2-serve-starter 后台线程,主页处于"启动中"状态);
             // 无内置载荷的开发构建保留原报错。
             try {
+                android.util.Log.i("andcode", "prootServe: auto-install starting");
+                RootfsInstaller.logger = message ->
+                    android.util.Log.i("andcode", "rootfs: " + message);
                 RootfsInstaller.install(files.toPath(),
-                    name -> app.getAssets().open("andcode-rootfs/" + name), null);
+                    app.getAssets()::open,
+                    new RootfsInstaller.Progress() {
+                        @Override public void onPhase(String phase) {
+                            android.util.Log.i("andcode", "rootfs install phase: " + phase);
+                        }
+                        @Override public void onBytes(long extracted) {
+                            android.util.Log.i("andcode", "rootfs install bytes: " + extracted);
+                        }
+                    });
+                android.util.Log.i("andcode", "prootServe: auto-install done");
             } catch (IOException e) {
+                android.util.Log.e("andcode", "prootServe: auto-install failed", e);
                 throw new IOException("Ubuntu PRoot 实例未安装且内置归档提取失败: " + e.getMessage(), e);
             }
             if (!new File(rootfs, "usr/bin/bash").isFile()) {
