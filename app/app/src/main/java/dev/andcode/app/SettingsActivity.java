@@ -106,8 +106,9 @@ public class SettingsActivity extends UtilityActivity {
                 }).setNegativeButton("取消", null).show();
         }), new LinearLayout.LayoutParams(-1, -2));
         divider(backend);
-        toggle(backend, "Ubuntu 显式使用设备代理", "仅新 Ubuntu 会话使用 127.0.0.1:7890；默认关闭，"
-            + "需设备自行提供代理，不关闭 TLS 校验。", "ubuntu-loopback-proxy", AppSettings.ubuntuProxy(this));
+        toggle(backend, "Ubuntu 显式使用设备代理", "仅新 Ubuntu 会话使用下方网络信任区配置的"
+            + "代理地址（协议与地址由该地址决定）；默认关闭，需设备自行提供代理，"
+            + "地址未配置时不注入。不关闭 TLS 校验。", "ubuntu-loopback-proxy", AppSettings.ubuntuProxy(this));
 
         section("OpenCode 网络信任", "可选 · 默认关闭 · 下次后端启动生效");
         LinearLayout trust = card(body, false);
@@ -147,8 +148,40 @@ public class SettingsActivity extends UtilityActivity {
             caMessage("已清除选择；旧副本保留供运行中服务读取。重启后端后不再追加信任。");
         }), new LinearLayout.LayoutParams(-1, -2));
         divider(trust);
-        toggle(trust, "后端使用设备回环代理", "仅新启动的 OpenCode 后端向 http://127.0.0.1:7890 注入"
-            + "代理环境变量；默认关闭，需设备自行提供本地代理（如 VPN 客户端混合端口）；"
+        trust.addView(label("代理地址", 16, true, false));
+        gap(trust, 6);
+        TextView proxyValue = label(AppSettings.proxyUrl(this).isEmpty()
+            ? "未配置（开启代理开关前必须先填写）" : AppSettings.proxyUrl(this), 13, false, true);
+        proxyValue.setTypeface(Typeface.MONOSPACE);
+        trust.addView(proxyValue);
+        gap(trust, 10);
+        trust.addView(action("设置代理地址（含协议）", false, () -> {
+            android.widget.EditText input = new android.widget.EditText(this);
+            input.setSingleLine(true);
+            input.setText(AppSettings.proxyUrl(this));
+            input.setHint("http://127.0.0.1:7890 或 socks5://127.0.0.1:1080");
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("代理地址（作用于上方两个代理开关）")
+                .setView(input)
+                .setPositiveButton("保存", (d, w) -> {
+                    String v = input.getText().toString().trim();
+                    if (!v.isEmpty() && !v.contains("://")) {
+                        android.widget.Toast.makeText(this, "地址需含协议前缀（如 http:// 或 socks5://）",
+                            android.widget.Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    AppSettings.prefs(this).edit().putString("proxy-url", v).apply();
+                    proxyValue.setText(v.isEmpty() ? "未配置（开启代理开关前必须先填写）" : v);
+                    android.widget.Toast.makeText(this, "已保存；对重启后的服务与新终端生效。",
+                        android.widget.Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("取消", null).show();
+        }), new LinearLayout.LayoutParams(-1, -2));
+        gap(trust, 8);
+        divider(trust);
+        toggle(trust, "后端使用设备回环代理", "仅新启动的 OpenCode 后端向下方配置的代理地址注入"
+            + "代理环境变量（协议与地址均由代理地址项决定，如 http:// 或 socks5://）；默认关闭，"
+            + "需设备自行提供本地代理；地址未配置时即使开启也不注入。"
             + "不关闭 TLS 校验，证书信任仍由上方自定义 CA 控制。更改后请在主页手动停止并重新启动服务。", "serve-loopback-proxy",
             AppSettings.serveLoopbackProxy(this));
         divider(trust);

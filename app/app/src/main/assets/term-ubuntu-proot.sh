@@ -13,7 +13,7 @@ proxy=''
 wait_install=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        loopback-proxy) proxy=http://127.0.0.1:7890 ;;
+        proxy=*) proxy=${1#proxy=} ;;
         wait-install) wait_install=1 ;;
     esac
     shift

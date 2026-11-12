@@ -260,11 +260,16 @@ public final class ServeManager {
         // local mixed-port proxy; TLS verification is never disabled and CA
         // trust stays with the CustomCa NODE_EXTRA_CA_CERTS mechanism below.
         if (AppSettings.serveLoopbackProxy(app)) {
-            String proxy = "http://127.0.0.1:7890";
-            env.put("http_proxy", proxy);
-            env.put("https_proxy", proxy);
-            env.put("HTTP_PROXY", proxy);
-            env.put("HTTPS_PROXY", proxy);
+            // 代理地址与协议由用户配置;未配置时不注入任何假设值。
+            String proxy = AppSettings.proxyUrl(app).trim();
+            if (!proxy.isEmpty()) {
+                env.put("http_proxy", proxy);
+                env.put("https_proxy", proxy);
+                env.put("HTTP_PROXY", proxy);
+                env.put("HTTPS_PROXY", proxy);
+                env.put("ALL_PROXY", proxy);
+                env.put("all_proxy", proxy);
+            }
         }
         CustomCa.apply(env, files.toPath(), AppSettings.customCaEnabled(app), AppSettings.customCaDigest(app));
         return pb;

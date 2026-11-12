@@ -24,4 +24,12 @@
     <string name="terminal_card_desc">交互式 shell,会话保持;输入 opencode 启动 AI 代理</string>
     <string name="serve_card_title">opencode 服务</string>
     <string name="copied">已复制</string>
+
+    <string name="settings_proxy_title">代理地址</string>
+    <string name="settings_proxy_unset">未配置（开启代理开关前必须先填写）</string>
+    <string name="settings_proxy_action">设置代理地址（含协议）</string>
+    <string name="settings_proxy_hint">http://127.0.0.1:7890 或 socks5://127.0.0.1:1080</string>
+    <string name="settings_proxy_dialog_title">代理地址（作用于上方两个代理开关）</string>
+    <string name="settings_proxy_saved">已保存；对重启后的服务与新终端生效。</string>
+    <string name="settings_proxy_need_scheme">地址需含协议前缀（如 http:// 或 socks5://）</string>
 </resources>

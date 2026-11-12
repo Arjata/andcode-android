@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">andcode</string>
+    <string name="app_subtitle">opencode · AI coding agent</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_terminal">Terminal</string>
+    <string name="nav_web">Web UI</string>
+    <string name="nav_open_menu">Open menu</string>
+
+    <string name="state_running">Running</string>
+    <string name="state_starting">Starting…</string>
+    <string name="state_stopped">Not running</string>
+    <string name="address_hint">Service address; open it in a browser to reach opencode serve</string>
+    <string name="detail_prefix">Detail: </string>
+
+    <string name="action_start">Start service</string>
+    <string name="action_stop">Stop service</string>
+    <string name="action_web">Web UI</string>
+    <string name="action_terminal">Terminal</string>
+    <string name="web_card_title">opencode Web UI (OpenCode 2.0)</string>
+    <string name="web_card_desc">Hosted by the local serve, rendered in a WebView, auto-pairing</string>
+    <string name="terminal_card_title">Terminal (Termux style)</string>
+    <string name="terminal_card_desc">Interactive shell with session persistence; type opencode to start the AI agent</string>
+    <string name="serve_card_title">opencode service</string>
+    <string name="copied">Copied</string>
+
+    <string name="settings_proxy_title">Proxy address</string>
+    <string name="settings_proxy_unset">Not configured (fill this in before enabling the proxy switches)</string>
+    <string name="settings_proxy_action">Set proxy address (including scheme)</string>
+    <string name="settings_proxy_hint">http://127.0.0.1:7890 or socks5://127.0.0.1:1080</string>
+    <string name="settings_proxy_dialog_title">Proxy address (applies to both proxy switches above)</string>
+    <string name="settings_proxy_saved">Saved; applies to a restarted service and new terminals.</string>
+    <string name="settings_proxy_need_scheme">The address must include a scheme prefix (e.g. http:// or socks5://)</string>
+</resources>

@@ -286,7 +286,10 @@ public class TerminalActivity extends AppCompatActivity {
             // 归档的开发构建仍由启动器显式报错,不静默换环境。
             List<String> ubuntu = new ArrayList<>(List.of("/system/bin/sh",
                 new File(files, "term-ubuntu-proot").getAbsolutePath()));
-            if (AppSettings.ubuntuProxy(this)) ubuntu.add("loopback-proxy");
+            if (AppSettings.ubuntuProxy(this)) {
+                String proxyUrl = AppSettings.proxyUrl(this).trim();
+                if (!proxyUrl.isEmpty()) ubuntu.add("proxy=" + proxyUrl);
+            }
             if (!new File(files, "proot-rootfs/usr/bin/bash").isFile()) {
                 boolean embedded = false;
                 try {

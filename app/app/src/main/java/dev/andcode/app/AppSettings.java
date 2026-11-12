@@ -48,6 +48,11 @@ public final class AppSettings {
         return prefs(context).getBoolean("serve-loopback-proxy", false);
     }
 
+    /** 用户配置的代理 URL(含协议,如 http:// 或 socks5://);空 = 未配置,不注入。 */
+    static String proxyUrl(Context context) {
+        return prefs(context).getString("proxy-url", "");
+    }
+
     /** Opt-in PRoot backend: run the managed OpenCode serve inside the Ubuntu guest (default off). */
     static boolean serveProotBackend(Context context) {
         return prefs(context).getBoolean("serve-proot-backend", false);
