@@ -621,7 +621,10 @@ touched by this path. The terminal backend now defaults to this Ubuntu
 rootfs automatically (a missing instance auto-extracts in the background
 with an in-session wait), and device storage is bound at /mnt/sdcard in
 both the serve guest and the terminal session — Download verified
-read-write from the guest. Extraction diagnostics are surfaced via logcat
+read-write from the guest. The proxy address and scheme are configured by
+the user (no default is assumed); a socks5 URL set on the device was
+verified to flow through the guest environment verbatim.
+Extraction diagnostics are surfaced via logcat
 (tag andcode) because the failure reason otherwise only flashes in the UI.
 
 ## 必须通过的实机门禁
