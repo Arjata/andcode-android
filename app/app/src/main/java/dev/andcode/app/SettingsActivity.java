@@ -83,9 +83,20 @@ public class SettingsActivity extends UtilityActivity {
                 .setTitle("新终端环境")
                 .setSingleChoiceItems(choices, AppSettings.ubuntuTerminal(this) ? 1 : 0, (dialog, which) -> {
                     if (which == 1 && !AppSettings.ubuntuAvailable(this)) {
-                        android.widget.Toast.makeText(this, "Ubuntu 开发实例未安装；未更改设置。",
+                        // 单 APK:实例缺失但内置归档在位时允许选择,首次进入终端自动提取。
+                        boolean embedded = true;
+                        try {
+                            getAssets().open("andcode-rootfs/andcode-rootfs-arm64.tgz.sha256").close();
+                        } catch (java.io.IOException error) {
+                            embedded = false;
+                        }
+                        if (!embedded) {
+                            android.widget.Toast.makeText(this, "Ubuntu 开发实例未安装且无内置归档；未更改设置。",
+                                android.widget.Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        android.widget.Toast.makeText(this, "首次进入终端将自动提取 Ubuntu 实例（约 1-2 分钟）。",
                             android.widget.Toast.LENGTH_LONG).show();
-                        return;
                     }
                     AppSettings.prefs(this).edit().putString("terminal-backend", which == 1 ? "ubuntu-proot" : "bash").apply();
                     selectedBackend.setText(which == 1 ? "Ubuntu PRoot · 开发实例" : "轻量 Bash · 默认");

@@ -325,6 +325,12 @@ public final class ServeManager {
             "-b", exe + ":/mnt/andcode-exe",
             "-b", farm + ":/mnt/andcode-farm",
             "-b", new File(files, "home").getAbsolutePath() + ":/root"));
+        // 设备存储:FUSE 视图受平台权限约束(Download/媒体已实测可读写)。
+        File sdcard = new File("/storage/emulated/0");
+        if (sdcard.isDirectory()) {
+            cmd.add("-b");
+            cmd.add(sdcard.getAbsolutePath() + ":/mnt/sdcard");
+        }
         List<String> guest = new ArrayList<>(Arrays.asList(
             "/usr/bin/env", "-i",
             "HOME=/root", "USER=root", "LOGNAME=root", "SHELL=/bin/bash",

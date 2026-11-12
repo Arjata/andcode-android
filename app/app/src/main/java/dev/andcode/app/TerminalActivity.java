@@ -282,11 +282,33 @@ public class TerminalActivity extends AppCompatActivity {
         if (projectName != null && !projectName.isEmpty())
             env.add("ANDCODE_UBUNTU_PROJECT_NAME=" + projectName);
         if (AppSettings.ubuntuTerminal(this)) {
-            // Let the launcher explicitly fail on a missing instance; never silently
-            // run a command in a different environment than the user selected.
+            // 单 APK:实例缺失时后台提取,会话内等待 digest 标记后进入;无内置
+            // 归档的开发构建仍由启动器显式报错,不静默换环境。
             List<String> ubuntu = new ArrayList<>(List.of("/system/bin/sh",
                 new File(files, "term-ubuntu-proot").getAbsolutePath()));
             if (AppSettings.ubuntuProxy(this)) ubuntu.add("loopback-proxy");
+            if (!new File(files, "proot-rootfs/usr/bin/bash").isFile()) {
+                boolean embedded = false;
+                try {
+                    getAssets().open("andcode-rootfs/andcode-rootfs-arm64.tgz.sha256").close();
+                    embedded = true;
+                } catch (java.io.IOException ignored) {
+                }
+                if (embedded) {
+                    ubuntu.add("wait-install");
+                    RootfsInstaller.logger = m ->
+                        android.util.Log.i("andcode", "rootfs: " + m);
+                    new Thread(() -> {
+                        try {
+                            RootfsInstaller.install(files.toPath(),
+                                getAssets()::open, null);
+                        } catch (Exception e) {
+                            android.util.Log.e("andcode",
+                                "terminal rootfs install failed", e);
+                        }
+                    }, "terminal-rootfs-install").start();
+                }
+            }
             command = ubuntu.toArray(new String[0]);
             selected = null; // Host cwd is not the guest cwd; launcher owns the binding.
         }

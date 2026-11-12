@@ -32,8 +32,11 @@ public final class AppSettings {
         return prefs(context).getString("custom-ca-sha256", "");
     }
 
+    /** 终端后端:未显式选择时,canonical rootfs 就绪即自动进入 Ubuntu(单 APK 默认)。 */
     static boolean ubuntuTerminal(Context context) {
-        return "ubuntu-proot".equals(prefs(context).getString("terminal-backend", "bash"));
+        String v = prefs(context).getString("terminal-backend", null);
+        if (v != null) return "ubuntu-proot".equals(v);
+        return ubuntuAvailable(context);
     }
 
     static boolean ubuntuProxy(Context context) {
