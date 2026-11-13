@@ -17,6 +17,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.GravityCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.termux.terminal.TerminalEmulator;
@@ -61,6 +64,11 @@ public class TerminalActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Android 15/16 edge-to-edge no longer guarantees that adjustResize
+        // shrinks the content view. Apply IME insets to the terminal container
+        // so the extra-key rows remain above the keyboard on every API level.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_terminal);
         mTerminalView = findViewById(R.id.terminal_view);
@@ -82,13 +90,15 @@ public class TerminalActivity extends AppCompatActivity {
 
         // 悬浮抽屉球(与 WebActivity 共用停靠位置)
         FrameLayout content = findViewById(R.id.termContent);
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
-            androidx.core.graphics.Insets bars = insets.getInsets(
-                androidx.core.view.WindowInsetsCompat.Type.systemBars()
-                    | androidx.core.view.WindowInsetsCompat.Type.displayCutout());
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+        ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
+            androidx.core.graphics.Insets system = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            androidx.core.graphics.Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+            int bottom = Math.max(system.bottom, ime.bottom);
+            view.setPadding(system.left, system.top, system.right, bottom);
             return insets;
         });
+        ViewCompat.requestApplyInsets(content);
         mExtraKeys = new TerminalExtraKeys(findViewById(R.id.terminalExtraKeys), mTerminalView);
         content.addView(new FloatingMenuBall(this, content, "menu_ball",
             () -> mDrawer.openDrawer(GravityCompat.START)));

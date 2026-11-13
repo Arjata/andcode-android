@@ -306,21 +306,24 @@ public class SettingsActivity extends UtilityActivity {
     }
 
     private void toggle(LinearLayout parent, String title, String detail, String key, boolean checked) {
-        LinearLayout row = row();
-        LinearLayout copy = column();
-        copy.addView(label(title, 15, true, false));
-        gap(copy, 5);
-        copy.addView(label(detail, 12, false, true));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
-        params.setMarginEnd(dp(12));
-        row.addView(copy, params);
+        LinearLayout option = column();
+        LinearLayout header = row();
+        TextView heading = label(title, 15, true, false);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(0, -2, 1);
+        headingParams.setMarginEnd(dp(12));
+        header.addView(heading, headingParams);
         SwitchMaterial view = new SwitchMaterial(this);
         view.setContentDescription(title);
         view.setChecked(checked);
         view.setMinimumHeight(dp(48));
-        row.addView(view);
-        parent.addView(row);
-        row.setOnClickListener(v -> view.setChecked(!view.isChecked()));
+        header.addView(view, new LinearLayout.LayoutParams(-2, -2));
+        option.addView(header, new LinearLayout.LayoutParams(-1, -2));
+        TextView description = label(detail, 12, false, true);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
+        descriptionParams.topMargin = dp(4);
+        option.addView(description, descriptionParams);
+        parent.addView(option, new LinearLayout.LayoutParams(-1, -2));
+        option.setOnClickListener(v -> view.setChecked(!view.isChecked()));
         view.setOnCheckedChangeListener((button, value) ->
             AppSettings.prefs(this).edit().putBoolean(key, value).apply());
     }

@@ -99,13 +99,15 @@ public abstract class UtilityActivity extends AppCompatActivity {
         return view;
     }
     protected TextView section(String title, String detail) {
-        LinearLayout row = row();
-        row.setPadding(dp(4), dp(8), dp(4), dp(12));
+        LinearLayout group = column();
+        group.setPadding(dp(4), dp(8), dp(4), dp(12));
         TextView heading = label(title, 14, true, false);
-        row.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        group.addView(heading, new LinearLayout.LayoutParams(-1, -2));
         TextView extra = label(detail, 12, false, true);
-        row.addView(extra);
-        body.addView(row);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
+        detailParams.topMargin = dp(4);
+        group.addView(extra, detailParams);
+        body.addView(group);
         return extra;
     }
     protected LinearLayout card(LinearLayout parent, boolean featured) {

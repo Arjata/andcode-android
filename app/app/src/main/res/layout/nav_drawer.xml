@@ -67,7 +67,7 @@
         android:drawableStart="@drawable/ic_nav_projects"
         android:drawablePadding="14dp"
         android:drawableTint="?attr/colorOnSurfaceVariant"
-        android:text="项目 · 导入 / 导出" />
+        android:text="@string/nav_projects" />
 
     <TextView
         android:id="@+id/navSettings"
@@ -75,7 +75,7 @@
         android:drawableStart="@drawable/ic_nav_settings"
         android:drawablePadding="14dp"
         android:drawableTint="?attr/colorOnSurfaceVariant"
-        android:text="设置" />
+        android:text="@string/nav_settings" />
 
     <Space
         android:layout_width="match_parent"
