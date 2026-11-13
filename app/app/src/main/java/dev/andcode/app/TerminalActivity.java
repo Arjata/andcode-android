@@ -219,12 +219,12 @@ public class TerminalActivity extends AppCompatActivity {
         StringBuilder b = new StringBuilder();
         b.append("\n");
         b.append("        _                 _                       \n");
-        b.append("  __ _ | |__   __ _ _ __   __| |  ___  _ __   __ _ \n");
-        b.append(" / _` | '_ \\ / _` | '_ \\ / _` | / _ \\ | '__| / _` |\n");
-        b.append("| (_| | | | | (_| | | | | (_| || (_) | | | | (_| |\n");
-        b.append(" \\__,_||_| |_|\\__,_|_| |_|\\__,_| \\___/|_| |_|\\__,_|\n");
-        b.append("\n");
-        b.append(" opencode · AI coding agent on Android\n");
+        b.append("                    _            _       \n");
+        b.append("  __ _  _ __    __| |  ___  / _ \\  __| | / _ \\\n");
+        b.append(" / _` || '_ \\  / _` | / __|| (_) | / _` ||  __/\n");
+        b.append("| (_| || | | || (_| || (__ | (_) || (_| | \\___|\n");
+        b.append(" \\__,_||_| |_|| \\__,_| \\___/ \\___/ \\__,_| \\___|\n");
+        b.append(" andcode · opencode AI coding agent on Android\n");
         b.append("\n");
         b.append(" Android ").append(android.os.Build.VERSION.RELEASE)
           .append(" (SDK ").append(android.os.Build.VERSION.SDK_INT)
