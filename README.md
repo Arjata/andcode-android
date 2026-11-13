@@ -1,150 +1,240 @@
-[![CI](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml/badge.svg)](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml)
-
 # andcode
 
-Port [opencode](https://github.com/sst/opencode) (a terminal AI coding agent) to Android arm64,
-with a **compatible Linux arm64 build environment** (baseline: Ubuntu 24.04 arm64 / glibc 2.39;
-native programs built in this environment run directly on standard Linux arm64 devices with glibc ≥ 2.39).
+[![CI](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml/badge.svg)](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml)
 
-Target devices:
+**Run OpenCode and a Linux arm64 development environment on Android.**
 
-- Bootloader locked (no root) → adb-pushed bundle (Tier A) or custom APK (Tier P), including a loader/glibc sysroot
-- Bootloader unlocked + root → real chroot / Magisk module
+andcode packages [OpenCode](https://github.com/anomalyco/opencode), an embedded
+terminal, and an Ubuntu 24.04 arm64 toolchain for Android devices. The APK
+provides both the OpenCode Web interface and a terminal TUI, with a bundled
+Ubuntu root filesystem for shell commands, package installation, and native
+compilation. It requires no Termux App, proot-distro, or other host application.
 
-Platform baseline: **Android 12+ (minSdk 31)**, APK `compileSdk/targetSdk 37.2`.
-See **[docs/DESIGN.md](docs/DESIGN.md)** for architecture, build baseline specifications, the three self-contained
-delivery forms, phased plans, and risk tables; **[docs/REUSE.md](docs/REUSE.md)** for research on reusable open-source projects;
-and **[docs/NAMING.md](docs/NAMING.md)** for executable tool entry-point naming conventions.
-Current acceptance status is tracked in DESIGN v0.4.56.
+The project also maintains a Linux arm64 compatibility baseline and two
+alternative delivery forms: an adb-deployed bundle and Magisk integration.
 
-**Design principle: self-contained** — no dependency on third-party host apps beyond the Android system (no Termux).
-Delivery forms are a Magisk module (root) / adb-pushed bundle (locked) / custom minimal APK (locked).
+> **Development status — 2026-11-14:** the single-APK installation flow,
+> Web/TUI, and opt-in Ubuntu managed backend have passed scoped tests on device
+> `8c8da214`. Other devices and locked delivery remain **pending P0/P3 device
+> verification**. CI success and device test results do not establish formal
+> redistribution approval; dependency licensing and source-delivery review
+> remain open. See [current acceptance status](docs/DESIGN.md#6-historical-plan-and-current-acceptance-status).
 
-Tier P currently provides an interactive Bash terminal (enter `opencode` manually; sessions remain in the same process) and a Web GUI.
-The terminal shows a prompt on first entry, with two extra-key rows below (ESC/TAB/CTRL/ALT/arrows/page navigation, etc.).
-Tap CTRL/ALT to latch and tap again to release; the IME key toggles the soft keyboard. If Bash is not deployed, an explicit message announces fallback to system sh.
-Web PTY creation and command echo have been verified in the app domain on an older device; for preinstalled executable copies and socket redirection, see
-[DESIGN v0.4.54 §4.4](docs/DESIGN.md#44-tier-p--custom-minimal-apk-user-facing-form-for-locked-devices).
-The Web terminal supports character-by-character input, backspace, and enter with Android LatinIME; other input methods remain unverified.
-Home in the Web/terminal drawer explicitly returns to the app dashboard; leaving Web cancels delayed page tasks and releases the view.
-The drawer adds **Projects · Import / Export** and **Settings**:
-- Optional custom CA (default off): select a single PEM, verify its file SHA-256 obtained through an independent trusted channel,
-  then explicitly enable it. Trust is added only to the next OpenCode Web backend launch and child processes inheriting its environment,
-  preserving default root certificates. It does not change the system/WebView/standalone terminal/Ubuntu or automatically download or bundle site CAs.
-  Importing/disabling does not interrupt an existing service; manually stop and restart the backend to apply changes. Device scope and remaining issues follow below.
-  Regular CI `42609380415` and source-experiment CI `42609429688` for commit `c3a7574` succeeded:
-  all 26 CA security checks on arm64 passed, as did the pinned Bun checks for rejection when disabled/success when enabled/wrong-hostname rejection/
-  rejection after disabling again. This CI does not replace Android settings import or provider end-to-end verification.
-  2026-11-09 device update: same-signature overwrite installation preserved data; SAF import/wrong-digest rejection/disabled state after import/
-  backend start-stop environment checks all passed. Under real `untrusted_app`, Seccomp=2, and SELinux Enforcing,
-  an explicit loopback proxy + CA enabled the default model with streaming, interruption, and resumption; disabling the CA rejected the certificate.
-  The provider returned HTTP 400 after the first tool-result submission. On 2026-11-10, on the same device with explicit proxy+CA, a fresh session
-  completed two consecutive full tool round trips; the old acceptance session still returned 400. The history-replay root cause remains unresolved; no sessions were deleted
-  or protocol changes made. Default direct networking previously still had DNS `EAI_AGAIN` and was not retested in this round; no fix to default networking is claimed.
-  The earlier diagnostic backend was stopped with CA trust off; see the newer
-  managed-backend verification below and DESIGN for the exact acceptance scope.
-- Managed-backend loopback proxy (default off): explicitly opt into
-  `http://127.0.0.1:7890` in network-trust settings, then manually stop and
-  restart the service. The device must provide that proxy separately; direct
-  networking does not require a third-party host app. TLS verification stays
-  enabled and private CA trust is a separate opt-in. On 2026-11-11 device
-  `8c8da214`, SAF CA import + both opt-ins + restart produced the expected TUI
-  reply from `arjata/gpt-oss-120b`. A subsequent shell command succeeded, but
-  its tool-result continuation received provider HTTP 400 (`openai_error`);
-  full tool round trips remain unresolved. This device retains both opt-ins
-  enabled; other devices/networks remain pending P0/P3 verification.
-  PC debugging uses `adb -s 8c8da214 forward tcp:14096 tcp:4096`; the Web GUI
-  is served at `/` and authenticated JSON endpoints at `/api/*` use HTTP Basic
-  with the managed password. Never publish that password or expose the port
-  to the LAN. See [DESIGN §4.4](docs/DESIGN.md#44-tier-p--custom-minimal-apk-user-facing-form-for-locked-devices).
-- Material 3 grouped-card layout; the project card overflow menu offers copy/export, and settings provide an immediate font-size preview.
-- Managed Ubuntu PRoot backend (experimental, default off): enable
-  **Run the OpenCode service in Ubuntu PRoot (experimental)**, then manually stop and restart the
-  service. The installed PRoot instance and complete APK runtime payload are
-  required; missing prerequisites fail without direct fallback. Web/TUI keep
-  `127.0.0.1:4096`, while tools and Web PTY run in Ubuntu under the app UID.
-  App home is shared as guest `/root`; terminal-backend/project selection remains
-  separate. Proxy and custom CA are independent opt-ins, with TLS verification on.
-  On device `8c8da214`, Web/API, a plain-text model response, Ubuntu shell commands,
-  Web PTY, home writeback and manual stop/restart passed. Tool commands exited 0,
-  but provider continuation still returned HTTP 400/503; full model/tool round trips
-  remain unresolved. Overwrite-install retest of the reviewed build preserved the
-  opt-ins and reproduced the same boundary set (plain reply OK, tool executed,
-  continuation 400/503 in 4/4 fresh sessions), confirming the provider error is
-  not introduced by the review changes. Cross-model isolation attributes the
-  defect to the gpt-oss-120b tool path: a full agentic tool round trip (shell
-  executed, result resent, reply received) passed on `arjata/glm-5.2` through the
-  same PRoot backend — use a model with a working tool path for agentic sessions.
-  A five-step toolchain chain (write C file, gcc compile, run, readelf-verify
-  AArch64) then passed end to end on glm-5.2; the guest also exposes
-  python3/make/git 2.43.0, and other gateway models are currently unrouted.
-  Externally built arm64 executables (adb-staged musl-static busybox, the APK
-  pty launcher, glibc oc2 via the guest loader) all ran exit 0, including
-  model-dispatched execution. Single-APK first-launch flow validated on
-  device: a fresh install auto-extracts the embedded 193 MB canonical
-  rootfs (digest marker published, PRoot serve up, guest gcc/git/mawk
-  sanity all green). A model-driven multi-library dynamic build
-  (gcc -lm -lpthread -ldl -lz with runtime dlopen and zlib) also passed, with
-  the model recovering from a missing dev header via apt on its own.
-  Other devices and locked delivery remain pending P0/P3.
-  See [Ubuntu acceptance](docs/UBUNTU.md#managed-opencode-serve-in-ubuntu-proot) and
-  [DESIGN §4.4](docs/DESIGN.md#44-tier-p--custom-minimal-apk-user-facing-form-for-locked-devices).
-- Project/settings navigation includes icons; the standalone terminal supports two-finger spread/pinch font resizing (10–28 sp),
-  automatically saved and synchronized with settings without recreating the terminal session.
-- Use the system file picker to import ZIP/folder copies into the app-private workspace or export a project ZIP;
-  each operation is limited to 512 MiB, 20000 entries, and 64 levels. Same-named projects are not overwritten, and export does not follow symbolic links.
-- Copy a project path to open it in Web; selecting a project sets the starting directory for new terminals, without automatically running cd in existing sessions.
-- Configure terminal font size, terminal/Web keep-screen-on behavior, and .git export (default off). Other hidden files are still exported;
-  check for sensitive data such as .env. Imports do not automatically synchronize with the source folder, and uninstalling the app deletes private projects.
-ZIP import/export content round trips, folder import, and project terminal directories have been verified on the older device; other providers and large projects
-remain pending P3 device verification. ZIP data-component tests run independently in CI's `app-data-tests`.
-The single-APK canonical Ubuntu rootfs and jniLibs/CI pipeline are integrated. Locked-delivery and cross-device verification remain pending P0/P3.
+## What you can do
 
-An isolated native-source experiment rebuilt OpenTUI, watcher, fff, and
-bun-pty from pinned sources in Linux arm64 CI, passing preinstalled-library mapping, ordinary/persistent PTY, TUI, and no-runtime-ELF-extraction gates; it is **not yet
-integrated into the production APK**. FFmpeg directory links caused gaps in the initial artifact's full-file inventory; this was fixed,
-and the subsequent CI `42628073140` artifact's 29345-entry file/digest inventories matched completely and passed entry-by-entry verification. Licensing/relinking materials, Bun/JSC
-obligations, and Android admission remain unapproved; see the [native-experiment review record](docs/REUSE.md#21-core-delivery-components-permissive-licenses-bundled).
-Subsequent per-file preliminary review found that FFmpeg CRC assembly objects carrying GPL notices were still
-linked despite GPL being disabled in configuration. Existing experimental artifacts remain prohibited from production distribution. The exclusion recipe and actual source-dependency gate have now passed
-source CI `42646838972`; the new artifact's 29789-entry inventory, 446 link inputs, CRC object exclusion, and
-2304 generic CRC comparison sets have been reviewed. Other per-file notices, relinking, Bun/JSC, and Android
-admission remain unapproved; configuration strings or successful Linux CI cannot substitute for license review.
+- Use OpenCode through its Web UI or run `opencode` in the embedded terminal.
+- Work in Ubuntu 24.04 arm64 with Bash, Git, Python 3, GCC/G++, Make, and apt.
+  The rootfs is included in the APK and extracted when first needed.
+- Optionally run the managed OpenCode service inside Ubuntu PRoot so model
+  tools and Web terminals use the guest development environment.
+- Import a project ZIP or folder through Android's file picker, select its
+  directory for new terminal sessions, and export a project ZIP.
+- Use terminal extra keys, adjustable font size, pinch resizing, and
+  keep-screen-on settings.
+- Configure an explicit proxy and an optional custom CA when your provider
+  or network requires them. Both require explicit opt-in; TLS verification
+  remains enabled.
 
-The Ubuntu development environment includes an Ubuntu 24.04 arm64 development image and an opt-in, default-off managed PRoot serve backend.
-It also contains a separate root chroot prototype for ordinary-user sessions and dedicated CI. PRoot in the older device's real app domain has passed explicit-proxy
-HTTPS/apt, newly installed/compiled ELF, PTY/child-process, and glibc-update checks. The terminal provides
-the `andcode-ubuntu-proot [loopback-proxy]` development entry point, returning to lightweight Bash on exit.
-Settings can select the Ubuntu development terminal for new sessions; the canonical Ubuntu rootfs is now the terminal default when ready,
-with lightweight Bash as the fallback, and the proxy toggle defaults to off.
-A selected private project can map to `/workspace/<project-name>`; HTTPS/apt/Git without an explicit proxy passed
-on the older device with TCP DNS (the device's existing VPN remains enabled).
-The managed PRoot backend is integrated with OpenCode/Web PTY on the validated device, while other devices, locked-delivery forms, abnormal-stop recovery, and chroot-specific paths remain pending P0/P3 verification. Read-only diagnostics confirmed that the device's restricted
-network rules block UID 60000; no device policy was changed and no APK UID was borrowed to bypass this.
-See [docs/UBUNTU.md](docs/UBUNTU.md) for status, trusted image installation, and the acceptance checklist.
+The current APK uses pinned OpenCode **2.2.6** and a pre-staged PTY daemon.
+The older OpenCode payload retained for bundle diagnostics is excluded from
+the APK.
 
-An isolated native-arm64 `mmdebstrap` CI experiment now evaluates tool-built
-Ubuntu rootfs archives and ext4 images from signed repositories. Docker remains
-the default pending CI review; existing device instances are not replaced.
-See [the rootfs tool experiment](docs/UBUNTU.md#rootfs-tool-experiment).
-The isolated candidate also converts that canonical tree to a PRoot archive
-without changing ELF bytes (trusted CI and independent archive review passed).
-A new read-only original-image/tree comparison gate awaits Linux CI;
-trusted device installation remains pending.
-The next optional bootstrap pins guest packages to an explicit official HTTPS
-snapshot without disabling apt authentication; complete source delivery is pending.
-An additional experimental gate downloads exact installed source versions via
-authenticated apt and retains an external hash inventory; CI review is pending.
+## Requirements and delivery forms
 
-License: **AGPL-3.0-only** (see `LICENSE`).
+The Android baseline is **Android 12 or later (API 31), arm64-v8a**.
+The current Gradle configuration sets `minSdk = 31` and
+`compileSdk = targetSdk = 37`; the design documentation describes the platform
+baseline as 37.2. ELF compatibility gates require at least 16 KiB segment
+alignment; broader device acceptance is still pending.
 
-Directories (populated by phase; see design document §5/§6):
+| Form | Entry point | Root required | Current scope |
+|---|---|---|---|
+| **Tier P — APK** | Embedded terminal and Web UI | No | Primary user-facing form; single-APK and managed PRoot paths tested on the stated device |
+| **Tier A — adb bundle** | adb shell; bundle under `/data/local/tmp/andcode` | No; debugging access required | Developer deployment path; locked-device acceptance pending |
+| **Tier M — Magisk** | Root/module integration under `/data/adb/andcode` | Yes | Module implementation and manual root model/tool tests; full boot/lifecycle acceptance pending |
 
+Root is not part of Tier P's runtime design. Testing on a root-capable device
+does not establish acceptance on bootloader-locked devices. Detailed boundaries
+are recorded in [DESIGN](docs/DESIGN.md).
+
+## Try the Android app
+
+Use a reviewed APK from a trusted
+[CI run](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml).
+GitHub Releases are the intended sideload distribution channel; Play and
+F-Droid delivery are not currently enabled. CI artifacts remain development
+outputs, including artifacts whose names contain `release`.
+
+1. Install the APK on an arm64 Android 12+ device. Keep several gigabytes free:
+   the validated build was about 640 MB to download and used roughly 2.2 GB
+   after installation and rootfs extraction. Sizes vary by build.
+2. Open the app, choose the Ubuntu terminal environment in Settings if needed,
+   and open **Terminal**. Wait for the first rootfs extraction to finish and
+   the shell prompt to appear. The Ubuntu archive is embedded; a separate
+   rootfs download is not required.
+3. Start the managed OpenCode service from the dashboard and open the Web UI,
+   or open the terminal and enter `opencode` to connect to the running service.
+4. Configure your own provider and model using
+   [OpenCode's configuration guide](https://opencode.ai/v2/docs/config).
+   Global configuration belongs in `~/.config/opencode/opencode.json(c)`.
+   Provider access, credentials, and network connectivity are supplied by you.
+5. Use **Projects · Import / Export** to copy a project into the app workspace.
+   Select it before creating a new terminal; copy its path to open it in Web.
+
+When the canonical rootfs is ready, new terminals default to Ubuntu; lightweight
+Bash remains the fallback. Terminal environment selection affects new sessions.
+When the managed service is running, the `opencode` terminal command connects
+to it. Starting the service first is the validated TUI workflow.
+
+**Ubuntu terminal selection and the managed service backend are separate
+settings.** To run model tools and Web PTY inside Ubuntu, enable **Run the
+OpenCode service in Ubuntu PRoot (experimental)**, then manually stop and
+restart the service. This option defaults to **off**. If the rootfs is missing,
+service startup extracts the embedded archive before launching the backend;
+opening a terminal first is optional. Other missing runtime prerequisites
+cause an explicit failure. The guest shares the app home as `/root`, and
+selected terminal projects appear under `/workspace/<project-name>`.
+
+PRoot runs under the app UID and is not a security sandbox. Guest access to
+shared storage at `/mnt/sdcard` follows Android's storage permissions.
+
+### Network and certificate settings
+
+Proxy use and custom CA trust are independent opt-ins. Enter the proxy URL
+required by your network and enable the relevant setting; the app does not
+provide the proxy service. For a private CA, import a single PEM certificate,
+verify its SHA-256 through an independent trusted channel, and explicitly
+enable it. Manually stop and restart the managed service to apply changes.
+
+Additional CA trust applies to newly launched managed backends and inheriting
+children. It preserves built-in roots and does not alter Android's global
+trust store or WebView trust. Detailed acceptance conditions are in
+[DESIGN §4.4](docs/DESIGN.md#44-tier-p--custom-minimal-apk-user-facing-form-for-locked-devices).
+
+### Project data and sessions
+
+Imports are private copies, not synchronized links to the original folder.
+Import/export operations are limited to **512 MiB, 20,000 entries, and 64
+directory levels**. Existing same-named projects are not overwritten, and
+export does not follow symbolic links. `.git` export defaults to off; other
+hidden files, including `.env`, can still be included.
+
+Export important projects before uninstalling: Android removes the app's
+private data. Terminal sessions survive navigation within the same app
+process; recovery after force-stop or system process termination is not
+established.
+
+## Build and validate
+
+[`.github/workflows/andcode-ci.yml`](.github/workflows/andcode-ci.yml) is the
+reference build and validation pipeline. Native Linux work runs on
+`ubuntu-24.04-arm`; the Android packaging job consumes its artifacts.
+
+The pipeline assembles and audits the glibc bundle, prepares an Android-specific
+copy, maps executable payloads into `jniLibs`, builds the canonical Ubuntu
+rootfs, and passes the complete native/assets directory to Gradle. It runs
+component regressions, APK Lint, and byte checks on packaged payloads.
+
+| CI artifact | Contents and purpose |
+|---|---|
+| `andcode-dist` | Standard and Android-specific bundle archives, checksums, and third-party notices |
+| `andcode-tier-p-native` | `arm64-v8a/` payloads and `assets/`, including the Ubuntu archive; input to APK builds |
+| `andcode-apk-intermediate` | Debug APK and Lint reports; development/testing output |
+| `andcode-apk-release` | Release-signed APK, generated only when all four signing secrets are available |
+
+To rebuild the APK using the extracted `andcode-tier-p-native` artifact,
+use JDK 17, Gradle 8.14, and the Android SDK/NDK versions listed in the workflow:
+
+```sh
+gradle -p app -PandcodeNativeDir="<absolute-artifact-directory>" assembleDebug lintDebug --no-daemon
 ```
-baseline/       Compatible arm64 build baseline (Dockerfile, rootfs tools, and compatibility audit)
-bundle/         Bundle packers, launchers, overlay scripts, glibc closure, and LD_PRELOAD shim
-magisk-module/  Tier M: Magisk module for rooted devices (autostart at boot, no app)
-scripts/        adb push deployment (Tier A) and smoke tests
-app/            Tier P: custom minimal APK (minSdk 31 / targetSdk 37.2, embedded terminal and bundle)
-.github/workflows/ GitHub Actions workflows for build, audit, artifacts, APK, and release
-```
+
+Without `andcodeNativeDir`, Gradle produces a payload-free development build.
+Release signing uses the four `ANDCODE_RELEASE_*` secrets registered in
+[NAMING](docs/NAMING.md#3-namespace-registry-authoritative-allocation).
+Use a stable signing identity for updates: different debug keys cannot
+overwrite one another, and uninstalling to change signatures deletes app data.
+A signed APK still requires the documented device and distribution reviews.
+
+For delivery-pipeline changes, validate in this order on Linux CI:
+
+1. Run `bash -n` on modified shell scripts.
+2. Run `scripts/naming-lint.sh --bundle-dir <unpacked-directory>`.
+3. Run `baseline/check-compat.sh --page-align <bin-or-lib-directory>`.
+4. Pass the main CI workflow and perform the relevant real-device gates.
+
+Linux CI is the trusted environment for shell and compatibility validation.
+Device tests must run in the real application domain: `run-as` does not
+reproduce zygote seccomp restrictions.
+
+## Linux compatibility and runtime design
+
+The compatibility baseline is **Ubuntu 24.04 arm64 / glibc 2.39**. Linux
+payloads use a bundled glibc loader and dependency closure, with no glibc
+symbol requirements newer than 2.39. Standard Linux arm64 targets need a
+compatible glibc installation, normally 2.39 or later. Android-native platform
+components use the NDK/Bionic separately.
+
+For Tier P, executable payloads are packaged as `libandcode-*.so` and installed
+by Android into `nativeLibraryDir`. App-private data holds configuration,
+projects, runtime links, and the guest rootfs. Ubuntu ELF execution through
+PRoot is a scoped, device-tested path; it does not grant general execution
+permission to app-writable directories. The custom preload shim handles
+selected external glibc calls involving `/etc`; glibc-internal access requires
+the guest/bind path.
+
+[DESIGN](docs/DESIGN.md) explains the architecture and platform constraints.
+[UBUNTU](docs/UBUNTU.md) covers the PRoot backend, separate root chroot
+prototype, image construction, and acceptance procedures. The optional
+`mmdebstrap` rootfs and native-source build workflows remain isolated
+experiments.
+
+## Verified scope and open work
+
+- On device `8c8da214`, the APK passed fresh-install rootfs extraction,
+  Web/API access, TUI interaction, guest shell commands, Web PTY, and manual
+  stop/restart. A full model/tool round trip and native C compilation chain
+  passed through the managed Ubuntu backend with `arjata/glm-5.2`.
+- The tested gateway's `arjata/gpt-oss-120b` route returns HTTP 400/503 after
+  tool results, despite working plain-text replies. Cross-model isolation
+  identified a provider-side tool-path defect; use a model with a working
+  tool path until that route is fixed.
+- Networking results depend on the tested VPN/proxy/CA configuration. Passing
+  explicit-proxy tests does not prove default DNS or VPN-independent access.
+- Pinyin IME composition can intercept injected text and cover terminal extra
+  keys. The recorded TUI input probes used AOSP Latin IME; other input methods
+  need further verification.
+- Other devices, locked delivery, abnormal-stop recovery, and remaining root
+  chroot integration are **pending P0/P3 device verification**.
+- Source-built OpenTUI, watcher, fff, and bun-pty experiments have Linux CI
+  evidence but are not integrated into the production APK. Native dependency
+  notices, corresponding source, relinking materials, Bun/JSC obligations,
+  and Android admission remain subject to review. See [REUSE](docs/REUSE.md).
+
+## Repository and documentation
+
+| Path | Purpose |
+|---|---|
+| [`app/`](app/) | Android app, embedded terminal modules, assets, and app-data tests |
+| [`baseline/`](baseline/) | Linux arm64 build baseline and ELF compatibility audit |
+| [`bundle/`](bundle/) | Bundle/APK packers, launchers, overlay scripts, and preload shim |
+| [`runtime/ubuntu/`](runtime/ubuntu/) | Root chroot installation and management prototypes |
+| [`magisk-module/`](magisk-module/) | Tier M module integration |
+| [`scripts/`](scripts/) | Deployment, rootfs construction, audits, regressions, and device gates |
+| [`.github/workflows/`](.github/workflows/) | Main CI and isolated build experiments |
+
+Read [AGENTS.md](AGENTS.md) before contributing. The documentation entry points
+are [architecture and acceptance](docs/DESIGN.md),
+[Ubuntu development](docs/UBUNTU.md), [command and filename naming](docs/NAMING.md),
+[third-party reuse and licensing](docs/REUSE.md), and
+[repository binary/LFS rules](docs/LFS.md). Build artifacts and signing keys
+must stay out of Git; CI generates payload manifests and notices.
+
+## License
+
+Project-authored material is licensed under **AGPL-3.0-only**; see
+[LICENSE](LICENSE). Third-party components retain their original licenses,
+including the embedded terminal modules described in
+[app/NOTICE-TERMINAL.md](app/NOTICE-TERMINAL.md).
+The project license does not replace component-specific source, notice, or
+relinking obligations. [REUSE](docs/REUSE.md) tracks the outstanding review.
