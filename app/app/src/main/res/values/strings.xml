@@ -33,7 +33,8 @@
     <string name="settings_proxy_saved">已保存；对重启后的服务与新终端生效。</string>
     <string name="settings_proxy_need_scheme">地址需含协议前缀（如 http:// 或 socks5://）</string>
     <string name="settings_language_section">语言 / Language</string>
-    <string name="settings_language_desc">应用界面语言；跟随系统或固定选择。切换会重建页面。</string>
+    <string name="settings_language_hint">切换后立即生效</string>
+    <string name="settings_language_desc">应用界面语言；跟随系统或固定选择（简体中文 / English）。切换会重建页面。</string>
     <string name="settings_language_action">选择应用语言</string>
     <string name="settings_language_title">应用语言</string>
     <string name="settings_language_system">跟随系统</string>

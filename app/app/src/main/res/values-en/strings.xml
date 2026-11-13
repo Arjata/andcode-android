@@ -33,7 +33,8 @@
     <string name="settings_proxy_saved">Saved; applies to a restarted service and new terminals.</string>
     <string name="settings_proxy_need_scheme">The address must include a scheme prefix (e.g. http:// or socks5://)</string>
     <string name="settings_language_section">Language / 语言</string>
-    <string name="settings_language_desc">App UI language; follow the system or pick one. Switching recreates the page.</string>
+    <string name="settings_language_hint">Applies immediately</string>
+    <string name="settings_language_desc">App UI language; follow the system or pick one (简体中文 / English). Switching recreates the page.</string>
     <string name="settings_language_action">Choose app language</string>
     <string name="settings_language_title">App language</string>
     <string name="settings_language_system">Follow system</string>

@@ -210,8 +210,10 @@ public class SettingsActivity extends UtilityActivity {
         workspace.addView(paths);
         gap(workspace, 12);
         workspace.addView(label(getString(R.string.s_local_service) + ServeManager.BASE_URL, 12, false, true));
-        section(getString(R.string.settings_language_section), getString(R.string.settings_language_desc));
+        section(getString(R.string.settings_language_section), getString(R.string.settings_language_hint));
         LinearLayout langCard = card(body, false);
+        langCard.addView(label(getString(R.string.settings_language_desc), 12, false, true));
+        gap(langCard, 10);
         langCard.addView(action(getString(R.string.settings_language_action), false, () -> {
             String[] tags = {"", "zh", "en"};
             String[] labels = {getString(R.string.settings_language_system),
