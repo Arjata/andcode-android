@@ -24,7 +24,7 @@ When documentation and code disagree, NAMING.md is the naming authority. Record 
 
 ## 2. Hard constraints (violations require rework)
 
-1. **License = AGPL-3.0-only** (root `LICENSE`). Key reuse rules (REUSE.md §3):
+1. **Project-authored material is licensed under AGPL-3.0-only** (root `LICENSE`). Third-party components retain their original licenses; follow the key reuse rules in REUSE.md §3:
    - MIT/Apache/BSD code may be incorporated; retain copyright notices and register it in `bundle/manifest`;
    - **GPL-2.0 code (busybox, proot) must not be copied into the repository**. Only aggregation of independent binaries is allowed,
      with versions and source URLs recorded in the manifest;
@@ -34,12 +34,10 @@ When documentation and code disagree, NAMING.md is the naming authority. Record 
    §3–§5 before writing code. `physical-tier-p` in `bundle/manifest` must match
    `^libandcode-[a-z0-9-]+\.so$` (≤64 characters). Failure of CI `naming-lint.sh` means build failure.
 3. **Compatibility boundaries** (DESIGN §1.2/§3.1):
-   - glibc symbol versions ≤ **2.39**; linking against Android NDK/Bionic is prohibited;
+    - Linux/glibc payloads must use glibc symbol versions ≤ **2.39**. Android-native code may use the Android NDK/Bionic; Linux compatibility artifacts must not link against Bionic;
    - PT_LOAD segment alignment ≥ 16K (build flag for our own NDK code: `-Wl,-z,max-page-size=16384`);
-   - **targetSdk 37.2 platform constraint**: execution from data directories is prohibited → do not generate ELF files
-     at runtime that will be executed. Do not rely on runtime ELF extraction (if opencode does this, preinstall copies and redirect it to them);
-   - The custom LD_PRELOAD shim (`bundle/shim/`) is the intended solution for read-only /etc. Do not introduce proot
-     unless the shim is proven insufficient (record evidence in the P0 checklist first).
+    - **targetSdk 37.2 platform constraint**: do not directly execute ELF files from app-writable data directories or generate executable ELF files there at runtime. Package executable payloads in `jniLibs` so they are preinstalled under `nativeLibraryDir`. Ubuntu guest ELF execution through PRoot is a scoped, tested path and does not grant generic data-directory execution permission;
+    - The custom LD_PRELOAD shim (`bundle/shim/`) supports direct glibc PLT calls involving read-only `/etc`. Glibc-internal `/etc` access requires a guest bind in PRoot; the shim alone is insufficient. PRoot managed serve is implemented as an opt-in, default-off path, not a mandatory universal backend.
 4. **Self-contained principle**: introduce no dependency on Termux / proot-distro / any third-party host app;
    runtime dependencies are limited to bundled components and Android system tools (/system/bin/sh, getprop, etc.).
 5. **No binaries in the repository**: .gitignore already covers them; track all artifacts through CI artifacts and `bundle/manifest`.
@@ -53,7 +51,7 @@ When documentation and code disagree, NAMING.md is the naming authority. Record 
   1. Run `bash -n` on all modified shell scripts;
   2. `scripts/naming-lint.sh --bundle-dir <unpacked-directory>`;
   3. `baseline/check-compat.sh --page-align <bin|lib-directory>`;
-  4. Get CI (`ci/github-actions.yml`) passing; it is the only trusted execution environment (see §4).
+  4. Get CI (`.github/workflows/andcode-ci.yml`) passing; it is the only trusted execution environment (see §4).
 - Device validation (Tier A/M/P physical-device smoke tests) cannot run locally: **device behavior that has not been tested
   must be marked "pending P0/P3 device verification" in delivery notes. Do not claim it is verified**.
 - When changing architecture sections in `docs/DESIGN.md`, append a version entry to the top changelog (increment v0.x)
@@ -100,7 +98,6 @@ Rules:
 
 - The development host is **Windows (pwsh), with no local Linux shell/WSL distribution**. Do not execute
   bash scripts locally for validation; actual validation runs on GitHub Actions' native `ubuntu-24.04-arm` runner.
-- The repository has not yet had `git init` run; the first CI run will actually validate script syntax and the full pipeline.
 - Shell scripts must use **LF** (see `.gitattributes`). Device-side scripts with shebangs must be POSIX sh
   compatible (use the subset supported by `/system/bin/sh`; no bashisms — this includes `smoke-test.sh`
   and `bundle/overlay/sbin/*`).
@@ -110,13 +107,7 @@ Rules:
 
 ## 5. Current work (claim a task before starting)
 
-Status (2026-11-11): **P0/P1/P2/P3 are all complete** — Tier P Web/TUI works end to end
-(Release v0.1.1); the optional Ubuntu PRoot backend for managed serve is merged
-(`d7df3b2`, default off; device acceptance in DESIGN v0.4.54). CI jniLibs integration
-(`pack-apk-libs` output passed through artifacts to `-PandcodeNativeDir`), seccomp patching
-(within the Tier P physicalization step, including idempotence checks), and conditional release signing (when all four secrets are present,
-`assembleRelease` + `apksigner verify`) are in place. Two complete Tier M text+bash tool
-round trips passed retesting with an explicit proxy+CA (DESIGN §4.2, root manual-diagnostic scope).
+Status (2026-11-14): **Core Tier P Web/TUI and Ubuntu managed-serve paths are implemented and tested on device 8c8da214; cross-device and locked-delivery acceptance remains pending P0/P3.** The Ubuntu 24.04 arm64 rootfs is embedded in the single APK and extracted on first launch; managed PRoot serve is opt-in and default-off (DESIGN v0.4.56). The device passed Web/API, guest shell, Web PTY, rootfs launch, and a full glm-5.2 tool round trip. CI jniLibs integration (`pack-apk-libs` output passed through artifacts to `-PandcodeNativeDir`), seccomp patching (within Tier P physicalization, including idempotence checks), and conditional release signing (when all four secrets are present, `assembleRelease` + `apksigner verify`) are in place. Two complete Tier M text+bash tool round trips passed retesting with an explicit proxy+CA (DESIGN §4.2, root manual-diagnostic scope).
 
 Key findings (2026-11-08 device debugging; details in DESIGN v0.4.2):
 - **App-domain seccomp trap** (4.9-perf kernel + GSI): zygote seccomp sends SIGSYS directly for
@@ -139,5 +130,6 @@ Remaining:
 1. Provider-side gpt-oss-120b tool continuations returning 400/503 (track this; do not bypass the protocol in the client).
 2. TUI Pinyin IME composition intercepts adb injection and obscures the extra-key row (upstream behavior; injection works after switching to AOSP
    Latin IME, DESIGN v0.4.52).
-3. PRoot serve acceptance on other devices and locked delivery forms (P0/P3).
-4. User action: revoke exposed GitHub tokens (`ghp_...`) and API keys (`sk-...`).
+3. PRoot serve acceptance on other devices and locked delivery forms, plus abnormal-stop recovery (P0/P3).
+4. User action: revoke previously exposed GitHub tokens and API keys; do not repeat or publish credential values.
+5. Native-source OpenTUI/watchers/fff/bun-pty experiment remains unapproved for production; see README and `docs/REUSE.md`.

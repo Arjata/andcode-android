@@ -15,6 +15,7 @@ Platform baseline: **Android 12+ (minSdk 31)**, APK `compileSdk/targetSdk 37.2`.
 See **[docs/DESIGN.md](docs/DESIGN.md)** for architecture, build baseline specifications, the three self-contained
 delivery forms, phased plans, and risk tables; **[docs/REUSE.md](docs/REUSE.md)** for research on reusable open-source projects;
 and **[docs/NAMING.md](docs/NAMING.md)** for executable tool entry-point naming conventions.
+Current acceptance status is tracked in DESIGN v0.4.56.
 
 **Design principle: self-contained** — no dependency on third-party host apps beyond the Android system (no Termux).
 Delivery forms are a Magisk module (root) / adb-pushed bundle (locked) / custom minimal APK (locked).
@@ -97,7 +98,7 @@ The drawer adds **Projects · Import / Export** and **Settings**:
   check for sensitive data such as .env. Imports do not automatically synchronize with the source folder, and uninstalling the app deletes private projects.
 ZIP import/export content round trips, folder import, and project terminal directories have been verified on the older device; other providers and large projects
 remain pending P3 device verification. ZIP data-component tests run independently in CI's `app-data-tests`.
-This is still a development deployment; complete self-contained jniLibs/CI integration and locked-device verification are not yet complete.
+The single-APK canonical Ubuntu rootfs and jniLibs/CI pipeline are integrated. Locked-delivery and cross-device verification remain pending P0/P3.
 
 An isolated native-source experiment rebuilt OpenTUI, watcher, fff, and
 bun-pty from pinned sources in Linux arm64 CI, passing preinstalled-library mapping, ordinary/persistent PTY, TUI, and no-runtime-ELF-extraction gates; it is **not yet
@@ -110,15 +111,15 @@ source CI `42646838972`; the new artifact's 29789-entry inventory, 446 link inpu
 2304 generic CRC comparison sets have been reviewed. Other per-file notices, relinking, Bun/JSC, and Android
 admission remain unapproved; configuration strings or successful Linux CI cannot substitute for license review.
 
-The Ubuntu development environment is implementing two backends: a new Ubuntu 24.04 arm64 development-image recipe,
-a root chroot prototype for ordinary-user sessions, and separate CI. PRoot in the older device's real app domain has passed explicit-proxy
+The Ubuntu development environment includes an Ubuntu 24.04 arm64 development image and an opt-in, default-off managed PRoot serve backend.
+It also contains a separate root chroot prototype for ordinary-user sessions and dedicated CI. PRoot in the older device's real app domain has passed explicit-proxy
 HTTPS/apt, newly installed/compiled ELF, PTY/child-process, and glibc-update checks. The terminal provides
 the `andcode-ubuntu-proot [loopback-proxy]` development entry point, returning to lightweight Bash on exit.
-Settings can select the Ubuntu development terminal for new sessions; lightweight Bash remains the default, and the proxy toggle defaults to off.
+Settings can select the Ubuntu development terminal for new sessions; the canonical Ubuntu rootfs is now the terminal default when ready,
+with lightweight Bash as the fallback, and the proxy toggle defaults to off.
 A selected private project can map to `/workspace/<project-name>`; HTTPS/apt/Git without an explicit proxy passed
 on the older device with TCP DNS (the device's existing VPN remains enabled).
-**Not yet integrated with OpenCode/Web PTY and still not a locked self-contained delivery**; chroot network identity,
-the authenticated root service, and chroot project mapping remain pending P0/P3 device verification. Read-only diagnostics confirmed that the device's restricted
+The managed PRoot backend is integrated with OpenCode/Web PTY on the validated device, while other devices, locked-delivery forms, abnormal-stop recovery, and chroot-specific paths remain pending P0/P3 verification. Read-only diagnostics confirmed that the device's restricted
 network rules block UID 60000; no device policy was changed and no APK UID was borrowed to bypass this.
 See [docs/UBUNTU.md](docs/UBUNTU.md) for status, trusted image installation, and the acceptance checklist.
 
@@ -140,10 +141,10 @@ License: **AGPL-3.0-only** (see `LICENSE`).
 Directories (populated by phase; see design document §5/§6):
 
 ```
-baseline/       Compatible arm64 build baseline (Dockerfile / rootfs / compatibility audit)
-bundle/         Self-contained bundle (glibc dependency closure + loader wrappers + LD_PRELOAD shim)
+baseline/       Compatible arm64 build baseline (Dockerfile, rootfs tools, and compatibility audit)
+bundle/         Bundle packers, launchers, overlay scripts, glibc closure, and LD_PRELOAD shim
 magisk-module/  Tier M: Magisk module for rooted devices (autostart at boot, no app)
 scripts/        adb push deployment (Tier A) and smoke tests
 app/            Tier P: custom minimal APK (minSdk 31 / targetSdk 37.2, embedded terminal and bundle)
-.github/workflows/ CI(andcode-ci.yml)
+.github/workflows/ GitHub Actions workflows for build, audit, artifacts, APK, and release
 ```

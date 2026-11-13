@@ -1,6 +1,6 @@
 # Ubuntu Development Environment: Prototype Status and Acceptance
 
-See [DESIGN §4.8](DESIGN.md#48-dual-ubuntu-development-backends-implementation-ongoing-not-delivered-capability).
+See [DESIGN §4.8](DESIGN.md#48-dual-ubuntu-development-backends-implemented-acceptance-scope-stated-below).
 
 ## Current Status
 
@@ -194,8 +194,9 @@ binary/source-version tuples matched those indexes (review JSON SHA-256
 Materialized PRoot bytes are 469579853; path/link counts are unchanged. This
 artifact predates source acquisition and cannot be credited with that new gate.
 
-This is a **root chroot + PRoot development prototype**, not a fully delivered self-contained Ubuntu feature.
-Lightweight Bash and the Web interface remain unchanged; PRoot has passed proxy-mode development acceptance in the real application domain on the older device.
+This document covers both a root chroot prototype and the managed PRoot development path.
+The root chroot remains a prototype rather than a fully delivered self-contained Ubuntu form;
+the managed PRoot serve path has passed its scoped acceptance checks in the real application domain on the older device.
 It does not depend on the Termux App, lower targetSdk, or disable SELinux.
 
 - The first native arm64 CI run [42508958877](https://github.com/Arjata/andcode-android/actions/runs/42508958877)
@@ -341,7 +342,7 @@ Interactive terminal testing confirmed `stty size` returned 44×54, Ctrl+C inter
 prompt, and `exit` returned to the original project's lightweight Bash. A foreground guest Python signal test in the real application domain verified
 two SIGWINCH events as the soft keyboard hid/showed, with sizes 28×54 → 47×54 → 28×54 and output
 `ANDCODE_PROOT_RESIZE_OK`. This covers only this round on the older device; more devices remain pending P0/P3 on-device verification.
-The settings page's "Terminal environment" affects only new sessions, defaults to lightweight Bash, and offers an installed Ubuntu PRoot;
+In this earlier device round, the settings page's "Terminal environment" affected only new sessions, defaulted to lightweight Bash, and offered an installed Ubuntu PRoot;
 the proxy has a separate explicit default-off switch. On the older device, UI selection and persistence of the Ubuntu backend passed; after exiting the old
 shell, a new terminal immediately showed the Ubuntu prompt. Existing sessions do not switch. chroot is not offered,
 because its authenticated root service is unfinished. APK `assembleDebug` and `lintDebug` passed; Lint warnings were not hidden.
@@ -422,7 +423,7 @@ Official V2 persistent PTY using the pre-staged daemon passed system-sh tty, Web
 91×31 resize, reconnect replay and snapshot checks with `ANDCODE_NATIVE_PERSISTENT_WS_OK`. The default Bash
 wrapper exits immediately without output when directly exec'd by the daemon; explicitly executing the wrapper through system sh
 succeeds. To address this boundary, Tier P `bin/bash` retains its physical name but becomes a static ELF entry
-calling loader/Bash/shim in the same nativeLibraryDir; CI/new APK acceptance is pending.
+calling loader/Bash/shim in the same nativeLibraryDir; this historical boundary awaited CI and APK device tests at the time.
 This does not mean Web UI operation/default Bash or the Ubuntu Web backend passed.
 
 Integrity checks of pinned npm tarballs corrected the OpenTUI native-package license to MIT AND LGPL-2.1-or-later,
@@ -507,7 +508,7 @@ Enforcing must also be verified through adb. Permission denied is not treated as
   This does not establish automatic abnormal recovery or authorize releasing another instance's loop.
 - No forced stop, lazy unmount or automatic killing of unknown processes is offered. Manually inspect processes and mounts before recovery;
   **do not simply delete the lock and mount again**. Recovery from process death, device reboot and other abnormal conditions remains unverified.
-- chroot does not yet map APK private projects or integrate with OpenCode. Once the authenticated root service is complete,
+- The root chroot does not yet map APK private projects or integrate with OpenCode. Once the authenticated root service is complete,
   selected projects will be mapped to `/workspace/<project-name>`; default model execution must drop privileges.
   PRoot terminal project mapping is separate from the managed backend described below.
 
@@ -637,6 +638,6 @@ Extraction diagnostics are surfaced via logcat
 | Ordinary-user gcc compilation/execution, writes to `/etc` rejected | UID 60000 passed, LOAD 0x4000 | Pending P0/P3 |
 | Continued execution after libc update (do not blindly reuse old offset patches) | 2.39-0ubuntu8.7 → 8.9 passed | Execution after the same-version update passed, ELF unchanged |
 | Project access scope, no leftover mounts after stop/abnormal exit | Pending P0/P3 | Single-project bind/writeback/invalid-path rejection passed; not a sandbox, abnormal stop pending P0/P3 |
-| OpenCode tools and Web PTY use the selected backend without host root | Pending integration | Device 8c8da214: opt-in managed PRoot serve, guest shell/PTY and app-UID execution passed; full tool round trip verified on `arjata/glm-5.2` (plain two-turn with history `reasoning_content` also passed); `arjata/gpt-oss-120b` tool-result continuation fails provider-side (HTTP 400/503, 5/5 fresh sessions) while its plain replies pass; other devices pending P0/P3 |
+| OpenCode tools and Web PTY use the selected backend without host root | Scoped integration passed; broader device acceptance pending | Device 8c8da214: opt-in managed PRoot serve, guest shell/PTY and app-UID execution passed; full tool round trip verified on `arjata/glm-5.2` (plain two-turn with history `reasoning_content` also passed); `arjata/gpt-oss-120b` tool-result continuation fails provider-side (HTTP 400/503, 5/5 fresh sessions) while its plain replies pass; other devices pending P0/P3 |
 
 When PRoot fails, its status must remain "restricted/unavailable"; root relabeling must not be used to claim locked support.

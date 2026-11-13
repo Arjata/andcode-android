@@ -1,6 +1,8 @@
 # andcode — Design for porting opencode to Android arm64
 
-> Version: v0.4.55 (design draft) · Date: 2026-11-11
+> Version: v0.4.56 (design draft) · Date: 2026-11-14
+> v0.4.56 change: documentation scope corrections only. Clarify Android-native Bionic versus Linux/glibc artifact boundaries, scoped data-directory execution and PRoot behavior, current managed-PRoot and jniLibs integration status, and repository/acceptance status. No code behavior changed.
+> v0.4.55 (2026-11-11):
 > v0.4.55 change: adopt the single-APK release goal. One CI-built canonical
 > rootfs archive (dev-complete Ubuntu 24.04 arm64, gzip + SHA-256 + dpkg
 > manifest) becomes the shared BUILD artifact for chroot and PRoot; device
@@ -447,7 +449,7 @@ autostart and process supervision) come from system entry points or are embedded
 |---|---|---|
 | Minimum OS | **Android 12 (API 31)** | Phantom Process Killer (introduced in 12) applies throughout; every form must include mitigations |
 | APK compileSdk | **37.2** | Build with the latest SDK for current APIs/behavior |
-| APK targetSdk | **37.2** | Accept all new platform behavior: data-directory exec prohibition, W^X, mandatory FGS types, edge-to-edge, etc.; **no targetSdk 28 workaround** |
+| APK targetSdk | **37.2** | Accept current platform behavior including data-directory execution policy, mandatory FGS types and edge-to-edge; runtime W^X/JIT is a separate concern; **no targetSdk 28 workaround** |
 | Artifact runtime | arm64-only | Includes 4K and 16K page devices (see §1.2.8) |
 
 | Device class | Root | Available entry points | Applicable delivery forms |
@@ -457,31 +459,37 @@ autostart and process supervision) come from system entry points or are embedded
 
 ### 1.2 Hard Android platform constraints (mandatory for the design)
 
-1. **Different libc**: Android userspace uses Bionic, not glibc. glibc-linked binaries must
-   carry their own dynamic linker/libraries (our **glibc sysroot + loader wrapper**, §4.1),
-   or run inside chroot.
+1. **Different libc**: Android userspace uses Bionic, not glibc. Android-native JNI/platform
+   code may use the Android NDK and Bionic. Linux compatibility payloads use glibc symbols
+   no newer than 2.39 and carry their own dynamic linker/libraries (our **glibc sysroot +
+   loader wrapper**, §4.1), or run inside a Linux guest. A glibc Linux artifact must never
+   link against Bionic.
 2. **/sdcard mounts are noexec**: executables must reside in app-private directories,
    `/data/local/tmp` or `/data/adb/`. **No approach may place ELF in shared storage.**
-3. **Data-directory exec prohibition and W^X (fully enforced for targetSdk ≥ 29)**:
-   - SELinux domains prohibit apps targeting ≥29 from executing ELF in app-writable data directories;
-     W^X is also enforced (no anonymous RWX mappings).
-   - **Tier P standard solution: JNI library extraction** — package all ELF (opencode, glibc loader,
+3. **Data-directory execution boundary**:
+   - The targetSdk data-directory exec prohibition forbids direct execution of ELF from
+     app-writable data directories. Tier P packaged executables are preinstalled by Android from
+     `jniLibs/arm64-v8a/` into `nativeLibraryDir`; executable ELF is not extracted there at runtime.
+   - **Tier P packaged payload solution: JNI library extraction** — package executable payloads (opencode, glibc loader,
      git, busybox, dropbear and their .so files) as `lib*.so` in APK
      `jniLibs/arm64-v8a/`; the system extracts them at install into `nativeLibraryDir`
-     (`/data/app/.../lib/arm64/`), which **permits exec**.
-   - JIT (JSC): if W^X rejects Bun JIT, fall back to `BUN_JSC_useJIT=0`
-     (Bun supports `BUN_JSC_*` environment variables); assess through P0 device tests.
-   - Benefit: targetSdk 37.2 makes the APK **eligible for Google Play** (subject to §1.2.8's 16K
-     requirement); dual release channels: Play + GitHub Releases/F-Droid.
+     (`/data/app/.../lib/arm64/`).
+   - Tested Ubuntu guest ELF may execute only through the validated PRoot path in §4.8. This is
+     a scoped device-tested path, not blanket permission to execute ELF from app-writable data.
+   - Android platform/SELinux execution policy and runtime W^X/JIT policy are distinct concerns.
+     If runtime W^X policy rejects Bun JIT, assess `BUN_JSC_useJIT=0` on-device.
+   - Benefit: targetSdk 37.2 makes the APK technically **eligible for Google Play** (subject to §1.2.8's 16K
+     requirement). The current release channel is GitHub Release sideload; Play and F-Droid distribution are not currently enabled.
 4. **Android 12+ Phantom Process Killer**: background-app children exceeding thresholds (default
    32 processes / 10 minutes idle) are silently killed. opencode spawns LSP, git, shell and other children,
    making it high risk and requiring mitigation (§4.6).
 5. **SELinux**: on locked devices, shell domain can execute ELF in `/data/local/tmp`; APK domain
    can execute ELF in `nativeLibraryDir` (jniLibs extraction, §1.2.3). Neither can use
    absolute interpreter paths such as `/lib/ld-linux-aarch64.so.1` (always invoke loader explicitly).
-6. **Read-only /etc**: glibc reads `/etc/resolv.conf`, `/etc/passwd`, etc. at runtime,
-   but Android `/etc` is unwritable. Use our **LD_PRELOAD redirection shim** (§4.5),
-   without introducing proot for this purpose.
+6. **Read-only /etc**: Android `/etc` is unwritable. The shim can redirect external
+   glibc-object PLT calls to selected `/etc` paths; it cannot intercept glibc-internal calls
+   that bypass the PLT. Managed Ubuntu PRoot uses guest bind mounts for guest `/etc`.
+   The shim is useful but not a universal `/etc` solution; see §4.5.
 7. **Real root (chroot) avoids most of these issues**; Tier M prefers real chroot.
 8. **16K-page devices (some Android 15+ devices; Play requires this for apps with NDK code)**:
    - Debian/Ubuntu arm64 toolchains default to `-z max-page-size=65536`; baseline glibc/sysroot
@@ -548,7 +556,7 @@ In one sentence: **one build baseline, one self-contained bundle, three installa
 | libc | glibc 2.39 (mandatory symbol-version audit) | Ubuntu 24.04 bundled version |
 | libstdc++ | Bundled GCC 13, or shipped with artifacts | Required by bun and others |
 | Triple | `aarch64-unknown-linux-gnu` | Standard GNU |
-| Prohibited | Linking Android NDK/Bionic; introducing glibc symbols ≥ 2.40 | Compatibility boundary |
+| Prohibited | Linux compatibility artifacts linking against Bionic; introducing glibc symbols ≥ 2.40 | Android-native JNI/platform code may use NDK/Bionic |
 
 > **Compatibility floor (cost of Ubuntu 24.04)**: artifacts require target glibc ≥ 2.39,
 > hence standard Linux arm64 must use Ubuntu ≥ 24.04 / Debian ≥ 13 (trixie) / contemporary distributions.
@@ -597,8 +605,8 @@ andcode/
 > All naming (logical/physical names, slugs, environment variables) follows **docs/NAMING.md**;
 > that specification defines Tier P jniLibs physical names and link farms.
 
-**No runtime executable writes constraint**: with targetSdk 37.2, **ELF written at runtime
-cannot be executed** (data-directory exec prohibition, §1.2.3). Therefore:
+**No runtime executable writes constraint**: with targetSdk 37.2, ELF written to an app-writable
+data directory must not be directly executed (data-directory exec prohibition, §1.2.3). Therefore:
 - Any opencode runtime extraction (e.g. Go TUI into `~/.opencode/bin`) must be bypassed:
   prestage all child binaries in the bundle and redirect supported path/PATH mechanisms to them
   (verify exact mechanism in P0 and record in §1.3 checklist);
@@ -674,7 +682,7 @@ Platform parameters: `minSdk 31 · targetSdk/compileSdk 37.2 · arm64-v8a` (§1.
   `-PandcodeNativeDir=<artifact-directory>`, requiring basic payloads without automatic downloads. Use
   legacy packaging for system extraction into nativeLibraryDir at install; retain `libandcode-*`
   bytes without stripping. This intermediate artifact is not full V2/PTY closure or a claimed usable self-contained APK.
-- **Single-APK release form (v0.4.55, decided, implementation ongoing)**: release APK embeds
+- **Single-APK release form (v0.4.55, implemented; device scope recorded in the changelog)**: release APK embeds
   `assets/andcode-rootfs/` (canonical dev-complete rootfs gzip archive using
   `.tgz` suffix — AGP asset merging automatically decompresses `.gz` assets; `noCompress tgz`
   retains archive bytes in APK, plus SHA-256 and dpkg version manifest). First launch uses an in-app pure Java
@@ -691,7 +699,7 @@ Platform parameters: `minSdk 31 · targetSdk/compileSdk 37.2 · arm64-v8a` (§1.
   GitHub Release sideload only, no Play channel. Release version bumps follow bundle
   `--name` consistently, eliminating hardcoding.
 - Terminal UI now embeds Termux terminal-emulator/terminal-view modules
-  (GPLv3, copyright and NOTICE retained, combined work AGPL-3.0-only; REUSE §2.1),
+  (GPLv3, with copyright and license notices retained; AGPL-3.0-only does not relicense these components; REUSE §2.1),
   without requiring users to install Termux App.
 - **targetSdk 37.2 platform-behavior adaptation checklist**:
   - Foreground services must declare a type: `specialUse` (property explanation: long development-tool sessions),
@@ -709,7 +717,7 @@ Platform parameters: `minSdk 31 · targetSdk/compileSdk 37.2 · arm64-v8a` (§1.
     provide `opencode` function (foreground execution returns to shell rather than exec-replacing it). Without Bash,
     fall back to `/system/bin/sh -i`; ENV reads system mkshrc and explicitly announces degraded mode.
     SHELL remains directly executable system sh, avoiding downstream bare-glibc-Bash spawn PT_INTERP failures;
-    production Bash subshell launcher/full jniLibs closure wiring remains pending.
+    production Bash launcher is in the packaged native payload; locked-delivery matrix remains pending device verification.
     Bind TerminalViewClient before first frame; sync size/drawing after layout, without injecting Enter to fake a prompt.
     Two bottom extra-key rows include ESC/TAB/CTRL/ALT/four arrows, HOME/END/PGUP/PGDN, `/`/`-`/
     Enter/IME; CTRL/ALT are highlighted sticky keys (tap again to release), other non-text keys encoded by TerminalView
@@ -782,7 +790,7 @@ Platform parameters: `minSdk 31 · targetSdk/compileSdk 37.2 · arm64-v8a` (§1.
       adb input text is garbled through device IME and is not evidence for normal touchscreen input.
       Production Tier P must use nativeLibraryDir prestaged copies and launcher/loader redirection;
       root/chcon or fixed `/data/local/tmp/ld` must not become locked-device release solutions.
-      Full jniLibs/CI packaging remains **pending P0/P3 on-device verification**.
+      jniLibs/CI packaging is integrated; locked-delivery and other-device acceptance remain **pending P0/P3**.
 - **Projects/settings pages (v0.4.7)**: shared drawer adds Projects · Import / Export and Settings.
   - Project/settings navigation icons match other entries' size and theme tint.
     Standalone-terminal pinch adjusts font by 1 sp when accumulated scale >1.1 / <0.9, then resets;
@@ -901,16 +909,17 @@ bypassing shim — confirmed by device TEST-NET probe's immediate 244ms disconne
 
 | Layer | /etc redirection mechanism |
 |---|---|
-| **Tier A/M (primary)** | **proot userspace bind**: `proot -b $ROOT/etc/resolv.conf:/etc/resolv.conf -b $ROOT/etc/ssl:/etc/ssl …`, covering all descendants; proot (Termux bionic build, GPL-2.0) + loader + libtalloc + libandroid-shmem bundled as independent aggregation, recorded in manifest |
+| **Tier A PRoot path** | **PRoot userspace bind**: bind selected guest files such as resolv.conf and SSL configuration for that guest process tree; PRoot components are independent aggregation recorded in the manifest |
+| **Tier P managed Ubuntu guest** | PRoot guest binds provide guest `/etc`; this is the default-off managed backend in §4.4/§4.8, not a generic host `/etc` mechanism |
 | **Tier M (root, optional)** | Real bind mount (`mount --bind`), zero overhead |
-| **shim (secondary)** | Retained to intercept /etc access by **non-glibc objects** (PLT calls from libcrypto/libssl, etc.), and self-clear LD_PRELOAD to protect Bionic children |
+| **shim (secondary)** | Supports external glibc-object PLT calls, including calls from non-glibc objects; it cannot intercept glibc-internal calls that bypass PLT. It self-clears LD_PRELOAD to protect Bionic children |
 
 **Known constraints**: ①proot ptrace interception **cannot nest** — wrapper/entry guards with
 `ANDCODE_IN_PROOT`, never nesting proot inside proot; ②mobile/managed networks often block outbound UDP 53 —
 `andcode-mkresolv` forces `options use-vc timeout:3
-attempts:2` in resolv.conf (TCP DNS, device-proven necessary); ③Tier P (jniLibs + data directory) cannot be
-wrapped in a proot process tree (no terminal-host concept) — its /etc solution awaits P3 design
-(candidates: rebuild glibc sysconfdir, or app asset placement + HOME configuration).
+attempts:2` in resolv.conf (TCP DNS, device-proven necessary); ③managed Tier P Ubuntu serve now uses
+the default-off PRoot backend described in §4.4/§4.8. Guest bind mounts provide guest `/etc`; this does
+not make PRoot the universal host `/etc` solution. The v0.4.1 device evidence above remains historical.
 
 ### 4.6 Android 12+ Phantom Process Killer mitigation (all three forms)
 
@@ -937,7 +946,18 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
 
 ---
 
-### 4.8 Dual Ubuntu development backends (implementation ongoing, not delivered capability)
+### 4.8 Dual Ubuntu development backends (implemented; acceptance scope stated below)
+
+**Current status (2026-11-14).** Single-APK rootfs extraction and the opt-in, default-off managed
+PRoot serve backend are integrated. On device `8c8da214`, the embedded Ubuntu 24.04.4 arm64 rootfs
+was installed on first launch; managed serve passed Web/API, guest shell execution, Web PTY and
+guest-file persistence checks. `arjata/glm-5.2` completed an agentic tool round trip through this
+backend. The same provider's `gpt-oss-120b` tool-result continuation still fails with HTTP 400/503;
+plain-text replies and tool execution itself were observed. This is tracked as a provider-side
+defect, with no client protocol workaround. Other-device acceptance, the locked-delivery matrix,
+root chroot integration with the canonical archive, and abnormal-stop/recovery acceptance remain
+pending P0/P3 device verification. The implementation and acceptance boundaries are distinct:
+Linux CI does not substitute for these Android/device checks.
 
 - Rootfs tool evaluation: `scripts/build-ubuntu-mmdebstrap.sh` delegates package
   bootstrap/dependency resolution to mmdebstrap in native arm64 CI. It retains
@@ -994,13 +1014,13 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
   capability bounding/inheritable/ambient sets and set no-new-privs; `/workspace`
   belongs to that user. `admin` is explicit manual maintenance only, allowing apt but exposing no sudo/root to models.
   **Chroot is not a security sandbox**: shared host UID, proc visibility, shared kernel and root administration retain risks.
-- No APK/root IPC or OpenCode integration yet: first require signature/peer-credential authenticated channels,
+- Root APK IPC is not integrated: any future privileged bridge requires signature/peer-credential authenticated channels,
   project-scoped mappings and real-device admission; concatenated `su -c` strings are not a production service.
 - PRoot admission must test apt, newly installed/compiled ELF, PTY/children,
   DNS/HTTPS and libc upgrades in real zygote app domain; adb root/run-as cannot substitute, nor can lower targetSdk
   or disabled SELinux hide issues. Old-device real app domain passed explicit-proxy apt/HTTPS, hello,
   freshly gcc-compiled ELF, PTY/children and execution after libc 2.39-0ubuntu8.7 → 8.9 upgrade, without
-  guest ELF patches. This is development admission, not default-direct or locked self-contained delivery certification.
+  guest ELF patches. This is development admission, not certification of the full locked-delivery matrix.
 - APK terminal offers explicit development entry `andcode-ubuntu-proot [loopback-proxy] [command...]`;
   no arguments starts interactive Bash, exit returns to lightweight Bash, missing instance fails explicitly. No auto-install or su.
   This terminal entry is separate from the managed OpenCode/Web PTY backend.
@@ -1028,44 +1048,51 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
 - CI copies standard bundle separately for Tier P, verifies/patches seven seccomp byte sites, reruns and
   verifies unchanged loader/libc SHA-256 before repackaging/physicalization. Standard Linux bundle unchanged;
   new-baseline byte mismatch fails build; patches never apply to PRoot guest or apt-updated libc.
-  Android-specific artifact chain/full jniLibs/Gradle integration awaits first CI run and P0/P3 on-device verification.
+  Android-specific artifact chain is integrated: `pack-apk-libs` output passes through CI artifacts to
+  Gradle via `-PandcodeNativeDir`; conditional release signing verifies with `apksigner` when all required
+  secrets are configured. Locked-form/device matrix acceptance remains pending P0/P3.
 - Independent Linux CI workflow tests only rootfs apt/non-root compilation/execution, privilege reduction and compatibility,
   not Android support. After user cleanup on 2026-11-09, old device had about 54 GiB free.
   No local Docker; add native-device development bootstrap with official fixed-SHA-256 Ubuntu Base,
   not equivalent to CI build validation. Copy existing independent BusyBox to root-private directory for bind mount,
   no third-party app; old Toybox incorrectly attempts loop for character-device bind. Allocate loop explicitly,
-  do not detach again after kernel auto-detach. Chroot UID 60000 networking still fails; authenticated service,
-  project mapping, OpenCode/Web PTY and self-contained integration **pending P0/P3 on-device verification**.
+  do not detach again after kernel auto-detach. Chroot UID 60000 networking still fails; canonical-archive
+  chroot integration, authenticated root service and recovery remain **pending P0/P3 on-device verification**.
   Operations/acceptance: `docs/UBUNTU.md`.
 
-## 5. Repository structure (deliverables in this repository)
+## 5. Repository structure (current top-level layout)
 
 ```
 andcode/
-├── docs/                     # DESIGN.md · REUSE.md · NAMING.md
-├── baseline/                 # Compatibility build baseline (§3)
-│   ├── Dockerfile            # ubuntu:24.04 (arm64) + build-essential + git + bun
-│   ├── make-rootfs.sh        # debootstrap arm64 rootfs (bundle sysroot source)
-│   └── check-compat.sh       # glibc/ELF compatibility audit gate
-├── bundle/                   # Self-contained bundle (§4.1)
-│   ├── pack-bundle.sh        # Extract glibc closure + components from baseline rootfs → tarball
-│   ├── pack-apk-libs.sh      # Canonical layout → Tier P jniLibs physical-name repackaging (NAMING §6.2)
-│   ├── wrapper.sh.tpl        # Loader wrapper template
-│   └── shim/                 # LD_PRELOAD redirection shim (C, AGPL)
-├── magisk-module/            # Tier M(§4.2)
-├── runtime/ubuntu/           # Root chroot prototype management/installation entries (§4.8)
-├── scripts/
-│   ├── deploy-adb.sh         # Tier A(§4.3)
-│   ├── naming-lint.sh        # Naming CI gate (NAMING §8)
-│   └── smoke-test.sh         # Acceptance shared by all three forms (§6)
-├── app/                      # Tier P custom APK (§4.4, Kotlin + jackpal terminal-library fork)
-├── third_party/              # Guides/patches (build recipes only, no vendored source)
-└── .github/workflows/andcode-ci.yml  # Baseline → bundle → audit → smoke → release
+├── docs/                     # Design, naming, reuse, Ubuntu and LFS documentation
+├── baseline/                 # Ubuntu arm64 baseline and compatibility audit
+├── bundle/                   # Bundle packers, pack-apk-libs, launchers, overlay and shim
+├── runtime/ubuntu/           # Root-side Ubuntu chroot installation/management
+├── app/                      # Android application and terminal modules
+├── magisk-module/            # Tier M module integration
+├── scripts/                  # Packaging, rootfs, audits, CI and device gates
+├── ci/                       # CI integration assets and helpers
+└── .github/workflows/        # Build, artifact transfer, APK and release workflows
 ```
 
 ---
 
-## 6. Phase plan and acceptance criteria
+## 6. Historical plan and current acceptance status
+
+The phase table below is retained as the original project plan, not a statement of current
+implementation status. Current acceptance scope is summarized here; device claims are limited
+to the explicitly tested device and paths.
+
+| Area | Current status |
+|---|---|
+| Tier P Web/TUI and packaged native payload | Integrated; single-APK rootfs installation and managed PRoot serve passed stated checks on device `8c8da214` |
+| Linux compatibility baseline and CI artifact chain | Integrated, including `pack-apk-libs` to Gradle `-PandcodeNativeDir` transfer |
+| Managed PRoot serve | Implemented, default off; device scope and gpt-oss-120b continuation defect are recorded in §4.4/§4.8 |
+| Other-device and locked-delivery matrix | Pending P0/P3 device verification |
+| Root chroot integration/recovery using canonical archive | Pending P0/P3 device verification |
+| Tier M model/tool tests | Two text+bash tool round trips passed with explicit proxy and CA; manual root diagnostic scope only (§4.2) |
+
+Original phase plan:
 
 | Phase | Content | Acceptance criteria |
 |---|---|---|
@@ -1083,7 +1110,7 @@ andcode/
 |---|---|---|---|
 | R1 | Bun/opencode needs uncovered system files in "bare glibc sysroot without proot" (shim gaps), or JSC JIT restricted beyond targetSdk 28 | Tier A/P main path blocked | ① Device-test/fill shim gaps in P0; ② introduce one static proot binary for bind (independent GPL-2.0 aggregation + source provision); ③ Tier M real chroot unaffected |
 | R2 | Ubuntu 24.04 raises standard-device floor to glibc ≥ 2.39 | Narrower standard Linux targets | ① Android unaffected (bundled glibc); ② add Debian 12 second baseline/release tier; ③ static musl for simple tools |
-| R3 | targetSdk 37.2 runtime constraints: data-directory exec prohibition, W^X/JIT, runtime ELF extraction | Tier P main path blocked | ① jniLibs extraction (`lib*.so` → `nativeLibraryDir`), no executable runtime writes (§4.4); ② `BUN_JSC_useJIT=0` if JIT rejected (performance cost, assess on device); ③ if opencode must extract ELF and cannot redirect, patch to prestaged paths (AGPL patch) |
+| R3 | Android data-directory execution policy and runtime W^X/JIT constraints are distinct; runtime ELF extraction may require redirection | Tier P launch or JIT may be affected | ① Package executables in jniLibs (`lib*.so` → `nativeLibraryDir`); ② use the validated guest PRoot path for Ubuntu ELF only; ③ assess `BUN_JSC_useJIT=0` if runtime W^X policy rejects JIT; ④ redirect runtime extraction to prestaged copies where supported |
 | R4 | ROM differences (vendor background killing, locked device_config) | Process survival | Prefer persistent root Tier M; `serve`+SSH fallback; document mainstream ROM adaptation commands |
 | R5 | Rapid upstream opencode changes and artifact-layout shifts | Maintenance cost | Regular CI P0 smoke reruns; encode assumptions in `scripts/smoke-test.sh` |
 | R6 | Unmaintained jackpal terminal library; new Android (targetSdk 35+ behavior) regressions | Tier P terminal experience | Maintain minimal fork with edge-to-edge/predictive-back adaptation; terminal is one entry, SSH/serve fallback; evaluate Termux terminal if needed (GPLv3, separate fork repository required) |

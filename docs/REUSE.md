@@ -58,7 +58,7 @@ conditions must still be reviewed; no complete-source or license approval is imp
 | dropbear | `mkj/dropbear` (★2.5k, active) | **MIT** (LICENSE text verified: Matt Johnston, MIT-style grant) | Built-in sshd shared by all three forms (§4.7 interaction entry points) | Build static/dynamic versions within the baseline and distribute with the bundle |
 | termux-exec | `termux/termux-exec` (★268, active) | **Apache-2.0** (LICENSE inspected: Apache-2.0 + MIT components) | **LD_PRELOAD interception reference implementation**: years of Android LD_PRELOAD engineering directly inform §4.5 shim interception scope and pitfalls | Reference implementation; retain Apache-2.0 notices if taking code |
 | jackpal/Android-Terminal-Emulator | `jackpal/Android-Terminal-Emulator` (★3.2k) | **Apache-2.0** | Tier P APK terminal-emulator core (emulator/view libraries may be incorporated into the AGPL project) | Minimal fork (upstream stopped updating in 2022; all existing forks stalled in 2014–2021, verified), retaining copyright notices |
-| **Termux terminal-emulator / terminal-view (final P3 choice, incorporated)** | `termux/termux-app` modules (★64.2k, active) | **GPLv3** | P3 APK terminal core (selected because jackpal is inactive) | One-way GPLv3→AGPLv3 compatibility; incorporated into app/terminal-* (copyright headers retained, app/NOTICE-TERMINAL.md); combined work as a whole AGPL-3.0-only; publishing this repository satisfies the source obligation |
+| **Termux terminal-emulator / terminal-view (final P3 choice, incorporated)** | `termux/termux-app` modules (★64.2k, active) | **GPLv3** | P3 APK terminal core (selected because jackpal is inactive) | These components remain under GPLv3; retain their original copyright and license notices (app/NOTICE-TERMINAL.md). AGPL-3.0-only applies to this project's own material and material the project may license under it, and does not relicense these GPLv3 components. Source-related obligations depend on the exact materials distributed and the method of distribution; repository availability alone does not establish fulfillment. |
 | proot (Termux bionic build) | packages.termux.dev pool/main/p/proot | **GPL-2.0** | **The /etc redirection solution for Tier A/M** (on-device P0: LD_PRELOAD cannot intercept glibc internal fopen("/etc/resolv.conf"); proot bind enabled the complete git https chain in device testing) | Independent-program aggregation; proot + loader + libtalloc (LGPL-3.0) + libandroid-shmem (**BSD-2-Clause**, termux/libandroid-shmem LICENSE checked) distributed with the bundle and recorded in manifest |
 | ConnectBot | `connectbot/connectbot` (★3.6k, active) | Apache-2.0 | Recommended Tier A/M SSH client (**optional tool, not a dependency**) | Documentation recommendation only |
 
@@ -1678,8 +1678,10 @@ it collects only our own CI process stacks and is not included in APK/bundle.
 
 1. **All original project work** (design documents, bundle/pack scripts, shim, Magisk module scripts, APK,
    jackpal fork modifications) → AGPL-3.0-only.
-2. **MIT/BSD/Apache code** (opencode, dropbear, jackpal, etc.) → may be incorporated with copyright
-   and license notices retained; the incorporated whole is subject to AGPL for downstream recipients.
+2. **MIT/BSD/Apache code** (opencode, dropbear, jackpal, etc.) → may be incorporated where its license permits,
+   with copyright and license notices retained. AGPL-3.0-only applies to this project's own material and material
+   the project may license under it; it does not change third-party component licenses or establish that an entire
+   combined work is exclusively AGPL-3.0-only.
 3. **LGPL dependencies** (glibc, JavaScriptCore) → verify versions, static/dynamic linking and changes individually;
    retain notices and fulfill applicable requirements for exact corresponding source, relinking/replacement and necessary installation materials.
    Attaching license text or upstream URLs alone does not establish fulfillment.
