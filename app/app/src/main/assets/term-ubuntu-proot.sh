@@ -20,18 +20,18 @@ while [ $# -gt 0 ]; do
 done
 [ -f "$ROOT/usr/bin/bash" ] && [ -f "$P/proot" ] && [ -f "$P/loader" ] || {
     if [ "$wait_install" = 1 ]; then
-        echo '正在准备 Ubuntu 实例（首次约 1-2 分钟）...' >&2
+        echo 'Preparing the Ubuntu instance (first run, 1-2 minutes)...' >&2
         n=0
         while [ ! -f "$ROOT.digest" ] && [ "$n" -lt 300 ]; do sleep 2; n=$((n+2)); done
-        [ -f "$ROOT/usr/bin/bash" ] || { echo 'Ubuntu 实例提取失败；会话未启动。' >&2; exit 1; }
-        [ -f "$P/proot" ] && [ -f "$P/loader" ] || { echo 'PRoot 载荷缺失。' >&2; exit 1; }
-        echo 'Ubuntu 实例就绪。' >&2
+        [ -f "$ROOT/usr/bin/bash" ] || { echo 'Ubuntu instance extraction failed; session not started.' >&2; exit 1; }
+        [ -f "$P/proot" ] && [ -f "$P/loader" ] || { echo 'PRoot payload missing.' >&2; exit 1; }
+        echo 'Ubuntu instance ready.' >&2
     else
-        echo 'Ubuntu PRoot 实例未安装；会话未启动。' >&2
+        echo 'Ubuntu PRoot instance not installed; session not started.' >&2
         exit 1
     fi
 }
-echo 'Ubuntu PRoot 开发后端：fake root 非宿主 root；不是安全沙箱。' >&2
+echo 'Ubuntu PRoot dev backend: fake root, not host root; not a security sandbox.' >&2
 [ "$#" -gt 0 ] || set -- /bin/bash --noprofile --norc -i
 set -- /usr/bin/env -i HOME=/root USER=root LOGNAME=root SHELL=/bin/bash \
     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
@@ -40,12 +40,12 @@ set -- /usr/bin/env -i HOME=/root USER=root LOGNAME=root SHELL=/bin/bash \
 WORK=/root
 NAME=${ANDCODE_UBUNTU_PROJECT_NAME:-}
 if [ -n "$NAME" ]; then
-    case "$NAME" in .|..|*/*|*\\*|*:*) echo '拒绝无效项目名。' >&2; exit 1 ;; esac
+    case "$NAME" in .|..|*/*|*\\*|*:*) echo 'Invalid project name rejected.' >&2; exit 1 ;; esac
     PROJECT=$FILES/projects/$NAME
     # Reject symlink roots and aliases; never silently run in a different cwd.
     [ ! -L "$FILES/projects" ] && [ ! -L "$PROJECT" ] && [ -d "$PROJECT" ] \
         && [ "$(/system/bin/toybox realpath "$PROJECT")" = "$(/system/bin/toybox realpath "$FILES")/projects/$NAME" ] || {
-        echo '选中项目不存在或路径不安全；会话未启动。' >&2
+        echo 'Selected project missing or unsafe; session not started.' >&2
         exit 1
     }
     WORK=/workspace/$NAME
@@ -58,4 +58,23 @@ export GLIBC_TUNABLES=glibc.pthread.rseq=0
 # 设备存储:FUSE 视图受平台权限约束(Download/媒体已实测可读写)。
 SDCARD=/storage/emulated/0
 [ -d "$SDCARD" ] && set -- -b "$SDCARD:/mnt/sdcard" "$@"
+echo ""
+cat <<'ANDCODE_BANNER'
+        _                 _                       
+  __ _ | |__   __ _ _ __   __| |  ___  _ __   __ _ 
+ / _` | '_ \ / _` | '_ \ / _` | / _ \ | '__| / _` |
+| (_| | | | | (_| | | | | (_| || (_) | | | | (_| |
+ \__,_||_| |_|\__,_|_| |_|\__,_| \___/|_| |_|\__,_|
+
+ opencode · AI coding agent on Android
+ Ubuntu 24.04 dev rootfs (single-APK)
+ANDCODE_BANNER
+REL=$(getprop ro.build.version.release 2>/dev/null | head -1)
+[ -n "$REL" ] && echo " Android $REL" >&2
+echo " Linux $(uname -r) $(uname -m)" >&2
+MEMKB=$(grep MemAvailable /proc/meminfo 2>/dev/null | head -1 | sed "s/[^0-9]//g")
+[ -n "$MEMKB" ] && echo " Memory: $((MEMKB / 1048576)).$((MEMKB % 1048576 * 10 / 1048576)) GB available" >&2
+FREEKB=$(df -k $FILES 2>/dev/null | tail -1 | sed "s/[^0-9].*//")
+[ -n "$FREEKB" ] && echo " Storage free: $((FREEKB / 1048576)) GB" >&2
+echo "" >&2
 exec "$P/proot" --kill-on-exit -l -0 -r "$ROOT" -b /dev -b /proc "$@"

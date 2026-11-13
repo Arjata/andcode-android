@@ -169,9 +169,11 @@ public class TerminalActivity extends AppCompatActivity {
         sb.append("else\n");
         sb.append("  [ ! -r /system/etc/mkshrc ] || . /system/etc/mkshrc\n");
         sb.append("  PS1='$PWD $ '\n");
-        sb.append("  printf '%s\\n' 'Bash 未部署，当前使用系统 sh。'\n");
+        sb.append("  printf '%s\\n' 'Bash payload not installed; using the system sh.'\n");
         sb.append("fi\n");
-        sb.append("printf '%s\\n' 'andcode 终端 · 输入 opencode 启动 AI 编码代理'\n");
+        sb.append("cat <<'ANDCODE_BANNER'\n")
+           .append(buildBanner())
+           .append("ANDCODE_BANNER\n");
         if (mRuntimeRoot != null)
             sb.append("export ANDCODE_RUNTIME_ROOT=\"").append(mRuntimeRoot.getAbsolutePath()).append("\"\n");
         // Shell function, not an executable: app data dirs forbid exec (targetSdk 37.2);
@@ -194,7 +196,7 @@ public class TerminalActivity extends AppCompatActivity {
             sb.append("}\n");
         }
         sb.append("andcode-ubuntu-proot() { /system/bin/sh \"$ANDCODE_APP_DATA/term-ubuntu-proot\" \"$@\"; }\n");
-        sb.append("printf '%s\\n' 'Ubuntu 开发实例：andcode-ubuntu-proot [loopback-proxy]；未安装时明确报错。'\n");
+        sb.append("printf '%s\\n' 'Ubuntu dev instance: andcode-ubuntu-proot [proxy=<url>]; errors out if missing.'\n");
         prepareUbuntuProot(files);
         writeFile(new File(files, "term-env.sh"), sb.toString());
         writeFile(new File(files, "term-bashrc"), sb.toString());
@@ -210,6 +212,50 @@ public class TerminalActivity extends AppCompatActivity {
         if (!bashrc.exists() || bashrcLegacy.equals(readSmallFile(bashrc))) {
             writeFile(bashrc, bashrcWanted);
         }
+    }
+
+    /** Armbian 风格横幅:字符画 + 设备信息;终端提示词一律英文。 */
+    private String buildBanner() {
+        StringBuilder b = new StringBuilder();
+        b.append("\n");
+        b.append("        _                 _                       \n");
+        b.append("  __ _ | |__   __ _ _ __   __| |  ___  _ __   __ _ \n");
+        b.append(" / _` | '_ \\ / _` | '_ \\ / _` | / _ \\ | '__| / _` |\n");
+        b.append("| (_| | | | | (_| | | | | (_| || (_) | | | | (_| |\n");
+        b.append(" \\__,_||_| |_|\\__,_|_| |_|\\__,_| \\___/|_| |_|\\__,_|\n");
+        b.append("\n");
+        b.append(" opencode · AI coding agent on Android\n");
+        b.append("\n");
+        b.append(" Android ").append(android.os.Build.VERSION.RELEASE)
+          .append(" (SDK ").append(android.os.Build.VERSION.SDK_INT)
+          .append(") · ").append(android.os.Build.MODEL.substring(0,
+              Math.min(24, android.os.Build.MODEL.length()))).append("\n");
+        b.append(" Linux ").append(System.getProperty("os.version", ""))
+          .append("\n");
+        long memTotal = 0, memAvail = 0;
+        try (java.io.BufferedReader r = new java.io.BufferedReader(
+                new java.io.FileReader("/proc/meminfo"))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("MemTotal:"))
+                    memTotal = Long.parseLong(line.replaceAll("[^0-9]", ""));
+                if (line.startsWith("MemAvailable:"))
+                    memAvail = Long.parseLong(line.replaceAll("[^0-9]", ""));
+            }
+        } catch (Exception ignored) {
+        }
+        if (memTotal > 0) {
+            b.append(" Memory: ").append(memTotal / 1048576).append(" GB total / ")
+              .append(memAvail / 1048576).append(" GB available\n");
+        }
+        long free = getFilesDir().getUsableSpace();
+        b.append(" Storage free: ")
+          .append(String.format(java.util.Locale.US, "%.1f", free / 1073741824.0))
+          .append(" GB\n");
+        b.append("\n");
+        b.append(" Type opencode to start the AI coding agent.\n");
+        b.append("\n");
+        return b.toString();
     }
 
     /** 只解释脚本;不 su、不 relabel、不自动下载/解包、不把模型接入特权维护入口。 */
