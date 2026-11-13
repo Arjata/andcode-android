@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-serve-env.sh — 启动 opencode serve,抓 server 进程环境(验证 env 继承)
+# dev-serve-env.sh — Start opencode serve and capture the server process environment (verify environment inheritance)
 ROOT=/data/local/tmp/andcode
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
 export ANDCODE_APP_DATA=/data/data/dev.andcode.app/files

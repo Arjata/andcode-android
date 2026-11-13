@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# patch-nested.sh — wrapper 加嵌套 proot 守卫(ANDCODE_IN_PROOT)
-# 用法: sh patch-nested.sh <bundle-root>
+# patch-nested.sh — Add a nested-proot guard to wrappers (ANDCODE_IN_PROOT)
+# Usage: sh patch-nested.sh <bundle-root>
 set -u
 ROOT="${1:?usage: patch-nested.sh <bundle-root>}"
 

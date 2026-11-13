@@ -1,9 +1,9 @@
 #!/system/bin/sh
-# opencode TUI(Tier P 应用上下文)
-# 1) bundle=apk_data_file 应用只读;可写状态(HOME/TMPDIR/BUN_TMPDIR)在应用 filesDir
-# 2) BUN_TMPDIR:Bun 提取内嵌原生库(libopentui)的目录,必须应用可写
-# 3) ANDCODE_IN_PROOT=1: TUI 跳过 proot;GLIBC_TUNABLES 关闭 rseq 注册
-# 4) ld.so/libc.so.6 已打 seccomp 兼容补丁(set_robust_list/rseq/clone3)
+# opencode TUI (Tier P application context)
+# 1) bundle=apk_data_file is read-only to the app; writable state (HOME/TMPDIR/BUN_TMPDIR) lives in filesDir.
+# 2) BUN_TMPDIR: Bun's extraction directory for embedded native libraries (libopentui); must be app-writable.
+# 3) ANDCODE_IN_PROOT=1: TUI skips proot; GLIBC_TUNABLES disables rseq registration.
+# 4) ld.so/libc.so.6 have seccomp compatibility patches (set_robust_list/rseq/clone3).
 export ANDCODE_ROOT=/data/local/tmp/andcode
 export ANDCODE_TIER=a
 APP=/data/data/dev.andcode.app/files

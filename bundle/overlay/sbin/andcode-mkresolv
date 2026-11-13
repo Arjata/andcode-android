@@ -1,19 +1,19 @@
 #!/system/bin/sh
-# andcode-mkresolv — 从 Android 生成 resolv.conf(DESIGN §4.5, NAMING §4.2)
-# 用法: andcode-mkresolv [输出路径]  (默认 $ANDCODE_ROOT/etc/resolv.conf)
+# andcode-mkresolv — generate resolv.conf from Android (DESIGN §4.5, NAMING §4.2)
+# Usage: andcode-mkresolv [output path]  (default: $ANDCODE_ROOT/etc/resolv.conf)
 set -eu
 OUT="${1:-${ANDCODE_ROOT:?ANDCODE_ROOT 未设置}/etc/resolv.conf}"
 
-# 优先级: 环境显式 > ndc/system 属性运行时探测 > 公共兜底
+# Priority: explicit environment setting > runtime ndc/system property detection > public fallback
 DNS="${ANDCODE_DNS:-}"
 if [ -z "$DNS" ]; then
-  # getprop 在 shell/App 域可用;Tier P 无 shell 时由调用方注入 ANDCODE_DNS
+  # getprop is available in shell/App domains; callers inject ANDCODE_DNS for Tier P without a shell
   if command -v getprop >/dev/null 2>&1; then
     for i in 1 2 3 4; do
       d="$(getprop "net.dns$i" 2>/dev/null || true)"
       [ -n "$d" ] && DNS="$DNS $d"
     done
-    # Android 8+ 常见: net.dns1 为空,退回 rnd0 接口 DNS 或系统兜底
+    # Common on Android 8+: net.dns1 is empty; fall back to rnd0 interface DNS or the system fallback
     if [ -z "$(printf '%s' "$DNS" | tr -d ' ')" ]; then
       d="$(getprop net.dns1 2>/dev/null || true)"
       [ -n "$d" ] && DNS="$d"
@@ -24,7 +24,7 @@ fi
 
 {
   for d in $DNS; do echo "nameserver $d"; done
-  # 移动网络/受管 Wi-Fi 常阻断 UDP 53 出站(ICMP/443 可通):强制 TCP DNS
+  # Mobile networks/managed Wi-Fi often block outbound UDP 53 (ICMP/443 work): force TCP DNS
   echo "options use-vc timeout:3 attempts:2"
 } > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
 echo "resolv.conf → $OUT: $(tr '\n' ' ' < "$OUT")"

@@ -1,10 +1,10 @@
-# customize.sh — Magisk 安装脚本(Tier M,DESIGN §4.2)
-# 模块 zip 内容: 本目录脚本 + andcode-bundle-arm64.tar.gz(打包时由 CI 注入)
+# customize.sh — Magisk installation script (Tier M, DESIGN §4.2)
+# Module ZIP contents: scripts from this directory + andcode-bundle-arm64.tar.gz (injected by CI during packaging)
 SKIPUNZIP=0
 ui_print "- andcode: 释放交付包"
-BUNDLE_ZIP="$ZIPFILE"   # 安装器变量;bundle 以附加条目形式存在于 zip 内
+BUNDLE_ZIP="$ZIPFILE"   # Installer variable; the bundle is an additional entry in the ZIP.
 
-# 释放 bundle(ziptune 场景由 CI 把 andcode-bundle-*.tar.gz 附加进模块 zip)
+# Extract the bundle (for ziptune, CI adds andcode-bundle-*.tar.gz to the module ZIP).
 unzip -o "$ZIPFILE" 'andcode-bundle-*.tar.gz' -d "$MODPATH" >/dev/null 2>&1 || true
 BK="$(ls "$MODPATH"/andcode-bundle-*.tar.gz 2>/dev/null | head -n1 || true)"
 [ -n "$BK" ] || { ui_print "! 未找到 bundle,模块将以空壳安装"; exit 1; }

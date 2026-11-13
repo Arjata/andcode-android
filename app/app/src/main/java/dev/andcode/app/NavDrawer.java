@@ -9,9 +9,9 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 /**
- * 共享抽屉导航(对齐 andapi NavDrawer 模式):每个页面 inflate
- * layout/nav_drawer.xml 后交给本类接线,导航行为全局一致;
- * 当前页对应条目为空操作。版本号常驻抽屉底部。
+ * Shared drawer navigation (matching the andapi NavDrawer pattern): each page inflates
+ * layout/nav_drawer.xml and delegates wiring here for consistent navigation.
+ * The current page's entry is a no-op. The version stays at the bottom of the drawer.
  */
 public final class NavDrawer {
 
@@ -23,7 +23,7 @@ public final class NavDrawer {
 
     private NavDrawer() {}
 
-    /** “主页”是明确目的地,不能假定 finish() 后返回栈里一定是 HomeActivity。 */
+    /** Home is an explicit destination; finish() does not guarantee HomeActivity is next on the back stack. */
     public static void goHome(Activity activity) {
         activity.startActivity(new Intent(activity, HomeActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));

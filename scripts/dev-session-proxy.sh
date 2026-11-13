@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-session-proxy.sh — opencode 真实编码会话(经本机 Clash HTTP 代理)
+# dev-session-proxy.sh — Real opencode coding session (via the host Clash HTTP proxy)
 ROOT=/data/local/tmp/andcode
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
 export ANDCODE_APP_DATA=/data/data/dev.andcode.app/files

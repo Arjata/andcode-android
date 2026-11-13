@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-helper-proto.sh — 手动喂 helper 协议帧,验证 helper 自身是否正常
+# dev-helper-proto.sh — Feed helper protocol frames manually to verify the helper itself
 ROOT=/data/local/tmp/andcode
 H="$ROOT/usr/libexec/git-core"
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
@@ -7,9 +7,9 @@ export PATH="$ROOT/bin:$ROOT/usr/bin:$H:$PATH"
 export HOME="$ROOT/home"
 
 echo "== 恢复 wrapper(从 .bin 同目录重建)=="
-# 诱饵覆盖了 git-remote-https;从 git-remote-https.bin 同配置重建:直接拷贝 git-remote-http 的 wrapper 内容(同为 helper 形态)
+# The decoy overwrote git-remote-https; rebuild for git-remote-https.bin by copying the git-remote-http wrapper (same helper mode).
 if [ ! -x "$H/git-remote-https" ] || grep -q BAIT "$H/git-remote-https" 2>/dev/null; then
-  # 用 loader 直接验证 .bin 是否能应答 capabilities
+  # Use the loader directly to verify that the .bin responds to capabilities.
   echo "== 手动协议: capabilities 帧 → helper .bin =="
   printf 'capabilities\n\n' | \
     LD_PRELOAD="$ROOT/shim/libandcode-shim.so" \

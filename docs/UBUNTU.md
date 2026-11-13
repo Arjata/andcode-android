@@ -1,8 +1,8 @@
-# Ubuntu 开发环境：原型状态与验收
+# Ubuntu Development Environment: Prototype Status and Acceptance
 
-对应 [DESIGN §4.8](DESIGN.md#48-ubuntu-开发环境双后端实施中非已交付能力)。
+See [DESIGN §4.8](DESIGN.md#48-dual-ubuntu-development-backends-implementation-ongoing-not-delivered-capability).
 
-## 当前状态
+## Current Status
 
 ### Rootfs tool experiment
 
@@ -194,96 +194,96 @@ binary/source-version tuples matched those indexes (review JSON SHA-256
 Materialized PRoot bytes are 469579853; path/link counts are unchanged. This
 artifact predates source acquisition and cannot be credited with that new gate.
 
-这是 **root chroot + PRoot 开发原型**，不是已完成自包含交付的 Ubuntu 功能。
-轻量 Bash 与 Web 界面保持原样；PRoot 已通过旧设备真实应用域的代理模式开发准入。
-不依赖 Termux App，不降低 targetSdk，不关闭 SELinux。
+This is a **root chroot + PRoot development prototype**, not a fully delivered self-contained Ubuntu feature.
+Lightweight Bash and the Web interface remain unchanged; PRoot has passed proxy-mode development acceptance in the real application domain on the older device.
+It does not depend on the Termux App, lower targetSdk, or disable SELinux.
 
-- 原生 arm64 CI 首跑 [42508958877](https://github.com/Arjata/andcode-android/actions/runs/42508958877)
-  已通过镜像构建、私有 mount namespace 测试、glibc/16K 审计；该工件已按摘要
-  安装到独立 `/data/adb/andcode-ubuntu-ci`，拒绝重复安装已实测。可信镜像已通过
-  root 代理 HTTPS/严格 apt/hello，以及普通用户编译、权限清空、PTY 与生命周期；
-  最后普通用户连接回环代理超时，完整 smoke 退出 1，网络阻塞未解决。
-- 本轮已通过：构建归档校验器 14 项合成测试；设备系统 sh 的入口语法、预置 Bash
-  的构建脚本语法；Toybox 私有 mount namespace 递归 private 设置。空间不足门禁
-  曾实测拒绝且未创建实例。清理空间后已建立设备开发实例（不是 CI 工件安装）。
-- chroot root 维护入口已通过代理 HTTPS 证书校验、apt update/install hello 及
-  glibc 2.39-0ubuntu8.7 → 8.9 更新；UID/GID 60000 已通过 gcc 编译运行、16K
-  LOAD、capabilities 清零、prctl no-new-privs 查询、PTY/子进程及前台清理。
-  **普通用户连接代理超时，默认 DNS 未通过，完整 smoke 脚本仍失败。**
-  对照诊断在同样降权/清除 capabilities 条件下只更换 UID：60000 超时，实际 APK UID
-   10348 可连接；未因此改变正式开发身份或设备防火墙。只读 BPF 诊断进一步确认
-   设备受限网络模式开启，全局规则 `0x220` 包含 `RESTRICTED_MATCH`，APK UID 的
-   `0xa5` 包含相应放行位而 UID 60000 无记录。认证服务需解决网络身份适配。
-- PRoot 在真实 `untrusted_app`、Seccomp=2 下通过显式代理 apt update/install、
-  HTTPS 证书校验、新装 hello、gcc 编译产物执行、PTY/子进程与 glibc 8.7 → 8.9
-  更新后运行，输出 `ANDCODE_PROOT_DEVELOPMENT_OK`、`development-exit=0`。
-  guest ELF 未修改，没有用 su/run-as 替代；后续 TCP DNS 的无显式代理 HTTPS、
-  严格 apt update 与 Git HTTPS 已通过，其它设备及关闭 VPN 场景仍未验证。
-- 用户清理后旧设备 `8c8da214` 可用约 54 GiB，空间阻塞已解除，SELinux 保持 Enforcing。
-- 4 GiB 镜像需要先暂存压缩文件，再保留至少 **5 GiB** 可用空间。实际开发项目
-  可能需要更大的镜像；当前原型不提供自动扩容或覆盖重装。
-- chroot/PRoot 都不是安全沙箱；不要在原型内执行不可信项目或模型自动化操作。
-- 正式分发前还需对应源码/许可履约审查，CI 工件不代表发布已获批准。
+- The first native arm64 CI run [42508958877](https://github.com/Arjata/andcode-android/actions/runs/42508958877)
+  passed image construction, private mount namespace tests and the glibc/16K audit. The artifact was installed by digest
+  into the separate `/data/adb/andcode-ubuntu-ci`; rejection of duplicate installation was tested. The trusted image passed
+  root proxy HTTPS/strict apt/hello, and ordinary-user compilation, privilege clearing, PTY and lifecycle checks.
+  The final ordinary-user connection to the loopback proxy timed out; the complete smoke exited 1 and the network blocker remained unresolved.
+- This round passed: 14 synthetic build-archive validator tests; entry-point syntax under device system sh and build-script
+  syntax under the staged Bash; Toybox recursive-private setup in a private mount namespace. The insufficient-space gate
+  was tested and rejected installation without creating an instance. A device development instance was created after cleanup (not a CI artifact installation).
+- The chroot root maintenance entry passed proxy HTTPS certificate verification, apt update/install hello and the
+  glibc 2.39-0ubuntu8.7 → 8.9 update. UID/GID 60000 passed gcc compilation/execution, 16K
+  LOAD, zeroed capabilities, prctl no-new-privs queries, PTY/child processes and foreground cleanup.
+  **The ordinary-user proxy connection timed out, default DNS did not pass, and the complete smoke script still failed.**
+  A controlled diagnostic changed only the UID under the same privilege-drop/capability-clearing conditions: 60000 timed out, while the actual APK UID
+  10348 could connect. Neither the official development identity nor the device firewall was changed. Read-only BPF diagnostics further confirmed
+  that restricted networking mode was enabled: global rule `0x220` included `RESTRICTED_MATCH`, the APK UID's
+  `0xa5` included the corresponding allow bit, and UID 60000 had no record. The authenticated service needs to address network-identity adaptation.
+- Under real `untrusted_app`, Seccomp=2, PRoot passed explicit-proxy apt update/install,
+  HTTPS certificate verification, newly installed hello, execution of gcc output, PTY/child processes and execution after the glibc 8.7 → 8.9
+  update, emitting `ANDCODE_PROOT_DEVELOPMENT_OK` and `development-exit=0`.
+  Guest ELF files were unchanged; su/run-as was not used as a substitute. Subsequent HTTPS without an explicit proxy over TCP DNS,
+  strict apt update and Git HTTPS passed; other devices and VPN-disabled scenarios remain unverified.
+- After user cleanup, older device `8c8da214` had about 54 GiB free; the space blocker was resolved and SELinux remained Enforcing.
+- The 4 GiB image requires staging the compressed file first and then retaining at least **5 GiB** free. Real development projects
+  may need a larger image; the current prototype offers neither automatic expansion nor overwrite reinstallation.
+- Neither chroot nor PRoot is a security sandbox; do not run untrusted projects or automated model operations inside the prototype.
+- Corresponding-source/license fulfillment still requires review before formal distribution; CI artifacts do not indicate release approval.
 
-### 设备开发引导路径（不替代 CI）
+### Device Development Bootstrap Path (Not a Substitute for CI)
 
-本机无 Docker 且 CI 配方尚未发布时，可用 `scripts/bootstrap-ubuntu-device.sh`
-对固定摘要的官方 Ubuntu Base 24.04.4 arm64 归档建立独立 4 GiB ext4 开发实例。
-输入在 `/data/local/tmp/ubuntu-base-24.04.4-base-arm64.tar.gz`，必须 root:root 0600；
-同时需要审查后的 `/data/local/tmp/andcode-ubuntu` 与现有 bundle 的独立 BusyBox。
-配方只接受固定路径/摘要且拒绝覆盖实例，失败保留残留供检查。
-这是原生设备开发验证，不得称为 CI 工件安装验证。rootfs 来源与包清单分别记录在
-实例 `andcode-ubuntu-build.txt` 与 guest `/etc/andcode-ubuntu-packages.tsv`。
+When Docker is unavailable locally and the CI recipe has not yet been published, `scripts/bootstrap-ubuntu-device.sh`
+can create a separate 4 GiB ext4 development instance from the digest-pinned official Ubuntu Base 24.04.4 arm64 archive.
+The input at `/data/local/tmp/ubuntu-base-24.04.4-base-arm64.tar.gz` must be root:root 0600;
+the reviewed `/data/local/tmp/andcode-ubuntu` and the existing bundle's standalone BusyBox are also required.
+The recipe accepts only fixed paths/digests, refuses to overwrite instances, and retains failure remnants for inspection.
+This is native-device development validation and must not be called CI artifact installation validation. The rootfs origin and package inventory are recorded
+in the instance's `andcode-ubuntu-build.txt` and the guest's `/etc/andcode-ubuntu-packages.tsv`, respectively.
 
-旧设备 mke2fs 不支持 `orphan_file` 特性名；Toybox tar 拒绝 Ubuntu 的绝对链接，
-Toybox mount 对 `/dev/null` bind 错误执行 loop 逻辑。引导与会话复用现有 BusyBox
-独立载荷，将 root 私有副本保存在实例内。没有复制 BusyBox 源码进仓库。
-chroot 使用独立 devpts `newinstance,ptmxmode=0666,mode=0620,gid=60000`，不更改
-宿主 `/dev/pts`；宿主 `ptmxmode=000` 会让普通用户无法创建 PTY。旧内核缺少
-proc status 的 NoNewPrivs 字段，使用 `prctl(PR_GET_NO_NEW_PRIVS)` 验证，不能跳过检查。
-`scripts/ubuntu-device-test.sh` 验证 HTTPS、apt 安装、新安装 ELF、普通用户 capability
-清空、编译运行、宿主路径不可见与前台退出无挂载泄漏；它不测试 PRoot 应用域。
+The older device's mke2fs does not recognize the `orphan_file` feature name; Toybox tar rejects Ubuntu's absolute links,
+and Toybox mount incorrectly applies loop logic to a `/dev/null` bind. Bootstrap and sessions reuse the existing standalone BusyBox
+payload, keeping a root-private copy inside the instance. No BusyBox source was copied into the repository.
+chroot uses separate devpts `newinstance,ptmxmode=0666,mode=0620,gid=60000`, without changing
+host `/dev/pts`; host `ptmxmode=000` prevents ordinary users from creating PTYs. The older kernel lacks
+the NoNewPrivs field in proc status, so verification uses `prctl(PR_GET_NO_NEW_PRIVS)`; the check must not be skipped.
+`scripts/ubuntu-device-test.sh` verifies HTTPS, apt installation, newly installed ELF files, ordinary-user capability
+clearing, compilation/execution, host-path invisibility and no mount leaks on foreground exit; it does not test the PRoot application domain.
 
-## 构建与安装（仅可信 CI 工件，root 人工操作）
+## Build and Installation (Trusted CI Artifacts Only, Manual Root Operations)
 
-1. 触发 `.github/workflows/ubuntu-development.yml`。它生成镜像、压缩文件摘要、
-   包版本/源包清单与基础镜像 digest；使用另一份解压镜像做 apt/编译测试，
-   不修改上传的原镜像。只有该 run 通过后才能称“Linux CI 验证通过”。
-2. 将可信 run 的 `andcode-ubuntu-arm64.img.gz` 放至设备
-   `/data/local/tmp/andcode-ubuntu-arm64.img.gz`。从可信 CI 输出带外确认 SHA-256，
-   不把同目录任意文件给出的摘要当作真实性证明。
-3. 将本仓库审查后的 `runtime/ubuntu/andcode-ubuntu` 与
-   `runtime/ubuntu/andcode-ubuntu-install` 放至 `/data/local/tmp/` 同名路径。
-4. root 执行（将占位符替换为真实的 64 位小写十六进制摘要）：
+1. Trigger `.github/workflows/ubuntu-development.yml`. It generates the image, compressed-file digest,
+   package-version/source-package inventory and base-image digest. It tests apt/compilation on another decompressed image,
+   leaving the uploaded original unchanged. Only after that run passes may it be described as "validated by Linux CI."
+2. Place `andcode-ubuntu-arm64.img.gz` from the trusted run on the device at
+   `/data/local/tmp/andcode-ubuntu-arm64.img.gz`. Confirm its SHA-256 out of band from trusted CI output;
+   do not treat a digest supplied by an arbitrary file in the same directory as proof of authenticity.
+3. Place the reviewed repository files `runtime/ubuntu/andcode-ubuntu` and
+   `runtime/ubuntu/andcode-ubuntu-install` at their same-named paths under `/data/local/tmp/`.
+4. Run as root (replace the placeholder with the actual 64-character lowercase hexadecimal digest):
 
    ```sh
    su -c 'chown 0:0 /data/local/tmp/andcode-ubuntu-arm64.img.gz /data/local/tmp/andcode-ubuntu'
    su -c 'chmod 0600 /data/local/tmp/andcode-ubuntu-arm64.img.gz'
    su -c 'chmod 0700 /data/local/tmp/andcode-ubuntu'
-   su -c 'sh /data/local/tmp/andcode-ubuntu-install <可信的SHA256>'
+    su -c 'sh /data/local/tmp/andcode-ubuntu-install <trusted-SHA256>'
    su -c 'sh /data/adb/andcode-ubuntu/andcode-ubuntu status'
    su -c 'sh /data/adb/andcode-ubuntu/andcode-ubuntu shell'
    ```
 
-   安装拒绝已有实例，目录 `root:root 0700`，镜像 `root:root 0600`。安装失败保留
-   私有残留，不会自动删掉后重试。**不要直接使用项目 ZIP 导入功能安装 rootfs。**
-   暂存文件要求 root 所有且不可被其他用户写入；本原型假设设备无恶意 root 进程。
-   当前安装原型还需要 `/data/local/tmp/andcode/bin/busybox`，复制到 root 私有实例；
-   这是开发 bundle 依赖，不应被误称为已完成的自包含 APK 安装。
+   Installation rejects existing instances; directories are `root:root 0700` and the image is `root:root 0600`. Failed installation retains
+   private remnants rather than automatically deleting them and retrying. **Do not install a rootfs directly through the project ZIP import feature.**
+   Staged files must be root-owned and not writable by other users; this prototype assumes no malicious root process on the device.
+   The current installation prototype also requires `/data/local/tmp/andcode/bin/busybox`, copied into the root-private instance.
+   This is a development-bundle dependency and must not be misrepresented as completed self-contained APK installation.
 
-   设备已有开发实例时，可以显式选择**固定独立验收实例**，不要移动或覆盖旧实例：
+   If the device already has a development instance, explicitly select the **fixed separate acceptance instance**; do not move or overwrite the older instance:
 
    ```sh
-   su -c 'sh /data/local/tmp/andcode-ubuntu-install ci-validation <可信的SHA256>'
+    su -c 'sh /data/local/tmp/andcode-ubuntu-install ci-validation <trusted-SHA256>'
    su -c 'sh /data/adb/andcode-ubuntu-ci/andcode-ubuntu ci-validation status'
    su -c 'sh /data/local/tmp/andcode-ubuntu-device-test.sh ci-validation loopback-proxy'
    ```
 
-   `ci-validation` 必须同时传给安装器与该实例的 manager；它只选择
-   `/data/adb/andcode-ubuntu-ci`，不是任意路径参数。测试脚本来自
-   `scripts/ubuntu-device-test.sh`。两实例使用独立镜像/锁/命名空间，不共享可写系统。
+   `ci-validation` must be passed to both the installer and that instance's manager; it selects only
+   `/data/adb/andcode-ubuntu-ci`, not an arbitrary path. The test script comes from
+   `scripts/ubuntu-device-test.sh`. The instances use separate images/locks/namespaces and do not share a writable system.
 
-5. `shell`/`exec` 为普通用户（60000），在 `/workspace` 起步；显式维护命令示例：
+5. `shell`/`exec` run as an ordinary user (60000), starting in `/workspace`; explicit maintenance command examples:
 
    ```sh
    su -c 'sh /data/adb/andcode-ubuntu/andcode-ubuntu admin apt-get update'
@@ -291,229 +291,229 @@ proc status 的 NoNewPrivs 字段，使用 `prctl(PR_GET_NO_NEW_PRIVS)` 验证�
    su -c 'sh /data/adb/andcode-ubuntu/andcode-ubuntu exec hello'
    ```
 
-   `admin` 有宿主 root 权限，不交给模型，不放入 APK 终端 PATH。镜像不含 sudo。
-   不运行 systemd，不启动网络监听服务，不继承宿主代理或关闭 TLS 校验的环境。
-   默认 DNS 为 TCP 的 1.1.1.1 / 8.8.8.8，受管网络可能需要人工更换；尚无 Android
-   动态 DNS 同步。`_apt` 的主组设为 inet 3003（apt 沙箱会清除补充组），开发用户
-   加入补充组 3003；旧 Android 的网络权限行为仍需实机确认。
+   `admin` has host root privileges; do not expose it to the model or put it in the APK terminal PATH. The image contains no sudo.
+   It runs no systemd, starts no network-listening services, and inherits no host proxy or TLS-verification-disabling environment.
+   Default DNS uses TCP at 1.1.1.1 / 8.8.8.8; managed networks may require manual changes. Android
+   dynamic DNS synchronization is not yet available. `_apt` has primary group inet 3003 (the apt sandbox clears supplementary groups), and the development user
+   joins supplementary group 3003; older Android network-permission behavior still requires device confirmation.
 
-设备开发引导/测试允许显式选择 `loopback-proxy` 模式，只在本次调用设置
-`http_proxy`/`https_proxy=http://127.0.0.1:7890`。不自动继承宿主环境、不关闭 TLS。
-代理由设备现有网络配置提供，**代理测试通过不等于默认直连 DNS 通过**，不作为
-产品自包含能力的必需依赖。PRoot 默认模式已单独测试：UDP 公共 DNS 超时，
-同一应用域 TCP 查询正常，使用 `options use-vc timeout:3 attempts:2` 后，
-`getent`、证书校验 HTTPS、严格 apt update 与 Git HTTPS 成功。此处“无代理”只指
-未设置 HTTP/HTTPS/ALL_PROXY，设备原有 FlClash VPN 保持运行，不代表无需设备网络。
-chroot 普通用户的 UID 网络问题仍失败，不能与 PRoot 结果混为一谈。
+Device development bootstrap/tests allow explicit `loopback-proxy` mode, setting
+`http_proxy`/`https_proxy=http://127.0.0.1:7890` for that invocation only. They do not automatically inherit the host environment or disable TLS.
+The proxy is supplied by the device's existing network configuration. **Passing proxy tests does not mean default direct DNS passed**; it is not
+a required dependency of the product's self-contained capability. PRoot default mode was tested separately: public UDP DNS timed out,
+while TCP queries in the same application domain worked. With `options use-vc timeout:3 attempts:2`,
+`getent`, certificate-verified HTTPS, strict apt update and Git HTTPS succeeded. Here "no proxy" means only
+that HTTP/HTTPS/ALL_PROXY were unset; the existing FlClash VPN remained running, not that device networking was unnecessary.
+The chroot ordinary-user UID network issue still failed and must not be conflated with PRoot results.
 
-人工 root 诊断可执行 `sh /data/local/tmp/andcode-ubuntu-network-diagnose.sh`
-（从 `scripts/ubuntu-network-diagnose.sh` 部署）。它只读设备设置及三个 Android 13
-BPF map，校验 map 布局；旧 4.9 内核不支持对象信息 syscall 时读取 fdinfo。
-输出 `ANDROID13_RESTRICTED_RULE_BLOCKS_UID=60000` 表示该规则足以阻断此 UID，
-不是已排除所有其它网络问题。INTERNET 权限 map 中缺条目本身不代表拒绝。
-诊断不修改设置/BPF/防火墙，不借用 APK UID，不恢复 guest 权限；不要为了通过
-测试而关闭受限网络模式。现有模式下 chroot 联网仍记为失败，PRoot 结果不受替代。
+For manual root diagnostics, run `sh /data/local/tmp/andcode-ubuntu-network-diagnose.sh`
+(deployed from `scripts/ubuntu-network-diagnose.sh`). It reads device settings and three Android 13
+BPF maps without modifying them and validates map layouts; on older 4.9 kernels without the object-information syscall, it reads fdinfo.
+`ANDROID13_RESTRICTED_RULE_BLOCKS_UID=60000` means that rule is sufficient to block this UID,
+not that every other networking issue has been ruled out. A missing INTERNET permission-map entry alone does not imply denial.
+Diagnostics do not change settings/BPF/firewalls, borrow the APK UID, or restore guest privileges. Do not disable restricted networking mode
+to make tests pass. Under the existing mode chroot networking remains recorded as failed; PRoot results are not substituted for it.
 
-### PRoot 应用域开发准入
+### PRoot Application-Domain Development Acceptance
 
-`scripts/prepare-proot-gate.py <官方Base归档> <新输出归档>` 先核对固定官方 SHA-256，
-将绝对符号链接改为等价 guest 相对链接、硬链接展开等内容文件并移除特权位，
-不修改任何 ELF。原因是旧设备应用域 BusyBox 提取触发 SIGSYS，Toybox 对部分
-硬链接返回 Permission denied。输入仍是可信官方 Base，不是不可信归档安装器。
-将输出放到 `/data/local/tmp/ubuntu-base-app-gate.tar.gz`（应用可读），然后**从
-APK 终端**人工执行 `sh /data/local/tmp/proot-rootfs-gate.sh <生成输出的SHA256>`。
-脚本拒绝覆盖 `files/proot-rootfs`，保留失败现场；开发副本不与 chroot 共享写层。
+`scripts/prepare-proot-gate.py <official-Base-archive> <new-output-archive>` first checks the fixed official SHA-256,
+converts absolute symlinks to equivalent guest-relative links, materializes hardlinks as files with identical contents, and removes privilege bits,
+without changing any ELF. This is necessary because BusyBox extraction in the older device's application domain triggers SIGSYS, while Toybox returns
+Permission denied for some hardlinks. The input remains trusted official Base; this is not an untrusted-archive installer.
+Place the output at `/data/local/tmp/ubuntu-base-app-gate.tar.gz` (app-readable), then manually run
+`sh /data/local/tmp/proot-rootfs-gate.sh <generated-output-SHA256>` **from the APK terminal**.
+The script refuses to overwrite `files/proot-rootfs` and retains failure state; the development copy shares no writable layer with chroot.
 
-`scripts/proot-development-gate.sh [loopback-proxy]` 从该独立实例做 apt、hello、
-编译和 PTY 验证；使用现有 PRoot `-l`（hardlink→symlink）与 `--kill-on-exit`。
-日志在 APK `files/proot-development-gate.txt`。PRoot fake root 不是宿主 root，
-也不是安全沙箱。当前仍依赖 `/data/local/tmp` 开发载荷，**不证明 locked 自包含交付**。
-非交互 gate 从 `/dev/null` 读取 stdin，避免 timeout 新进程组触发终端 SIGTTIN。
-最初在 libc 触发器后被 job-control 停住的尝试已终止；同实例重新执行
-`dpkg --configure -a` 后完整 gate 成功，不把被中断的尝试算通过。
+`scripts/proot-development-gate.sh [loopback-proxy]` checks apt, hello,
+compilation and PTY in that separate instance, using the existing PRoot `-l` (hardlink→symlink) and `--kill-on-exit`.
+Logs are in APK `files/proot-development-gate.txt`. PRoot fake root is neither host root
+nor a security sandbox. It still depends on `/data/local/tmp` development payloads and **does not prove locked self-contained delivery**.
+The noninteractive gate reads stdin from `/dev/null` to avoid terminal SIGTTIN from timeout's new process group.
+The initial attempt stopped by job control after libc triggers was terminated; after rerunning
+`dpkg --configure -a` in the same instance, the full gate succeeded. The interrupted attempt is not counted as passing.
 
-APK 独立终端可执行 `andcode-ubuntu-proot [loopback-proxy] [命令...]`；无命令进入
-交互 Bash，`exit` 返回原轻量 Bash。缺少实例/载荷时明确报错，不自动安装/提权。
-生成的 `files/term-ubuntu-proot` 由系统 sh 读取，不作为数据目录 ELF 执行。
-开发入口已在真实应用域验证 hello、PTY、stdin 与退出码 42 传播；
-不改变 OpenCode 工具或 Web PTY 后端。归档预处理另有 14 项合成测试接入 CI。
-交互终端已实测 `stty size` 返回 44×54、Ctrl+C 中断前台 sleep 后返回 Ubuntu
-提示符、`exit` 返回原项目轻量 Bash。真实应用域的 guest Python 前台信号测试已验证
-软键盘隐藏/显示时两次 SIGWINCH，尺寸 28×54 → 47×54 → 28×54，输出
-`ANDCODE_PROOT_RESIZE_OK`；仅代表旧设备本轮，更多设备仍待 P0/P3 实机验证。
-设置页的“终端环境”仅影响新会话，默认轻量 Bash，可选已安装的 Ubuntu PRoot；
-代理另有默认关闭的显式开关。旧设备已通过 UI 选择并持久化 Ubuntu 后端、退出旧
-shell 后新终端直接显示 Ubuntu 提示符；已有会话不会切换。不提供 chroot 选择，
-其认证 root 服务尚未完成。APK `assembleDebug`、`lintDebug` 均通过，Lint 警告未隐藏。
-扩展 gate 也已在显式代理模式通过 C++ 编译、GNU Make 和 Git HTTPS `ls-remote`。
-相同完整 gate 已使用 TCP DNS 无显式代理重跑，通过 apt、C/C++、Make、Git HTTPS、
-PTY/子进程和现有 libc 执行，输出 `development-exit=0 network-mode=direct`。
-本次 apt 安装包均为已装最新版，不将重跑描述成再次安装或再次升级 libc。
-CI 增加 Android 专用 bundle 的 seccomp 七处校验、幂等摘要检查及后续 Tier P
-物理化，标准 Linux bundle 不变；首跑已执行该链，后续 manifest 分类修复及
-Tier P 原生中间工件仍需重跑，不代表 jniLibs 自包含已经完成。
+The standalone APK terminal can run `andcode-ubuntu-proot [loopback-proxy] [command...]`; without a command it enters
+interactive Bash, and `exit` returns to the original lightweight Bash. Missing instances/payloads fail explicitly, without automatic installation/elevation.
+Generated `files/term-ubuntu-proot` is read by system sh, not executed as a data-directory ELF.
+The development entry was verified in the real application domain for hello, PTY, stdin and exit-code 42 propagation;
+it does not change OpenCode tools or the Web PTY backend. Archive preprocessing has another 14 synthetic tests integrated into CI.
+Interactive terminal testing confirmed `stty size` returned 44×54, Ctrl+C interrupted foreground sleep and returned to the Ubuntu
+prompt, and `exit` returned to the original project's lightweight Bash. A foreground guest Python signal test in the real application domain verified
+two SIGWINCH events as the soft keyboard hid/showed, with sizes 28×54 → 47×54 → 28×54 and output
+`ANDCODE_PROOT_RESIZE_OK`. This covers only this round on the older device; more devices remain pending P0/P3 on-device verification.
+The settings page's "Terminal environment" affects only new sessions, defaults to lightweight Bash, and offers an installed Ubuntu PRoot;
+the proxy has a separate explicit default-off switch. On the older device, UI selection and persistence of the Ubuntu backend passed; after exiting the old
+shell, a new terminal immediately showed the Ubuntu prompt. Existing sessions do not switch. chroot is not offered,
+because its authenticated root service is unfinished. APK `assembleDebug` and `lintDebug` passed; Lint warnings were not hidden.
+The extended gate also passed C++ compilation, GNU Make and Git HTTPS `ls-remote` in explicit-proxy mode.
+The same full gate was rerun using TCP DNS without an explicit proxy, passing apt, C/C++, Make, Git HTTPS,
+PTY/child processes and existing-libc execution, with `development-exit=0 network-mode=direct`.
+All apt packages in this run were already at the latest installed versions; the rerun is not described as another installation or libc upgrade.
+CI added seven-site seccomp verification, idempotent digest checks and subsequent Tier P physicalization for the Android-specific
+bundle, leaving the standard Linux bundle unchanged. The first run executed this chain; the subsequent manifest-classification fix and
+Tier P native intermediate artifact still require a rerun. This does not establish completed jniLibs self-containment.
 
-2026-11-09 原生 arm64 run `42511151241` 的 build-bundle 已通过物理化、349 ELF
-兼容审计及改名 Bash 执行（保留 libc.so.6 SONAME 后）。APK job 当时因 Action
-请求已移除的 Android SDK `tools` 包失败，已改显式安装 platform-tools，待重跑。
-真实原生工件本机 assembleDebug/lintDebug 与 APK 逐字节核验通过；首启动只写
-data 并创建 nativeLibraryDir 链接，21 项回归及真实 manifest 往返通过。
-旧设备真实应用域已运行 APK 内 Bash，无 root relabel；git 首测因 launcher
-仍搜索旧 PRoot 库目录失败，修正待验证。不代表 V2/Web PTY 或 locked 整包通过。
+On 2026-11-09, native arm64 run `42511151241` build-bundle passed physicalization, compatibility auditing of 349 ELF files
+and renamed Bash execution (after retaining libc.so.6 SONAME). The APK job failed because the Action
+requested the removed Android SDK `tools` package; it was changed to explicitly install platform-tools, pending a rerun.
+Local assembleDebug/lintDebug with the real native artifact and byte-for-byte APK verification passed. First startup only writes
+data and creates nativeLibraryDir links; 21 regressions and a real manifest round trip passed.
+APK Bash ran in the older device's real application domain without root relabeling. The first git test failed because the launcher
+still searched the old PRoot library directory; the fix awaited verification. This does not mean V2/Web PTY or the complete locked package passed.
 
-原生 arm64 run `42515404336` 已全部成功：修复 Bun ET_EXEC 的 DT_VERDEF
-遗留地址及 clone3 补丁的新内核回退后，Bash/V2.2.6/PTY 0.4.0 实际执行通过，
-下游 SDK、APK 编译/Lint、真实 manifest 初始化与 APK 载荷逐字节核验通过。
-`scripts/native-payload-device-test.sh` 只从 APK 轻量终端执行；原生目录路径、
-真实应用域/seccomp、Bash/V2/PTY/Git/PRoot 子进程均为独立实机门禁，尚待新版安装。
-PRoot 开发完整 gate 也可显式使用当前 APK 的 farm/native 库，不再混用旧开发库。
-以上仍不是正式签名、Bun 原生扩展预置闭包或 locked 整包交付结论。
+Native arm64 run `42515404336` fully succeeded: after fixing the stale DT_VERDEF
+address in Bun ET_EXEC and the clone3 patch's newer-kernel fallback, actual Bash/V2.2.6/PTY 0.4.0 execution passed,
+as did downstream SDK, APK compilation/Lint, real manifest initialization and byte-for-byte APK payload verification.
+`scripts/native-payload-device-test.sh` runs only from the APK lightweight terminal. Native-directory paths,
+real application domain/seccomp and Bash/V2/PTY/Git/PRoot child processes are separate device gates, awaiting installation of the new version.
+The full PRoot development gate can also explicitly use the current APK's farm/native libraries rather than mixing in older development libraries.
+These results still do not establish formal signing, a pre-staged Bun native-extension closure, or complete locked-package delivery.
 
-后续原生 run `42516603502`（`4869307`）全成功；成功工件 ZIP 已核对 API
+Subsequent native run `42516603502` (`4869307`) fully succeeded; the successful artifact ZIP was checked against API
 SHA-256 `84287a218c6c885b1e4696bb6976a4db575ee1276bb5811d7b27252aafbe5e2e`，
-本机 APK 再次编译/Lint 与原生/assets 逐字节核验通过并保留原签名覆盖安装。
-旧设备真实 `untrusted_app`/UID10348/Seccomp=2 下 Bash 5.2.21、V2.2.6、
-PTY 0.4.0/protocol7、Git 2.43.0、原生 PRoot 子进程全部通过，
-`ANDCODE_NATIVE_PAYLOAD_OK`；adb 单独确认 SELinux Enforcing（应用域无法读状态）。
-APK 原生 PRoot 的完整开发 gate 同样在真实应用域输出
+Local APK recompilation/Lint and byte-for-byte native/assets verification passed again, followed by overwrite installation retaining the original signature.
+On the older device under real `untrusted_app`/UID10348/Seccomp=2, Bash 5.2.21, V2.2.6,
+PTY 0.4.0/protocol7, Git 2.43.0 and native PRoot child processes all passed,
+with `ANDCODE_NATIVE_PAYLOAD_OK`; adb independently confirmed SELinux Enforcing (the application domain cannot read its status).
+The APK native PRoot full development gate likewise emitted in the real application domain
 `ANDCODE_PROOT_DEVELOPMENT_OK`、`development-exit=0 network-mode=direct`：
-apt、C/C++、Make、Git HTTPS、PTY 均成功；仅未设置显式代理，设备 VPN 保留。
+apt, C/C++, Make, Git HTTPS and PTY all succeeded; only the explicit proxy was unset, while the device VPN remained active.
 
-`opencode-native-prototype.yml` 是手动固定源码构建实验：在 Bun 编译期将
-原生 .so 文件导入改为 `ANDCODE_EXE_DIR` 绝对目录下的内容寻址预置路径，
-.node 改为向同目录显式 `process.dlopen`，保留 CommonJS addon 导出语义。
-当前插件合成测试只证明改写/导出/字节保真与错误架构拒绝；CI serve 临时目录
-扫描仅覆盖启动路径，不替代工具、Web PTY、TUI 或全部传递原生库审计。
-实验不接 APK，不修改已验证官方载荷；许可证 notices/源码义务和兼容性待审查。
+`opencode-native-prototype.yml` is a manually triggered fixed-source build experiment: during Bun compilation,
+native .so file imports are rewritten to content-addressed pre-staged paths under the absolute `ANDCODE_EXE_DIR` directory;
+.node imports use explicit `process.dlopen` in that directory, retaining CommonJS addon export semantics.
+Current synthetic plugin tests establish only rewriting/exports/byte fidelity and wrong-architecture rejection. CI serve temporary-directory
+scans cover only startup, not tools, Web PTY, TUI or all transitive native-library audits.
+The experiment does not feed the APK or alter verified official payloads; license notices/source obligations and compatibility await review.
 
-首个源码实验 run `42518155724` 成功且工件 API 摘要核对通过，但后续更严格静态
-审计发现 Bun graph 仍嵌入 extensionless PTY ELF，且导入表包含不会选用的 musl
-PTY 库，因此不能集成。新版实验插件显式要求 `OPENCODE_PTY_BIN`、不嵌入 daemon，
-排除固定摘要的 musl 输入并在误选时失败；`.so` 的 require 返回路径字符串而不是
-ESM namespace。新增门禁待新 CI 通过，许可证/Android 闭包仍待验证。
+The first source experiment run `42518155724` succeeded and its artifact API digest matched, but subsequent stricter static
+auditing found an extensionless PTY ELF still embedded in the Bun graph and unused musl
+PTY libraries in the import table, preventing integration. The updated experimental plugin explicitly requires `OPENCODE_PTY_BIN`, does not embed the daemon,
+excludes digest-pinned musl inputs and fails on accidental selection; `.so` require returns a path string rather than
+an ESM namespace. New gates await a new successful CI run; license/Android closure remains unverified.
 
-当前正式原生载荷 Web 首页能在 APK WebView 渲染，默认模型查询为
-`arjata/gpt-oss-120b`；shell API 的 Bash/printf/Git 实际执行可达，但 Android
-系统 `id` 受到 glibc shim preload 泄漏而失败，普通 Web PTY 创建返回 500
-（bun-pty library 未加载，后续访问 symbols 失败）。这是待修边界，不是完整 Web
-或工具闭包验收成功；没有降低 targetSdk/SELinux 或引入 TLS bypass。
+The current official native payload's Web home page renders in APK WebView and reports the default model as
+`arjata/gpt-oss-120b`. Bash/printf/Git execution through the shell API works, but Android
+system `id` fails due to leaked glibc shim preload, and ordinary Web PTY creation returns 500
+(bun-pty library not loaded, followed by failed symbols access). These are unresolved boundaries, not acceptance of a complete Web
+or tool closure; targetSdk/SELinux were not lowered and no TLS bypass was introduced.
 
-源码实验 run `42519500865`（`c2277e8`）全部成功：Bun graph 无内嵌 ELF、
-四个 glibc 扩展的摘要/依赖/16K/版本审计、shell、普通 PTY 的 tty/resize/子进程、
-持久 PTY 快照回显及独立 BUN_TMPDIR 无 ELF 通过。仅为 Linux CI 证据，
-不是 Android 原生扩展加载/传递依赖许可证/正式交付批准。
+Source experiment run `42519500865` (`c2277e8`) fully succeeded: no embedded ELF in the Bun graph,
+digest/dependency/16K/version auditing of four glibc extensions, shell, ordinary PTY tty/resize/child processes,
+persistent PTY snapshot echo and no ELF in separate BUN_TMPDIR all passed. This is Linux CI evidence only,
+not approval of Android native-extension loading, transitive-dependency licensing or formal delivery.
 
-应用域诊断确认 Bash wrapper 的子环境中仍存在 LD_PRELOAD，临时仅对
-`/system/bin/id` 清空该变量后即成功（同 UID/domain，未修改网络策略）。
-wrapper 已改 direct loader `--preload` 单进程注入而不导出 LD_PRELOAD；
-新增真实 glibc Bash/子 sh 的 Linux 门禁和 native device gate 中 Bionic id 断言，
-修复待新 CI/APK 实测。模型默认配置正确，但本次实际请求因 EAI_AGAIN
-无法解析 provider 域名而重试，已中止；不能算模型端到端成功。
+Application-domain diagnostics confirmed LD_PRELOAD remained in the Bash wrapper's child environment; temporarily clearing it only for
+`/system/bin/id` succeeded (same UID/domain, no network-policy changes).
+The wrapper now uses direct loader `--preload` for single-process injection without exporting LD_PRELOAD.
+New Linux gates exercise real glibc Bash/child sh, and the native device gate asserts Bionic id;
+the fix awaits new CI/APK device tests. Default model configuration is correct, but the actual request retried after EAI_AGAIN
+prevented provider-domain resolution and was aborted; this cannot count as model end-to-end success.
 
-新版官方载荷 run `42519762828`（`2716a49`）全部 CI 成功；native 工件 ZIP/API
+Updated official payload run `42519762828` (`2716a49`) passed all CI; native artifact ZIP/API
 SHA-256 `60dbbaed741181f37c1c8194643fc79bcaf7227709689504de7899862a32ecaf`。
-本机 assembleDebug/lintDebug、APK 403 个 native 与 253 个 data 逐字节核对及
-原签名覆盖安装通过；ZIP 文件名按原 UTF-8 字节解释（Android 构建工具未置 UTF-8
-flag，Python 默认 CP437 显示并非真实文件名）。真实应用域新增
-`ANDCODE_NATIVE_BIONIC_CHILD_OK` 和原有 native/PRoot 子进程门禁全部通过，
-SELinux 由 adb 独立确认为 Enforcing。
+Local assembleDebug/lintDebug, byte-for-byte comparison of 403 native and 253 data APK entries and
+overwrite installation with the original signature passed. ZIP names were interpreted from original UTF-8 bytes (Android build tools did not set the UTF-8
+flag; Python's default CP437 display is not the actual filename). In the real application domain, the new
+`ANDCODE_NATIVE_BIONIC_CHILD_OK` and existing native/PRoot child-process gates all passed;
+adb independently confirmed SELinux Enforcing.
 
-官方 V2 的持久 PTY 使用预置 daemon 已通过系统 sh 的 tty、WebSocket 输入、
-91×31 resize、重连重放和快照 `ANDCODE_NATIVE_PERSISTENT_WS_OK`。默认 Bash
-wrapper 直接由 daemon exec 时立即退出，无输出；通过系统 sh 显式执行 wrapper
-可成功。为修正该边界，Tier P 的 `bin/bash` 保留原物理名，改为静态 ELF 入口
-直接调用同 nativeLibraryDir 的 loader/Bash/shim，CI/新版 APK 尚待验收。
-这不代表 Web UI 操作/默认 Bash 或 Ubuntu Web 后端已经通过。
+Official V2 persistent PTY using the pre-staged daemon passed system-sh tty, WebSocket input,
+91×31 resize, reconnect replay and snapshot checks with `ANDCODE_NATIVE_PERSISTENT_WS_OK`. The default Bash
+wrapper exits immediately without output when directly exec'd by the daemon; explicitly executing the wrapper through system sh
+succeeds. To address this boundary, Tier P `bin/bash` retains its physical name but becomes a static ELF entry
+calling loader/Bash/shim in the same nativeLibraryDir; CI/new APK acceptance is pending.
+This does not mean Web UI operation/default Bash or the Ubuntu Web backend passed.
 
-固定 npm tarball 完整性核查纠正 OpenTUI 原生包许可为 MIT AND LGPL-2.1-or-later，
-附 FFmpeg/Ghostty/LCMS2/WebP/STB/Wuffs/Zlib 声明；fff 平台包未附 LICENSE。
-详见 REUSE §2.1，仍不得把源码实验直接接入正式 APK。隔离设备 root 诊断可运行
-源码版 serve/普通 PTY，但不是应用域或自包含证据；测试进程已停止。
-默认 provider 域名在设备系统 ping 与宿主 DNS 均解析失败；PRoot 映射与 TCP DNS
-对照也未恢复模型请求，已中断自有重试并清理自有诊断进程，未改网络策略或凭据。
+Integrity checks of pinned npm tarballs corrected the OpenTUI native-package license to MIT AND LGPL-2.1-or-later,
+with FFmpeg/Ghostty/LCMS2/WebP/STB/Wuffs/Zlib notices; the fff platform package includes no LICENSE.
+See REUSE §2.1; source experiments still must not directly feed the official APK. Isolated device root diagnostics can run
+source-built serve/ordinary PTY, but are not application-domain or self-containment evidence; test processes were stopped.
+The default provider domain failed resolution in both device system ping and host DNS. PRoot mapping and TCP DNS
+comparisons did not restore model requests; our retries were interrupted and our diagnostic processes cleaned up, without changing network policy or credentials.
 
-实验 CI 继续增加真实 TUI 准入：独立 controlling PTY 内启动 `--standalone`，
-同时要求 `/proc/<pid>/maps` 实际映射预置 OpenTUI 与终端渲染，结束仅终止该
-测试进程组；运行期 ELF 扫描扩大到隔离 HOME 与 BUN_TMPDIR。该新门禁尚待 CI，
-不提前声称 TUI 或完整运行期加载闭包通过。
+Experimental CI adds real TUI acceptance: launch `--standalone` in a separate controlling PTY,
+requiring both actual pre-staged OpenTUI mappings in `/proc/<pid>/maps` and terminal rendering, then terminate only that
+test process group. Runtime ELF scanning expands to isolated HOME and BUN_TMPDIR. This new gate awaits CI;
+neither TUI nor complete runtime-loading closure is claimed to have passed in advance.
 
-源码实验 run `42522076401`（`c24813c`）现已通过上述 TUI 门禁，日志包含
-`ANDCODE_SOURCE_TUI_NATIVE_OK`，shell/普通和持久 PTY、隔离 HOME/BUN_TMPDIR
-无 ELF 扫描亦通过。前一轮 `42521939719` 的许可证据工件已核对 API SHA-256
+Source experiment run `42522076401` (`c24813c`) has now passed that TUI gate, logging
+`ANDCODE_SOURCE_TUI_NATIVE_OK`; shell/ordinary and persistent PTY and isolated HOME/BUN_TMPDIR
+no-ELF scans also passed. The previous run `42521939719` license-evidence artifact was checked against API SHA-256
 `60a9b72e71e2ebcc6dd66dce280fc698532e545b007d2d80502ca7831444c7c8`；
-四个固定包的 review 全部 blocked，与预期一致，不能作为发布合规通过证据。
+All four pinned-package reviews remain blocked as expected; this is not evidence of release-compliance acceptance.
 
-显式 `loopback-proxy` 的应用域独立 serve 诊断可越过 provider DNS 阻塞，但
-请求在 TLS 阶段因 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` 失败。未设置
-NODE_TLS_REJECT_UNAUTHORIZED=0、未添加未知 CA、未修改用户配置或默认代理；
-已中断自有重试并停止隔离服务。恢复端到端验收需要可验证的 provider 证书链或
-正常可解析的直连网络，不把代理可连接误称为模型可用。
+Separate application-domain serve diagnostics with explicit `loopback-proxy` bypass the provider DNS blocker, but
+requests fail during TLS with `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`. We did not set
+NODE_TLS_REJECT_UNAUTHORIZED=0, add unknown CAs, or change user configuration/default proxy;
+our retries were interrupted and the isolated service stopped. Resuming end-to-end acceptance requires a verifiable provider certificate chain or
+working direct-network resolution; proxy connectivity must not be misrepresented as model availability.
 
-静态 Bash 入口 run `42521752952` 全部 CI/本地 APK build/lint 与原签名覆盖安装
-通过；真实应用域 native gate 仍通过，持久 PTY 的 Bash `-c` 与系统 id 成功。
-但默认交互 Bash 仍退出。仅对自有应用域子进程附加 trace，确认 seccomp 在
-libtinfo 读取 terminfo 时禁止 `setfsuid/setfsgid`，未修改过滤器或身份。
-v0.4.34 的 ncurses shim 实验被 run `42523439252` 实际初始化门禁拒绝：
-libtinfo 内部绑定绕过 interposition；该实现与对应测试已移除，未部署设备。
-改为固定 Ubuntu ncurses 6.4+20240113-1ubuntu2.2 源码+安全补丁，关闭
-HAVE_SETFSUID、保留上游 safe-open 分支及内核权限检查的 Android 专用 libtinfo，
-新增真实 Bash/terminfo 无身份调用门禁；标准 Linux bundle 不变。
-本轮创建的 14 个持久 PTY 诊断已通过 API 删除，不影响用户会话或终端偏好。
+Static Bash entry run `42521752952` passed all CI/local APK build/lint and overwrite installation
+with the original signature. The real application-domain native gate still passed; persistent PTY Bash `-c` and system id succeeded.
+Default interactive Bash still exited. Tracing attached only to our own application-domain child processes confirmed seccomp
+forbids `setfsuid/setfsgid` while libtinfo reads terminfo; neither filters nor identity were changed.
+The v0.4.34 ncurses shim experiment was rejected by run `42523439252`'s real initialization gate:
+libtinfo internal binding bypassed interposition. That implementation and its tests were removed without device deployment.
+The replacement uses pinned Ubuntu ncurses 6.4+20240113-1ubuntu2.2 source plus security patches, disabling
+HAVE_SETFSUID in Android-specific libtinfo while retaining upstream safe-open branches and kernel permission checks,
+with a new real Bash/terminfo no-identity-call gate. The standard Linux bundle is unchanged.
+The 14 diagnostic persistent PTYs created in this round were deleted through the API, without affecting user sessions or terminal preferences.
 
-修复验收：run `42524341097` (`a411328`) 全部成功，包括实际 terminfo、精确
-staged libtinfo 映射、真实交互 Bash 与 fs-ID 函数陷阱；可信 native 工件
+Fix acceptance: run `42524341097` (`a411328`) fully succeeded, including real terminfo, exact
+staged libtinfo mappings, real interactive Bash and fs-ID function traps. Trusted native artifact
 `13635111177` ZIP SHA-256
 `045451ed8f7d16926b2f82079536107ef198619ea9ab3b0567de855a861a39ea`。
-本地 APK assembleDebug/lintDebug 通过，403 个 native / 255 个 data 与工件
-逐字节一致，原签名覆盖安装成功，APK SHA-256
+Local APK assembleDebug/lintDebug passed; 403 native / 255 data entries matched the artifact
+byte for byte, and overwrite installation with the original signature succeeded. APK SHA-256
 `4bc04edc0a0e991e92c1ecb09f91a66facc8eeb7d190e8cd642e9b6a0d80d493`。
-旧设备真实 `untrusted_app` / `Seccomp=2`、SELinux Enforcing：默认无 args 持久
-PTY 启动预置 Bash 后保持 running，stdin/out/err 均为 `/dev/pts/1`，maps 确认
-来自 nativeLibraryDir 的 libandcode-libtinfo.so；WebSocket 输入、91×31 resize、
-重连回放和 snapshot 通过 `ANDCODE_NATIVE_PERSISTENT_WS_OK`。
-完整 native gate 新增强制交互初始化，得到 `ANDCODE_NATIVE_INTERACTIVE_BASH_OK`，
-其余 Bionic/PRoot 子进程及版本门禁均通过；独立终端首屏 Bash 提示符截图确认。
-完整 PRoot 无显式代理 apt/HTTPS/C/C++/Make/Git HTTPS/PTY 与 libc 8.9 回归通过，
-`development-exit=0 network-mode=direct`。新专属验收 PTY 已删除，未删用户会话。
-此结果不代表官方普通 Web PTY 或源码原生扩展加载已解决；前者仍需独立修复，
-后者仍在许可/源码/闭包准入阶段。
+On the older device under real `untrusted_app` / `Seccomp=2`, SELinux Enforcing, the default no-args persistent
+PTY remained running after launching pre-staged Bash; stdin/out/err were all `/dev/pts/1`, and maps confirmed
+libandcode-libtinfo.so from nativeLibraryDir. WebSocket input, 91×31 resize,
+reconnect replay and snapshot passed with `ANDCODE_NATIVE_PERSISTENT_WS_OK`.
+The full native gate added mandatory interactive initialization, yielding `ANDCODE_NATIVE_INTERACTIVE_BASH_OK`;
+other Bionic/PRoot child-process and version gates passed. A screenshot confirmed the standalone terminal's initial Bash prompt.
+Full PRoot apt/HTTPS/C/C++/Make/Git HTTPS/PTY and libc 8.9 regression without an explicit proxy passed,
+with `development-exit=0 network-mode=direct`. The new dedicated acceptance PTY was deleted, not user sessions.
+This does not establish a fix for official ordinary Web PTY or source-built native-extension loading; the former still needs a separate fix,
+while the latter remains in license/source/closure acceptance review.
 
-后续网络复核(同日)：宿主 DNS 当前解析到 `198.18.0.66`，使用系统默认校验的
-Python HTTPS 已成功；证书 subject 为 `one.ai.api.service.arjata`，issuer 为
-私有 `Arjata Authority` 的 `Arjata Fundamental Public Endpoint Issuer`。
-这仅证明宿主当前信任链可用，不代表 Android/Bun 信任。真实 APK 默认模型仍
-`getaddrinfo EAI_AGAIN`，隔离显式回环代理仍 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`。
-两次自有请求已 interrupt，4296 专属服务已通过其 shell API 停止；未改 4096
-默认服务的代理/CA/校验。后续需带外核对的 CA 证书与显式信任配置，或 provider
-提供 APK 默认信任的完整链；不能自动从网络/宿主导入未知 CA 或关闭 TLS 校验。
+Subsequent network review (same day): host DNS currently resolves to `198.18.0.66`; Python HTTPS with
+default system verification succeeded. Certificate subject is `one.ai.api.service.arjata`, issued by
+`Arjata Fundamental Public Endpoint Issuer` under the private `Arjata Authority`.
+This proves only that the host's current trust chain works, not Android/Bun trust. The real APK default model still reports
+`getaddrinfo EAI_AGAIN`, and the isolated explicit loopback proxy still reports `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`.
+Our two requests were interrupted and the dedicated 4296 service stopped through its shell API; the default 4096 service's
+proxy/CA/verification were unchanged. Further work requires an out-of-band verified CA certificate and explicit trust configuration, or a provider-supplied
+complete chain trusted by the APK by default. Unknown CAs must not be automatically imported from the network/host, nor TLS verification disabled.
 
-新终端创建时快照选中的单个私有项目名；启动器只接受 `files/projects/<项目名>`，
-绑定至 `/workspace/<项目名>` 并从该目录起步。无选中项目时从 `/root` 起步。
-不绑定整个项目目录集合、`/data` 或任意调用者传入的宿主路径。拒绝链接父目录/
-项目根、越界名、冒号分隔符和丢失项目；Android 数据目录的合法别名不会被误拒绝。
-项目内部的链接不会被递归过滤，PRoot 不构成沙箱，也不能阻止同 UID 的宿主访问。
-`scripts/proot-terminal-test.sh` 从轻量终端执行，已实测独立临时项目写回、参数保真、
-stdin/退出码 42、空项目回 `/root`、错误路径/链接拒绝与自有夹具清理。
-日志为 `files/proot-terminal-test.txt`；应用域无法读取 SELinux 全局状态时会明确提示，
-须同时在 adb 侧核验 Enforcing，不把 Permission denied 当作状态通过。
+New terminal creation snapshots the selected single private project name; the launcher accepts only `files/projects/<project-name>`,
+binds it at `/workspace/<project-name>` and starts there. With no selected project it starts at `/root`.
+It does not bind the entire project collection, `/data`, or arbitrary caller-supplied host paths. Symlinked parents/project roots,
+out-of-bounds names, colon separators and missing projects are rejected; valid aliases of Android data directories are not falsely rejected.
+Links inside projects are not recursively filtered. PRoot is not a sandbox and cannot prevent same-UID host access.
+`scripts/proot-terminal-test.sh` runs from the lightweight terminal and has verified separate temporary-project writeback, argument fidelity,
+stdin/exit-code 42, empty-project fallback to `/root`, invalid-path/link rejection and cleanup of its own fixtures.
+Logs are in `files/proot-terminal-test.txt`. Inability to read global SELinux status from the application domain is reported explicitly;
+Enforcing must also be verified through adb. Permission denied is not treated as a successful status check.
 
-## 会话与恢复限制
+## Session and Recovery Limitations
 
-- 每次调用独立挂载命名空间，同一镜像仅允许一个会话。
-- 前台退出会反向卸载；如果后台进程仍占用，退出码 75 且保留 `session-lock`。
-- 外层接收 HUP/INT/TERM 或子命名空间被信号终止时保留锁，不假设命名空间已清理。
-- 已做自有限时后台 `sleep` 实测：卸载报 busy、返回 75 且保锁；待该进程退出后，
-  逐个检查进程 root/mountinfo 无引用，再释放确认属于本实例的 loop 并删空锁。
-  不代表已实现自动异常恢复，也不授权释放其它实例的 loop。
-- 不提供强制停止、懒卸载或自动杀未知进程。恢复前应人工检查进程与挂载；
-  **不要只删锁后再次挂载**。进程死亡、设备重启等异常恢复仍待验证。
-- chroot 暂不映射 APK 私有项目，也不接入 OpenCode。待认证 root 服务完成后，
-  再将选择的项目映射至 `/workspace/<项目名>`，默认模型执行必须降权。
+- Each invocation has a separate mount namespace; only one session is allowed per image.
+- Foreground exit unmounts in reverse order; if a background process still holds resources, exit code is 75 and `session-lock` is retained.
+- The lock is retained if the outer process receives HUP/INT/TERM or a child namespace is terminated by a signal; namespace cleanup is not assumed.
+- A bounded background `sleep` of our own was tested: unmount reported busy, returned 75 and retained the lock. After that process exited,
+  each process root/mountinfo was checked for references before releasing the loop confirmed to belong to this instance and removing the empty lock.
+  This does not establish automatic abnormal recovery or authorize releasing another instance's loop.
+- No forced stop, lazy unmount or automatic killing of unknown processes is offered. Manually inspect processes and mounts before recovery;
+  **do not simply delete the lock and mount again**. Recovery from process death, device reboot and other abnormal conditions remains unverified.
+- chroot does not yet map APK private projects or integrate with OpenCode. Once the authenticated root service is complete,
+  selected projects will be mapped to `/workspace/<project-name>`; default model execution must drop privileges.
   PRoot terminal project mapping is separate from the managed backend described below.
 
 ## Managed OpenCode serve in Ubuntu PRoot
 
-The network-trust settings offer **OpenCode 服务进入 Ubuntu PRoot（实验）**
+The network-trust settings offer **Run the OpenCode service in Ubuntu PRoot (experimental)**
 (`serve-proot-backend`, default off). Install the PRoot instance and the complete
 APK native payload first, enable the setting, then manually stop and restart the
 managed service. Missing guest/payload/farm fails explicitly without direct fallback.
@@ -627,16 +627,16 @@ verified to flow through the guest environment verbatim.
 Extraction diagnostics are surfaced via logcat
 (tag andcode) because the failure reason otherwise only flashes in the UI.
 
-## 必须通过的实机门禁
+## Required On-Device Gates
 
-| 验证 | chroot | PRoot（真实应用域） |
+| Check | chroot | PRoot (real application domain) |
 |---|---|---|
-| rootfs Bash、PTY 与终端尺寸/信号 | Bash/PTY 创建通过；交互尺寸/信号待 P0/P3 | Bash/PTY/子进程、stty 初始尺寸、Ctrl+C、exit 返回、IME 往返两次 SIGWINCH/尺寸同步通过；其它设备待 P0/P3 |
-| DNS、HTTPS 证书校验、`apt update/install` | root 代理模式通过；UID 60000 网络超时、直连 DNS 未通过 | 显式代理完整通过；TCP DNS 无显式代理 HTTPS/apt update/Git 通过，VPN 未关闭 |
-| 新安装 `hello` ELF 能运行 | root/普通用户均通过 | 应用域通过 |
-| 普通用户 gcc 编译并运行，写 `/etc` 被拒 | UID 60000 通过，LOAD 0x4000 | 待 P0/P3 |
-| libc 更新后继续运行（不可盲用旧偏移补丁） | 2.39-0ubuntu8.7 → 8.9 通过 | 同版本更新后执行通过,未修改 ELF |
-| 项目访问范围、停止/异常退出无遗留挂载 | 待 P0/P3 | 单项目 bind/写回/错误路径拒绝通过；不是沙箱，异常停止待 P0/P3 |
+| rootfs Bash, PTY and terminal size/signals | Bash/PTY creation passed; interactive size/signals pending P0/P3 | Bash/PTY/child processes, initial stty size, Ctrl+C, exit return and two SIGWINCH/size synchronizations across an IME round trip passed; other devices pending P0/P3 |
+| DNS, HTTPS certificate verification, `apt update/install` | Root proxy mode passed; UID 60000 networking timed out, direct DNS did not pass | Explicit proxy fully passed; TCP DNS HTTPS/apt update/Git without explicit proxy passed, VPN not disabled |
+| Newly installed `hello` ELF runs | Both root/ordinary user passed | Application domain passed |
+| Ordinary-user gcc compilation/execution, writes to `/etc` rejected | UID 60000 passed, LOAD 0x4000 | Pending P0/P3 |
+| Continued execution after libc update (do not blindly reuse old offset patches) | 2.39-0ubuntu8.7 → 8.9 passed | Execution after the same-version update passed, ELF unchanged |
+| Project access scope, no leftover mounts after stop/abnormal exit | Pending P0/P3 | Single-project bind/writeback/invalid-path rejection passed; not a sandbox, abnormal stop pending P0/P3 |
 | OpenCode tools and Web PTY use the selected backend without host root | Pending integration | Device 8c8da214: opt-in managed PRoot serve, guest shell/PTY and app-UID execution passed; full tool round trip verified on `arjata/glm-5.2` (plain two-turn with history `reasoning_content` also passed); `arjata/gpt-oss-120b` tool-result continuation fails provider-side (HTTP 400/503, 5/5 fresh sessions) while its plain replies pass; other devices pending P0/P3 |
 
-PRoot 失败时必须保留为“受限/不可用”，不能借助 root relabel 后声称 locked 支持。
+When PRoot fails, its status must remain "restricted/unavailable"; root relabeling must not be used to claim locked support.

@@ -10,7 +10,7 @@ import com.google.android.material.button.MaterialButton;
 import com.termux.terminal.KeyHandler;
 import com.termux.view.TerminalView;
 
-/** 自有两行附加键;非文本键走终端协议,不向 IME 注入字符串。CTRL/ALT 点击锁定。 */
+/** Two custom extra-key rows; non-text keys use the terminal protocol, not IME string injection. Tap CTRL/ALT to latch. */
 final class TerminalExtraKeys {
     private final TerminalView terminal;
     private final LinearLayout host;
@@ -83,7 +83,7 @@ final class TerminalExtraKeys {
         button.setBackgroundTintList(new ColorStateList(new int[][]{
             {android.R.attr.state_checked}, {}}, new int[]{Color.rgb(103, 80, 164), Color.rgb(36, 36, 42)}));
         button.setTextColor(Color.rgb(235, 230, 240));
-        // 附加键不能抢走终端的 InputConnection,也不强制弹出键盘。
+        // Extra keys must not steal the terminal's InputConnection or force the keyboard open.
         button.setFocusable(false);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
         params.setMarginStart(dp(1));

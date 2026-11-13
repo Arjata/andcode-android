@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-helper-debug.sh — 真机定位 git helper 执行路径(ROOT)
+# dev-helper-debug.sh — Locate the Git helper execution path on a device (ROOT)
 ROOT=/data/local/tmp/andcode
 H="$ROOT/usr/libexec/git-core"
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a

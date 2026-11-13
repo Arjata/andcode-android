@@ -15,8 +15,8 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import com.google.android.material.button.MaterialButton;
 
 /**
- * 主页仪表盘(布局对齐 andapi):服务状态卡(状态点/地址/启停)+ 双入口卡
- * (桌面 UI / TUI 终端),DrawerLayout 抽屉导航。状态每 2s 轮询刷新。
+ * Home dashboard (layout matching andapi): service status card (dot/address/start-stop)
+ * and desktop UI / TUI terminal entry cards, with DrawerLayout navigation. Poll status every 2s.
  */
 public class HomeActivity extends AppCompatActivity {
 
@@ -28,7 +28,7 @@ public class HomeActivity extends AppCompatActivity {
     private MaterialButton mStopButton;
     private DrawerLayout mDrawer;
 
-    /** 用户点了启动、尚未 ping 通的过渡态 */
+    /** Transitional state after the user starts the service, before ping succeeds. */
     private boolean mWaitingStart;
     private boolean mPolling;
 
@@ -73,7 +73,7 @@ public class HomeActivity extends AppCompatActivity {
         mStopButton.setOnClickListener(v -> {
             mWaitingStart = false;
             ServeManager.stop(this);
-            // FGS 也一并停掉:START_STICKY 会重建服务并 ensureStarted,把 serve 又拉起来
+            // Stop the FGS too: START_STICKY would recreate it and call ensureStarted, restarting serve.
             stopService(new Intent(this, SessionService.class));
             render(false, null);
         });
@@ -86,7 +86,7 @@ public class HomeActivity extends AppCompatActivity {
         render(false, null);
     }
 
-    /** edge-to-edge:内容避开状态栏/键盘/导航栏(andapi 同款处理) */
+    /** Edge-to-edge: keep content clear of the status bar, keyboard, and navigation bar (as in andapi). */
     private void applyInsets() {
         View root = findViewById(R.id.rootScroll);
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
@@ -100,7 +100,7 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    /** 启动 serve:走 SessionService FGS 承接常驻,再确保进程拉起 */
+    /** Start serve: use the SessionService FGS to keep it alive, then ensure the process is started. */
     private void requestStart() {
         android.util.Log.i("andcode", "requestStart: start button clicked");
         mWaitingStart = true;
@@ -122,7 +122,7 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    /** 启动流程结束后恢复 2s 状态轮询(此期间 onResume 被 mWaitingStart 跳过) */
+    /** Resume 2s status polling after startup (mWaitingStart makes onResume skip it during startup). */
     private void resumePoll() {
         mPolling = true;
         mStatusDot.removeCallbacks(mPoll);
@@ -130,9 +130,9 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     /**
-     * 渲染状态。up 为 null 表示只更新文案(过渡态),不改变状态点。
-     * 传入非 null 时:绿=运行,灰=停止;detail 非空时以错误色显示
-     * (失败原因必须透出,不能被状态行覆盖)。
+     * Render status. A null up updates text only (transition), leaving the status dot unchanged.
+     * Otherwise, green means running and gray means stopped; nonempty detail uses the error color
+     * (failure reasons must remain visible rather than being overwritten by the status line).
      */
     private void render(Boolean up, String detail) {
         mDetailText.setText(detail != null
@@ -151,7 +151,7 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (mWaitingStart) return; // 启动流程已在轮询
+        if (mWaitingStart) return; // Startup is already polling.
         mPolling = true;
         mStatusDot.post(mPoll);
     }

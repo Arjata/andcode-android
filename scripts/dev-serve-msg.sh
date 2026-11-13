@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-serve-msg.sh — 经本地 serve API 发消息,捕获 server 侧异常栈
+# dev-serve-msg.sh — Send a message through the local serve API and capture server exception stacks
 ROOT=/data/local/tmp/andcode
 P="$ROOT/usr/lib/proot/proot"
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a

@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# dev-opencode-session.sh — 真机 opencode 真实编码会话(P0 终验)
-# 前置: 配置文件已推送到 /data/local/tmp/oc-config.json(含 provider/model,勿入库)
+# dev-opencode-session.sh — Real opencode coding session on a device (P0 final acceptance)
+# Prerequisite: configuration pushed to /data/local/tmp/oc-config.json (includes provider/model; do not commit).
 ROOT=/data/local/tmp/andcode
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
 export PATH="$ROOT/bin:$ROOT/usr/bin:$ROOT/usr/libexec/git-core:$PATH"

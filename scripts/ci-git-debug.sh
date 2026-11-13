@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ci-git-debug.sh — git 助手链路诊断(CI 用;容器内执行,bundle 解包在 $1,默认 /opt)
-# 探针: helper wrapper 内容、直接调用、sh -c 复现、诱饵测试(确认 git 实际执行哪个文件)
+# ci-git-debug.sh — Git helper chain diagnostics (CI; runs in a container, bundle extracted at $1, default /opt)
+# Probes: helper wrapper contents, direct invocation, sh -c reproduction, and decoys (identify the file Git actually executes).
 set -u
 ROOT="${1:-/opt}"
 export PATH="$ROOT/bin:$ROOT/usr/bin:$PATH"

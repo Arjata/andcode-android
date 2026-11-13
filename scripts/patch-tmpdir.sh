@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# patch-tmpdir.sh — andcode-entry 加 PROOT_TMP_DIR(应用 uid 需可写临时目录)
+# patch-tmpdir.sh — Add PROOT_TMP_DIR to andcode-entry (the application UID needs a writable temporary directory)
 F=/data/local/tmp/andcode/sbin/andcode-entry
 OLD='export LD_LIBRARY_PATH="$ROOT/usr/lib/proot${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"'
 NEW="$OLD

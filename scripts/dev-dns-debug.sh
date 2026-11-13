@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-dns-debug.sh — DNS/网络分层诊断
+# dev-dns-debug.sh — Layered DNS/network diagnostics
 ROOT=/data/local/tmp/andcode
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
 export PATH="$ROOT/bin:$ROOT/usr/bin:$ROOT/usr/libexec/git-core:$PATH"

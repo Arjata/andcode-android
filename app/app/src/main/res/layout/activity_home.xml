@@ -20,7 +20,7 @@
             android:paddingTop="16dp"
             android:paddingBottom="24dp">
 
-            <!-- 标题行 + 抽屉菜单按钮 -->
+            <!-- Title row and drawer menu button. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -56,7 +56,7 @@
                 android:alpha="0.6"
                 android:textColor="?attr/colorOnSurface" />
 
-            <!-- 服务状态卡:serve 运行状态 + 启停 -->
+            <!-- Service status card: serve state and start/stop controls. -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/serveCard"
                 style="?attr/materialCardViewFilledStyle"

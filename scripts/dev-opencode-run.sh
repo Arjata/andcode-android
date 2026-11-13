@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-opencode-run.sh — 真机 opencode 完整启动验证(Tier A, 经 proot)
+# dev-opencode-run.sh — Full opencode startup verification on a device (Tier A, via proot)
 ROOT=/data/local/tmp/andcode
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
 export PATH="$ROOT/bin:$ROOT/usr/bin:$ROOT/usr/libexec/git-core:$PATH"

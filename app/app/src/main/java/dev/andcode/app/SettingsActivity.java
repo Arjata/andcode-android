@@ -82,7 +82,7 @@ public class SettingsActivity extends UtilityActivity {
                 .setTitle(getString(R.string.s_backend_dialog_title))
                 .setSingleChoiceItems(choices, AppSettings.ubuntuTerminal(this) ? 1 : 0, (dialog, which) -> {
                     if (which == 1 && !AppSettings.ubuntuAvailable(this)) {
-                        // 单 APK:实例缺失但内置归档在位时允许选择,首次进入终端自动提取。
+                        // Single APK: allow selection when only the bundled archive exists; extract on first terminal entry.
                         boolean embedded = true;
                         try {
                             getAssets().open("andcode-rootfs/andcode-rootfs-arm64.tgz.sha256").close();
@@ -252,7 +252,7 @@ public class SettingsActivity extends UtilityActivity {
 
     @Override protected void onResume() {
         super.onResume();
-        // 页面可被复用;同步终端双指手势保存的字号及其预览。
+        // The page may be reused; refresh the font size saved by terminal pinch gestures and its preview.
         mSizeSlider.setProgress(AppSettings.terminalSize(this) - 10);
         refreshCa();
     }

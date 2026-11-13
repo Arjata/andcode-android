@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# deploy-adb.sh — Tier A:经 adb 部署 bundle 到 /data/local/tmp(DESIGN §4.3)
-# 用法: deploy-adb.sh [--serial <ser>] [--bundle <tar.gz>] [--no-smoke]
-# 说明: 使用 .tar.gz(toybox tar 原生支持 gzip;zstd 不保证存在于旧 toybox)
+# deploy-adb.sh — Tier A: deploy the bundle to /data/local/tmp via adb (DESIGN §4.3)
+# Usage: deploy-adb.sh [--serial <ser>] [--bundle <tar.gz>] [--no-smoke]
+# Note: use .tar.gz (toybox tar supports gzip natively; older toybox may lack zstd).
 set -euo pipefail
 
 SERIAL="" BUNDLE="" SMOKE=1
@@ -15,7 +15,7 @@ while [ $# -gt 0 ]; do
 done
 ADB=(adb); [ -n "$SERIAL" ] && ADB+=(-s "$SERIAL")
 
-# 找产物:显式指定 > 仓库 dist/ 最新
+# Locate the artifact: explicit path takes precedence over the latest file in repository dist/.
 if [ -z "$BUNDLE" ]; then
   BUNDLE="$(ls -t dist/andcode-bundle-arm64-*.tar.gz 2>/dev/null | head -n1 || true)"
   [ -n "$BUNDLE" ] || { echo "未找到 bundle,先跑 CI 或 pack-bundle.sh"; exit 1; }

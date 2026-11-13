@@ -14,7 +14,7 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.appbar.MaterialToolbar;
 
-/** 项目/设置页共用的 Material 顶栏、卡片与排版。颜色跟随 DayNight 主题。 */
+/** Shared Material top bar, cards, and typography for project/settings pages. Colors follow the DayNight theme. */
 public abstract class UtilityActivity extends AppCompatActivity {
     protected LinearLayout body;
     private DrawerLayout drawer;

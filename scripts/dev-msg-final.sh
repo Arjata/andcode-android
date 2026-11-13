@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-msg-final.sh — 对常驻 serve 发消息,触发完整模型循环
+# dev-msg-final.sh — Send a message to persistent serve to trigger a full model loop
 ROOT=/data/local/tmp/andcode
 SID=$(sed 's/.*"id":"\([^"]*\)".*/\1/' /data/local/tmp/sess.json)
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# check-compat.sh — andcode 兼容性审计门禁(DESIGN §3.3, NAMING §8)
-# 用法: check-compat.sh [--page-align] <elf-or-dir> [more...]
-#   审计每个 aarch64 ELF:
-#     1) glibc 符号版本上限 ≤ $MAX_GLIBC(默认 2.39)
-#     2) NEEDED 依赖列表输出(人工/脚本复核是否已捆绑)
-#     3) --page-align: 校验 PT_LOAD p_align ≥ 16384(16K 页设备,DESIGN §1.2.8)
-# 任一违规 → 退出码 1。
+# check-compat.sh — andcode compatibility audit gate (DESIGN §3.3, NAMING §8)
+# Usage: check-compat.sh [--page-align] <elf-or-dir> [more...]
+#   Audit each aarch64 ELF:
+#     1) Maximum glibc symbol version ≤ $MAX_GLIBC (default 2.39)
+#     2) Print NEEDED dependencies (manual/script review of bundled libraries)
+#     3) --page-align: verify PT_LOAD p_align ≥ 16384 (16K-page devices, DESIGN §1.2.8)
+# Any violation results in exit code 1.
 set -euo pipefail
 
 MAX_GLIBC="${MAX_GLIBC:-2.39}"
@@ -20,7 +20,7 @@ for arg in "$@"; do
 done
 [ ${#TARGETS[@]} -gt 0 ] || { echo "no targets"; exit 2; }
 
-ver_le() { # $1,$2 版本比较, $1 ≤ $2 → 0
+ver_le() { # Compare versions $1 and $2; return 0 when $1 ≤ $2.
   [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]
 }
 
@@ -39,7 +39,7 @@ collect_elfs() {
 fail=0; n_elf=0
 while IFS= read -r -d '' elf; do
   n_elf=$((n_elf+1))
-  # 1) glibc 符号版本
+  # 1) glibc symbol versions
   maxver="$(objdump -T "$elf" 2>/dev/null | grep -oE 'GLIBC_[0-9.]+' | sed 's/^GLIBC_//' | sort -uV | tail -n1 || true)"
   if [ -n "$maxver" ]; then
     if ver_le "$maxver" "$MAX_GLIBC"; then
@@ -50,10 +50,10 @@ while IFS= read -r -d '' elf; do
   else
     echo "[info] 无 GLIBC 符号引用(静态或非 glibc)  $elf"
   fi
-  # 2) NEEDED 清单
+  # 2) NEEDED list
   needed="$(readelf -d "$elf" 2>/dev/null | grep -oE 'NEEDED.*\[(.+)\]' | sed 's/.*\[\(.*\)\]/\1/' | tr '\n' ' ' || true)"
   [ -n "$needed" ] && echo "       NEEDED: $needed"
-  # 3) 16K 段对齐(数值比较;0x10000=64K 是合规的,勿用前缀通配)
+  # 3) 16K segment alignment (numeric comparison; 0x10000=64K is valid, so avoid prefix matching)
   if [ "$PAGE_ALIGN" = 1 ]; then
     min=""
     for a in $(readelf -lW "$elf" 2>/dev/null | awk '/LOAD/{print $NF}'); do

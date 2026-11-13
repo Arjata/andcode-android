@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# patch-home.sh v2 — 设备侧修补 wrapper 的 HOME 兜底(无 sed,纯 grep/head/tail 拼接)
-# 用法: sh patch-home.sh <bundle-root>
+# patch-home.sh v2 — Patch wrapper HOME fallback on devices (no sed; assemble with grep/head/tail)
+# Usage: sh patch-home.sh <bundle-root>
 set -u
 ROOT="${1:?usage: patch-home.sh <bundle-root>}"
 

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# patch-entry-libpath.sh — andcode-entry 的 proot 分支补 LD_LIBRARY_PATH
+# patch-entry-libpath.sh — Add LD_LIBRARY_PATH to the proot branch of andcode-entry
 ROOT=/data/local/tmp/andcode
 F="$ROOT/sbin/andcode-entry"
 OLD='export PROOT_LOADER="$ROOT/usr/lib/proot/loader"'

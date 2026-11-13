@@ -10,8 +10,8 @@ import android.os.IBinder;
 import androidx.annotation.Nullable;
 
 /**
- * specialUse 前台服务:承载长会话(targetSdk 37.2 FGS 类型强制,DESIGN §4.4)。
- * MVP:仅占位通知 + wake-lock 语义;后续版本承接 opencode serve 常驻。
+ * specialUse foreground service for long sessions (FGS type required by targetSdk 37.2, DESIGN §4.4).
+ * MVP: placeholder notification and wake-lock semantics only; later versions keep opencode serve running.
  */
 public class SessionService extends Service {
 
@@ -34,7 +34,7 @@ public class SessionService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // 承接 opencode serve 常驻(桌面级 Web UI 后端);已启动则幂等
+        // Keep opencode serve running (desktop Web UI backend); idempotent when already started.
         ServeManager.ensureStarted(this, new ServeManager.ReadyCallback() {
             @Override public void onReady(String password) { }
             @Override public void onFailed(String reason) { }

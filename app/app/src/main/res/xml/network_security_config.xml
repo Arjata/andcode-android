@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 仅放行本机 opencode serve 的明文回环;其余域名仍强制 https(DESIGN §1.2) -->
+<!-- Allow cleartext loopback only for local opencode serve; all other domains require HTTPS (DESIGN §1.2). -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">

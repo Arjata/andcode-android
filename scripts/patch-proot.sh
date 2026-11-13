@@ -1,7 +1,7 @@
 #!/system/bin/sh
-# patch-proot.sh — wrapper proot 分支前清除 LD_PRELOAD(proot 为 Bionic 二进制,
-# 不能加载 glibc shim;/etc 重定向已由 proot bind 接管)
-# 用法: sh patch-proot.sh <bundle-root>
+# patch-proot.sh — Clear LD_PRELOAD before the wrapper's proot branch (proot is a Bionic binary
+# and cannot load the glibc shim; proot bind already handles /etc redirection).
+# Usage: sh patch-proot.sh <bundle-root>
 set -u
 ROOT="${1:?usage: patch-proot.sh <bundle-root>}"
 

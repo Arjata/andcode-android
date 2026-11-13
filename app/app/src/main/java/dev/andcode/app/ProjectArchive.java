@@ -6,7 +6,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.zip.*;
 
-/** 不调用外部命令的 ZIP 数据导入/导出;导入目标必须是独立的空暂存目录。 */
+/** ZIP import/export without external commands; imports require a separate, empty staging directory. */
 public final class ProjectArchive {
     static final long MAX_BYTES = 512L * 1024 * 1024;
     static final int MAX_ENTRIES = 20000;
@@ -59,7 +59,7 @@ public final class ProjectArchive {
                 File file = child(target, entry.getName());
                 if (!names.add(file.getCanonicalPath())) throw new IOException("ZIP 含重复路径");
                 if (entry.isDirectory()) {
-                    // 不让 closeEntry() 无限制地排空伪装成目录的压缩数据。
+                    // Prevent closeEntry() from draining unbounded compressed data disguised as a directory.
                     if (zip.read() != -1) throw new IOException("ZIP 目录项包含数据");
                     if (!file.isDirectory() && !file.mkdirs()) throw new IOException("无法创建目录");
                 } else {

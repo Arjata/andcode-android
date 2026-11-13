@@ -25,7 +25,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.Executors;
 
-/** SAF 文件交换;仅导入副本,不修改系统选择器中的源文件。 */
+/** SAF file exchange; import copies only, without modifying source files selected in the system picker. */
 public class ProjectsActivity extends UtilityActivity {
     private String pendingName;
     private String pendingExport;
@@ -176,7 +176,7 @@ public class ProjectsActivity extends UtilityActivity {
                 Files.move(staging.toPath(), destination.toPath());
                 return "已导入 " + name + "。可复制路径在 Web 中打开，或设为新终端目录。";
             } finally {
-                // 仅清理本任务创建的暂存目录,不跟随符号链接。
+                // Clean up only this task's staging directory, without following symbolic links.
                 if (staging.exists()) {
                     try (java.util.stream.Stream<Path> paths = Files.walk(staging.toPath())) {
                         for (Path path : paths.sorted(Comparator.reverseOrder()).toArray(Path[]::new))
@@ -312,7 +312,7 @@ public class ProjectsActivity extends UtilityActivity {
         menu.show();
     }
 
-    /** 无 Activity 引用的任务状态;旋转屏幕不重复导入或丢失完成回调。 */
+    /** Task state without Activity references; rotation neither repeats imports nor loses completion callbacks. */
     public static class JobState extends ViewModel {
         final MutableLiveData<String> message = new MutableLiveData<>("就绪");
         boolean busy;

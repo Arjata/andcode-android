@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# pack-bundle.sh — 组装自包含交付包(DESIGN §4.1, NAMING §6.1)
+# pack-bundle.sh — Assemble a self-contained distribution bundle (DESIGN §4.1, NAMING §6.1)
 #
-# 用法:
+# Usage:
 #   pack-bundle.sh --rootfs <baseline-rootfs> --stage <payload-stage> \
 #                  --out <bundle.tar.gz> [--shebang /system/bin/sh] [--name <ver>]
 #
-# --rootfs: baseline/make-rootfs.sh 或 `docker export ubuntu:24.04` 的产物
-# --stage:  上游载荷树,相对布局即规范布局(root/ 之外可省略 root/ 前缀):
-#             bin/opencode.bin            # opencode 官方 linux-arm64 ELF(必须)
-#             usr/bin/…  usr/libexec/git-core/…   # git 前缀(必须)
-#             sbin/dropbear  sbin/dbclient        # 可选
-#             bin/rg  bin/busybox(静态)…         # 可选
-# 规则(NAMING):
-#   - 每个 glibc ELF 改名 <name>.bin,并在原路径生成包装器脚本(动态链接的
-#     git libexec 助手同样处理,git 经 GIT_EXEC_PATH 按原名调用包装器);
-#   - 静态 ELF(如 busybox)保持原名直通;
-#   - glibc 依赖闭包(lddtree)收进 root/lib,保持 soname 原名(路线乙;
-#     Tier P 的路线甲重写由 pack-apk-libs.sh 处理);
-#   - 生成 TSV manifest(NAMING §7.2),供 naming-lint 与 notices 使用。
+# --rootfs: output of baseline/make-rootfs.sh or `docker export ubuntu:24.04`
+# --stage: upstream payload tree in canonical relative layout (the root/ prefix may be omitted):
+#             bin/opencode.bin            # Official opencode linux-arm64 ELF (required)
+#             usr/bin/…  usr/libexec/git-core/…   # Git prefix (required)
+#             sbin/dropbear  sbin/dbclient        # Optional
+#             bin/rg  bin/busybox (static)…       # Optional
+# Rules (NAMING):
+#   - Rename each glibc ELF to <name>.bin and generate a wrapper at its original path (also
+#     applies to dynamically linked git libexec helpers; git calls wrappers by original name via GIT_EXEC_PATH);
+#   - Keep static ELFs (such as busybox) unchanged under their original names;
+#   - Collect the glibc dependency closure (lddtree) in root/lib, preserving sonames (route B;
+#     pack-apk-libs.sh handles Tier P route A rewriting);
+#   - Generate a TSV manifest (NAMING §7.2) for naming-lint and notices.
 set -euo pipefail
 
 ROOTFS="" STAGE="" OUT="" SHEBANG="/system/bin/sh" VER="0.0.0+dev"
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
-[ -n "$ROOTFS" ] && [ -n "$STAGE" ] && [ -n "$OUT" ] || { grep '^# 用法' -A3 "$0"; exit 2; }
+[ -n "$ROOTFS" ] && [ -n "$STAGE" ] && [ -n "$OUT" ] || { grep '^# Usage' -A3 "$0"; exit 2; }
 
 command -v readelf >/dev/null || { echo "需要 binutils(readelf)"; exit 1; }
 BUNDLE_TPL="$(dirname "$0")/wrapper.sh.tpl"
@@ -47,16 +47,16 @@ ORIG_PWD="$PWD"
 case "$OUT" in /*) ABS_OUT="$OUT" ;; *) ABS_OUT="$ORIG_PWD/$OUT" ;; esac
 B="$WORK/andcode"; mkdir -p "$B"
 
-# ── 1. 载荷 + overlay + ELF→.bin/包装器变换 ──────────────────────────────
+# ── 1. Payload + overlay + ELF→.bin/wrapper conversion ─────────────────────
 cp -a "$STAGE/." "$B/"
 if [ -d "$B/root" ]; then mv "$B/root/." "$B/"; rmdir "$B/root"; fi
-# 本仓库维护的 sbin 入口脚本(命名规范 NAMING §4.2)
+# Repository-maintained sbin entry scripts (naming rules: NAMING §4.2)
 if [ -d "$(dirname "$0")/overlay" ]; then
   cp -a "$(dirname "$0")/overlay/." "$B/"
 fi
 
-# 解引用树内符号链接(git-core 的 git-remote-https → git-remote-http 等):
-# 否则 find -type f 会跳过它们,导致助手从未被包装 → https 链路断裂
+# Dereference symlinks within the tree (such as git-core's git-remote-https → git-remote-http):
+# otherwise find -type f skips them, leaving helpers unwrapped and breaking HTTPS.
 while IFS= read -r -d '' l; do
   tgt="$(readlink -f "$l")" || continue
   [ -f "$tgt" ] || continue
@@ -66,20 +66,20 @@ done < <(find "$B" -type l -print0)
 
 is_static() { file -b "$1" | grep -q 'statically linked\|static-pie'; }
 
-# 深度优先处理:静态直通;动态 ELF 改名 .bin 并在原路径生成包装器
-# ROOT 自推导深度 = 路径在 root/ 下的目录层数(bin/x → 1 层 → "../";深路径按层数累加)
+# Process depth-first: keep static ELFs; rename dynamic ELFs to .bin and generate wrappers at original paths.
+# ROOT inference depth equals directory depth beneath root/ (bin/x → 1 level → "../"; repeat for deeper paths).
 while IFS= read -r -d '' f; do
   if is_static "$f"; then
     echo "[直通] 静态 ELF: ${f#$B/}"
   else
     mv "$f" "$f.bin"
     cmd="$(basename "$f")"
-    rel="${f#"$B/"}"                     # 如 bin/opencode、usr/libexec/git-core/git-remote-https
+    rel="${f#"$B/"}"                     # For example, bin/opencode or usr/libexec/git-core/git-remote-https
     depth="$(printf '%s' "$rel" | awk -F'/' '{print NF-1}')"
     up=""; i=0; while [ $i -lt $depth ]; do up="${up}../"; i=$((i+1)); done
     if [ -n "$LAUNCHER" ] && [ -f "$LAUNCHER" ] && case "$rel" in usr/libexec/git-core/*) true ;; *) false ;; esac; then
-      # launcher 形态(NAMING §6.2):静态 musl 启动器取代 shell wrapper,
-      # 规避 git spawn 的 shell 链路(真机 P0: capabilities not found)
+      # Launcher mode (NAMING §6.2): a static musl launcher replaces the shell wrapper,
+      # avoiding the git spawn shell chain (device P0: capabilities not found).
       cp -f "$LAUNCHER" "$f"
       echo "[包装] $rel → $rel.bin(launcher)"
       printf '%s\tlauncher\n' "$rel" >> "$B/.kindmap"
@@ -95,8 +95,8 @@ while IFS= read -r -d '' f; do
       printf '%s\tshell\n' "$rel" >> "$B/.kindmap"
     fi
     if [ -n "$LAUNCHER" ] && [ -f "$LAUNCHER" ]; then
-  # opencode 以 posix_spawn 调 'git'(无 shell,Bun 不回落 /bin/sh):
-  # bin/git 必须是 ELF launcher(target = usr/libexec/git-core/git.bin)
+  # opencode invokes 'git' with posix_spawn (no shell; Bun does not fall back to /bin/sh):
+  # bin/git must be an ELF launcher (target = usr/libexec/git-core/git.bin).
   cp -f "$LAUNCHER" "$B/bin/git"
   chmod 0755 "$B/bin/git"
   printf '%s\tlauncher\n' "bin/git" >> "$B/.kindmap"
@@ -119,12 +119,12 @@ if [ -f "$B/bin/opencode-pty" ] && [ -f "$B/usr/lib/opencode-pty/opencode-pty.bi
   rm -f "$B/usr/lib/opencode-pty/opencode-pty"
 fi
 
-# ── 2. glibc 闭包(root/lib,保持 soname)─────────────────────────────────
+# ── 2. glibc closure (root/lib, preserving sonames) ─────────────────────────
 mkdir -p "$B/lib"
 declare -A COPIED=()
-# 依赖解析顺序: --extralib(上游容器私有库)→ 基线 rootfs;
-# -L 跟随符号链接;lib 落点用 soname 原名(路线乙)
-resolve_in_rootfs() { # $1 = 库文件名 → 输出绝对路径
+# Dependency resolution order: --extralib (upstream container private libraries) → baseline rootfs;
+# -L follows symlinks; library destinations use original sonames (route B).
+resolve_in_rootfs() { # $1 = library filename → print absolute path
   local name="$1" d p
   for d in "${EXTRA_LIBS[@]:-}"; do
     [ -n "$d" ] || continue
@@ -134,9 +134,9 @@ resolve_in_rootfs() { # $1 = 库文件名 → 输出绝对路径
   find -L "$ROOTFS/lib" "$ROOTFS/usr/lib" "$ROOTFS/usr/lib/aarch64-linux-gnu" \
        -name "$name" -type f 2>/dev/null | head -n1
 }
-copy_deps() { # $1 = ELF 路径(必须在 rootfs 的 chroot 视角下解析)
+copy_deps() { # $1 = ELF path (must resolve from the rootfs chroot perspective)
   local elf="$1" needed name path
-  # 捕获全部 DT_NEEDED(ld-linux 开头与 lib 开头都要,不能只匹配 lib*)
+  # Capture all DT_NEEDED entries (both ld-linux and lib prefixes, not just lib*).
   needed="$(readelf -d "$elf" 2>/dev/null | grep -oE '\[(lib|ld-linux)[^]]+\]' | tr -d '[]' || true)"
   for name in $needed; do
     [ -n "${COPIED[$name]:-}" ] && continue
@@ -149,7 +149,7 @@ copy_deps() { # $1 = ELF 路径(必须在 rootfs 的 chroot 视角下解析)
         path="$(resolve_in_rootfs "$name")"
         if [ -n "$path" ]; then
           cp -f "$path" "$B/lib/$name"; COPIED[$name]=1
-          copy_deps "$path"   # 递归二阶依赖
+          copy_deps "$path"   # Recursively collect transitive dependencies.
         else
           echo "[警告] 闭包缺库: $name(被 ${elf#$B/} 需要)" >&2
         fi
@@ -161,10 +161,10 @@ while IFS= read -r -d '' f; do
   case "$f" in *.bin) copy_deps "$f" ;; esac
 done < <(find "$B" -type f -name '*.bin' -print0)
 
-# ── 3. proot(bionic 构建,Tier A/M 的 /etc 重定向正解)+ shim + etc 模板 ──
-# 依据(真机 P0 结论):LD_PRELOAD 无法拦截 glibc 内部 fopen("/etc/resolv.conf"),
-# shim 对 glibc-internal /etc 读取无效;proot 用户态 bind 是无 root 正解。
-# 组件:Termux proot(bionic)+ loader + libtalloc + libandroid-shmem,独立聚合。
+# ── 3. proot (bionic build, Tier A/M /etc redirection solution) + shim + etc templates ──
+# Rationale (device P0 findings): LD_PRELOAD cannot intercept glibc-internal fopen("/etc/resolv.conf");
+# the shim cannot redirect glibc-internal /etc reads; proot userspace binds provide the rootless solution.
+# Components: Termux proot (bionic) + loader + libtalloc + libandroid-shmem, aggregated independently.
 if [ -n "$PROOT_DIR" ] && [ -d "$PROOT_DIR" ]; then
   mkdir -p "$B/usr/lib/proot"
   cp -f "$PROOT_DIR/proot"  "$B/usr/lib/proot/proot"
@@ -188,10 +188,10 @@ root:x:0:
 andcode:x:10001:
 EOF
 printf 'hosts: files dns\n' > "$B/etc/nsswitch.conf"
-printf '# 运行期由 andcode-mkresolv 覆盖\nnameserver 1.1.1.1\n' > "$B/etc/resolv.conf"
+  printf '# Overridden at runtime by andcode-mkresolv\nnameserver 1.1.1.1\n' > "$B/etc/resolv.conf"
 
-# CA 证书(git/https 必需;shim 对 /etc/ssl/ 前缀整段重定向,DESIGN §4.5)
-# -L 解引用:/etc/ssl/certs 常为符号链接,内部哈希链接指向 rootfs 他处
+# CA certificates (required for git/HTTPS; shim redirects the entire /etc/ssl/ prefix, DESIGN §4.5)
+# Dereference with -L: /etc/ssl/certs is often a symlink, with internal hash links pointing elsewhere in rootfs.
 if [ -e "$ROOTFS/etc/ssl/certs" ] || [ -e "$ROOTFS/usr/lib/ssl/certs" ]; then
   SRC="$ROOTFS/etc/ssl/certs"; [ -e "$SRC" ] || SRC="$ROOTFS/usr/lib/ssl/certs"
   mkdir -p "$B/etc/ssl"
@@ -200,10 +200,10 @@ if [ -e "$ROOTFS/etc/ssl/certs" ] || [ -e "$ROOTFS/usr/lib/ssl/certs" ]; then
   echo "[etc] CA 证书已收录($(find "$B/etc/ssl/certs" -type f | wc -l) 项)"
 fi
 
-# ── 4. manifest(NAMING §7.2;kind/物理名判定见 NAMING §6.2)───────────────
+# ── 4. Manifest (NAMING §7.2; kind/physical-name rules: NAMING §6.2) ─────────
 MF="$B/manifest"
 printf '# logical-path\tphysical-tier-p\tkind\tlicense\tversion\tupstream\n' > "$MF"
-# 从真实基线包数据库取版本,不把交付包版本误记为 Bash/ncurses 版本。
+# Read versions from the actual baseline package database, not the bundle version, for Bash/ncurses.
 package_version() {
   awk -v package="$1" 'BEGIN { RS=""; FS="\n" }
     { matched=0; version=""; for (i=1; i<=NF; i++) {
@@ -212,10 +212,10 @@ package_version() {
     } if (matched) { print version; exit } }' "$ROOTFS/var/lib/dpkg/status"
 }
 
-slug() { # $1 = bundle 内逻辑路径(root/ 相对) → 物理名(NAMING §6.2)
+slug() { # $1 = bundle logical path (relative to root/) → physical name (NAMING §6.2)
   local p="${1#root/}" base s
   case "$p" in
-    *.bin) base="${p%.bin}" ;;                      # ELF 本体:剥 .bin
+    *.bin) base="${p%.bin}" ;;                      # ELF payload: strip .bin
     *)    base="$p" ;;
   esac
   case "$base" in
@@ -223,10 +223,10 @@ slug() { # $1 = bundle 内逻辑路径(root/ 相对) → 物理名(NAMING §6.2)
     *)                      p="$base" ;;
   esac
   s="$(printf '%s' "$p" | tr '/' '-')"
-  s="$(printf '%s' "$s" | tr -c 'a-z0-9A-Z-' '-')"   # 字符净化(NAMING §6.2)
+  s="$(printf '%s' "$s" | tr -c 'a-z0-9A-Z-' '-')"   # Sanitize characters (NAMING §6.2)
   printf 'libandcode-%s.so' "$s"
 }
-lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版本尾)
+lib_slug() { # $1 = root/lib/<soname> → physical name (loader exception; strip .so.N version suffix)
   local b="$(basename "$1")"
   case "$b" in
     ld-linux*) printf 'libandcode-ld-linux.so' ;;
@@ -236,7 +236,7 @@ lib_slug() { # $1 = root/lib/<soname> → 物理名(loader 特例;剥 .so.N 版�
   esac
 }
 
-wrapper_slug() { # $1 = 逻辑路径 → wrapper/launcher 物理名(bin|usr/bin|libexec|sbin 剥前缀,NAMING §6.2)
+wrapper_slug() { # $1 = logical path → wrapper/launcher physical name (strip bin|usr/bin|libexec|sbin prefix, NAMING §6.2)
   local p="${1#root/}"
   case "$p" in usr/libexec/git-core/*)
     printf 'libandcode-git-core-%s.so' "${p#usr/libexec/git-core/}"
@@ -266,7 +266,7 @@ while IFS= read -r -d '' f; do
   if [ "${lp#lib/}" != "$lp" ]; then
     kind=glibc-lib; phys="$(lib_slug "$lp")"; lic=LGPL-2.1; up=glibc-2.39
   elif [ "${lp#root/etc/}" != "$lp" ] || [ "${lp#etc/}" != "$lp" ]; then
-    # data 类不进 jniLibs(只读数据经 APK assets → filesDir 原样落位),物理名占位 "-"
+    # Data bypasses jniLibs (read-only data is copied unchanged from APK assets to filesDir); physical-name placeholder is "-".
     kind=data; phys="-"
   elif [ "$lp" = "shim/libandcode-shim.so" ]; then
     kind=preload-lib; phys="libandcode-shim.so"
@@ -291,7 +291,7 @@ while IFS= read -r -d '' f; do
       *)                   lic=MIT;                up=sst/opencode ;;
     esac
   elif [ -f "$f.bin" ]; then
-    # 有同名 .bin ⇒ 上游命令包装器(shell 形态,未登记 kindmap 的兜底)
+    # A matching .bin indicates an upstream command wrapper (shell mode, fallback for entries absent from kindmap).
     phys="$(wrapper_slug "$lp")"
     kind=wrapper-sh
   else
@@ -317,7 +317,7 @@ while IFS= read -r -d '' f; do
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$lp" "$phys" "$kind" "$lic" "$ver" "$up" >> "$MF"
 done < <(find "$B" -type f -print0 | sort -z)
 
-# ── 5. 打包 ──────────────────────────────────────────────────────────────
+# ── 5. Packaging ──────────────────────────────────────────────────────────
 rm -f "$B/.kindmap"
 mkdir -p "$(dirname "$ABS_OUT")"
 ( cd "$WORK" && tar -czf "$ABS_OUT" andcode )

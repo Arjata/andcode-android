@@ -28,13 +28,13 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Web 图形界面(OpenCode 2.0):WebView 承载本机 serve 的 SPA(DESIGN §4 Tier P)。
- * - serve 由 {@link ServeManager} 托管;就绪前显示状态文本。
- * - 首次配对:页面自带"使用密码"登录;尝试 JS 自动填充,失败则用户手动一次,
- *   之后 localStorage 持久(与 Chrome 行为一致)。
- * - 全屏 WebView 上叠加 {@link FloatingMenuBall} 悬浮球 + 共享抽屉导航
- *   (对齐 andapi ChatActivity 模式)。
- * - 127.0.0.1 明文仅经 networkSecurityConfig 放行,其余流量仍强制 https。
+ * Web UI (OpenCode 2.0): WebView hosts the local serve SPA (DESIGN §4 Tier P).
+ * - {@link ServeManager} manages serve; show status text until ready.
+ * - Initial pairing: try JS autofill for the page's password login; on failure, the user
+ *   logs in manually once, then localStorage persists it (as in Chrome).
+ * - Overlay the fullscreen WebView with {@link FloatingMenuBall} and shared drawer navigation
+ *   (matching the andapi ChatActivity pattern).
+ * - networkSecurityConfig allows cleartext only for 127.0.0.1; all other traffic requires HTTPS.
  */
 public class WebActivity extends AppCompatActivity {
 
@@ -60,7 +60,7 @@ public class WebActivity extends AppCompatActivity {
         mDrawer = findViewById(R.id.rootDrawer);
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
-                // 抽屉优先,然后 Web 历史,最后交回 Activity 默认导航。
+                // Handle the drawer first, then Web history, then default Activity navigation.
                 if (mDrawer.isDrawerOpen(GravityCompat.START)) {
                     mDrawer.closeDrawer(GravityCompat.START);
                 } else if (mWebView != null && mWebView.canGoBack()) {
@@ -73,7 +73,7 @@ public class WebActivity extends AppCompatActivity {
             }
         });
 
-        // 悬浮抽屉球:可拖拽、贴边自动隐藏,点击打开共享抽屉(需 content 引用)
+        // Floating drawer ball: draggable, auto-hides at the edge, and opens the shared drawer on tap (needs content).
         FrameLayout content = findViewById(R.id.webContent);
         content.addView(new FloatingMenuBall(this, content, "menu_ball",
             () -> mDrawer.openDrawer(GravityCompat.START)));
@@ -82,12 +82,12 @@ public class WebActivity extends AppCompatActivity {
             @Override public void onTerminalSelected() {
                 startActivity(new Intent(WebActivity.this, TerminalActivity.class));
             }
-            @Override public void onWebSelected() { /* 当前页 */ }
+            @Override public void onWebSelected() { /* Current page. */ }
         });
 
         WebSettings s = mWebView.getSettings();
         s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true); // 配对凭证存 localStorage
+        s.setDomStorageEnabled(true); // Pairing credentials are stored in localStorage.
         s.setAllowFileAccess(false);
         try (InputStream in = getAssets().open("andcode-terminal-ime.js");
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -98,8 +98,8 @@ public class WebActivity extends AppCompatActivity {
         } catch (IOException e) {
             android.util.Log.e("andcode", "无法加载 Web 终端输入法适配", e);
         }
-        // opencode 附件按钮最终触发 <input type=file>;WebView 没有
-        // WebChromeClient.onShowFileChooser 时该点击静默无响应。
+        // The opencode attachment button triggers <input type=file>; without
+        // WebChromeClient.onShowFileChooser, WebView silently ignores the click.
         mWebView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(
                     WebView view, ValueCallback<Uri[]> callback,
@@ -123,7 +123,7 @@ public class WebActivity extends AppCompatActivity {
         }
         mWebView.setWebViewClient(new Client());
 
-        // FGS 承接常驻(DESIGN §4.4):应用切后台后 serve 存活
+        // The FGS keeps serve alive when the app enters the background (DESIGN §4.4).
         startForegroundService(new Intent(this, SessionService.class));
 
         mStatus.setText(getString(R.string.s_starting_web));
@@ -133,9 +133,9 @@ public class WebActivity extends AppCompatActivity {
                 mPassword = password;
                 mStatus.setVisibility(View.GONE);
                 mWebView.loadUrl(ServeManager.BASE_URL + "/");
-                // serve 的 stdout 先打 "server listening"(ping 即通)后打
-                // "server password":就绪回调时密码可能尚未解析。定期重试注入,
-                // 页面侧 __acPair 守卫保证真正生效的只有第一次。
+                // serve stdout prints "server listening" (ping succeeds) before
+                // "server password", so the ready callback may precede password parsing. Retry injection;
+                // the page-side __acPair guard ensures only the first successful attempt takes effect.
                 for (int i = 1; i <= 15; i++) {
                     mUiHandler.postDelayed(() -> tryAutoPair(), i * 2000L);
                 }
@@ -148,11 +148,11 @@ public class WebActivity extends AppCompatActivity {
     }
 
     /**
-     * 注入轮询式自动配对 JS(SPA 异步渲染,onPageFinished 时表单往往未挂载,必须轮询)。
-     * 每 500ms 探测一次,共 40s:有"使用密码"入口先点开;密码框出现后用 React 原生
-     * setter 填值 + input 事件 + 点连接。已登录(localStorage 有效)时页面无密码框,自然空转。
-     * 点击选择器覆盖 button/a/[role]/span/div,取 textContent 最短(最内层)元素——
-     * click 事件会冒泡到真正的处理器;兼容中英文两种界面文案。
+     * Inject polling-based pairing JS (async SPA rendering often mounts the form after onPageFinished).
+     * Poll every 500ms for 40s: open the password login entry, then fill the password via the native
+     * setter for React, fire input, and click connect. With valid localStorage login, no password field appears.
+     * Click selectors cover button/a/[role]/span/div, choosing the shortest (innermost) textContent;
+     * click bubbles to the actual handler. Supports both English and Chinese UI text.
      */
     private void tryAutoPair() {
         if (!hasLiveWebView() || mPassword == null || mPassword.isEmpty()) return;
@@ -209,7 +209,7 @@ public class WebActivity extends AppCompatActivity {
 
     private class Client extends WebViewClient {
         @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-            // 仅本机 serve 的导航留在 WebView 内
+            // Keep only local serve navigation inside WebView.
             return !"127.0.0.1".equals(req.getUrl().getHost());
         }
         @Override public void onPageFinished(WebView view, String url) {
@@ -225,7 +225,7 @@ public class WebActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         mUiHandler.removeCallbacksAndMessages(null);
-        // 先断开 Activity 回调与视图树,再销毁;serve 生命周期不受页面退出影响。
+        // Detach Activity callbacks and the view tree before destruction; leaving the page does not affect serve.
         WebView webView = mWebView;
         mWebView = null;
         if (webView != null) {

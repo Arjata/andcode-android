@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# pack-apk-libs.sh — 规范布局 bundle → Tier P jniLibs 物理化(NAMING §6.2/§6.3,路线甲)
+# pack-apk-libs.sh — Map the canonical bundle layout to Tier P jniLibs (NAMING §6.2/§6.3, route A)
 #
-# 用法: pack-apk-libs.sh --bundle <andcode-bundle.tar.gz> --out <jniLibs-dir>
+# Usage: pack-apk-libs.sh --bundle <andcode-bundle.tar.gz> --out <jniLibs-dir>
 #                        [--no-rewrite] [--exclude <logical-path>]...
 #
-# --exclude 可重复:按逻辑路径(manifest 第 1 列,精确匹配)排除条目,使其不进
-# jniLibs、manifest.farm 与 assets/andcode-runtime/manifest(APK 侧瘦身;规范
-# bundle 本体不受影响)。用于单 APK 移除 legacy opencode v1(DESIGN v0.4.55)。 [--no-rewrite]
+# Repeat --exclude to omit entries by logical path (exact match against manifest column 1)
+# from jniLibs, manifest.farm and assets/andcode-runtime/manifest (APK size reduction;
+# the canonical bundle is unaffected). Removes legacy opencode v1 from an APK (DESIGN v0.4.55). [--no-rewrite]
 #
-# 步骤:
-#   1. 解包,按 manifest 逐行把 root/... 映射为 libandcode-*.so 物理名;
-#   2. 路线甲(默认):patchelf 全量重写 glibc 闭包的 SONAME/NEEDED
-#      (libc.so.6 → libandcode-libc.so …),依赖与物理名一一对应;
-#   3. loader 特例:ld-linux-aarch64.so.1 → libandcode-ld-linux.so(显式调用,可改名);
-#   4. 校验每个产物:名称符合 ^libandcode-[a-z0-9-]+\.so$,长度 ≤ 64;
-#   5. 输出 link-farm 清单(manifest.farm)供 APK 首启动建农场(NAMING §6.4)。
+# Steps:
+#   1. Unpack and map root/... to libandcode-*.so physical names using each manifest row;
+#   2. Route A (default): use patchelf to rewrite all SONAME/NEEDED entries in the glibc closure
+#      (libc.so.6 → libandcode-libc.so ...), matching dependencies to physical names;
+#   3. Loader exception: ld-linux-aarch64.so.1 → libandcode-ld-linux.so (explicit invocation allows renaming);
+#   4. Verify each output: name matches ^libandcode-[a-z0-9-]+\.so$, length ≤ 64;
+#   5. Emit manifest.farm for APK link-farm creation on first launch (NAMING §6.4).
 set -euo pipefail
 
 BUNDLE="" OUT="" REWRITE=1
@@ -29,7 +29,7 @@ while [ $# -gt 0 ]; do
     *) echo "未知参数: $1"; exit 2 ;;
   esac
 done
-[ -n "$BUNDLE" ] && [ -n "$OUT" ] || { grep '^# 用法' -A3 "$0"; exit 1; }
+[ -n "$BUNDLE" ] && [ -n "$OUT" ] || { grep '^# Usage' -A3 "$0"; exit 1; }
 command -v patchelf >/dev/null || { echo "需要 patchelf"; exit 1; }
 
 is_excluded() {
@@ -46,13 +46,13 @@ B="$WORK/andcode"
 LIBS="$OUT/arm64-v8a"
 mkdir -p "$LIBS"
 
-# 可选排除清单文件供 awk 过滤两份输出清单;空数组时不创建文件。
+# Optional exclusion file lets awk filter both output manifests; no file is created for an empty array.
 EXC_FILE=""
 if [ "${#EXCLUDE[@]}" -gt 0 ]; then
   EXC_FILE="$WORK/exclude.txt"
   printf '%s\n' "${EXCLUDE[@]}" > "$EXC_FILE"
 fi
-# 输出清单必须与 jniLibs 实际产物一致,否则首启动 farm 校验失败(RuntimePayload)。
+# Output manifests must match jniLibs artifacts or first-launch farm validation fails (RuntimePayload).
 filter_manifest() {
   awk -F'\t' -v exclfile="$EXC_FILE" '
     BEGIN { if (exclfile != "") { while ((getline l < exclfile) > 0) e[l] = 1 } }
@@ -61,9 +61,9 @@ filter_manifest() {
   ' "$1"
 }
 
-# ── 1+2+3. 映射与重写 ─────────────────────────────────────────────────────
+# ── 1+2+3. Mapping and rewriting ───────────────────────────────────────────
 TPL="$(dirname "$0")/wrapper.sh.tpl"
-declare -A SONAME_MAP=() ELF_PHYS=()   # ELF_PHYS: 逻辑路径(.bin) → jniLibs 物理名
+declare -A SONAME_MAP=() ELF_PHYS=()   # ELF_PHYS: logical path (.bin) → jniLibs physical name
 while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$lp" in '#'*|"") continue ;; esac
   ELF_PHYS["$lp"]="$phys"
@@ -71,12 +71,12 @@ done < "$B/manifest"
 while IFS=$'\t' read -r lp phys kind lic ver up; do
   case "$lp" in '#'*|"") continue ;; esac
   case "$kind" in
-    data) continue ;;   # data 不进 jniLibs(NAMING §6.2;APK assets 原样落位 filesDir)
+    data) continue ;;   # Data bypasses jniLibs (NAMING §6.2; APK assets are copied unchanged to filesDir)
     glibc-lib|preload-lib|elf-exec|wrapper-sh|launcher|script|alias) ;;
     *) echo "[FAIL] manifest 未知 kind: $kind($lp)"; exit 1 ;;
   esac
-  is_excluded "$lp" && continue   # APK 侧排除(如 legacy v1);规范 bundle 不受影响
-  # 物理名门禁(NAMING §8)
+  is_excluded "$lp" && continue   # APK-only exclusions (such as legacy v1); canonical bundle is unaffected
+  # Physical-name gate (NAMING §8)
   if ! printf '%s' "$phys" | grep -qE '^libandcode-[a-z0-9-]+\.so$' || [ ${#phys} -gt 64 ]; then
     echo "[FAIL] 物理名不合规: '$phys' ← $lp"; exit 1
   fi
@@ -116,8 +116,8 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
           -o "$LIBS/$phys" "$(dirname "$0")/launcher/bash-launcher.c"
         continue
       fi
-      # Tier P 重渲染(NAMING §6.3):ROOT/EXEDIR 来自 APK 注入的环境变量,
-      # loader/target 用 jniLibs 物理名
+      # Tier P re-rendering (NAMING §6.3): ROOT/EXEDIR come from APK-injected environment variables;
+      # loader/target use jniLibs physical names.
       target="${ELF_PHYS["$lp.bin"]:-}"
       [ -n "$target" ] || { echo "[FAIL] wrapper 缺少配对 .bin manifest 行: $lp"; exit 1; }
       sed -e "s|@ROOT@|ROOT=\"\${ANDCODE_ROOT:?}\"|" \
@@ -146,7 +146,7 @@ while IFS=$'\t' read -r lp phys kind lic ver up; do
   esac
 done < <(sort -t$'\t' -k3 "$B/manifest")
 
-# 二遍:用完成的映射重写全部 exec/lib 的 NEEDED
+# Second pass: rewrite NEEDED entries for all exec/lib files using the completed mapping.
 if [ "$REWRITE" = 1 ]; then
   while IFS=$'\t' read -r lp phys kind lic ver up; do
     case "$lp" in '#'*|"") continue ;; esac
@@ -160,7 +160,7 @@ if [ "$REWRITE" = 1 ]; then
   done < <(sort -t$'\t' -k3 "$B/manifest")
 fi
 
-# ── 4. 结果校验(check-compat 兼容审计同样适用,由 CI 串联)──────────────
+# ── 4. Validate outputs (CI also runs the check-compat compatibility audit) ──
 # Ubuntu patchelf may move .gnu.version_d without updating DT_VERDEF (notably
 # Bun ET_EXEC). Validate against the ELF's own tables; never hardcode offsets.
 python3 "$(dirname "$0")/../scripts/repair-elf-verdef.py" "$LIBS"/*.so
@@ -173,8 +173,8 @@ for f in "$LIBS"/*.so; do
 done
 [ $bad -eq 0 ] || exit 1
 
-# ── 5. link-farm 清单(逻辑路径 → 物理名;data 类排除,物理为 "-")────────
-# 与 jniLibs 产物保持一致:被 --exclude 的行不出现(RuntimePayload 交叉校验)。
+# ── 5. Link-farm manifest (logical path → physical name; omit data, whose physical name is "-") ──
+# Match jniLibs artifacts: omit rows selected by --exclude (RuntimePayload cross-checks them).
 filter_manifest "$B/manifest" | awk -F'\t' '$1 !~ /^#/ && $1 != "" && $2 != "-" {print $1 "\t" $2}' > "$OUT/manifest.farm"
 # Package only declared data, not a runtime-extracted executable archive.
 ASSETS="$OUT/assets/andcode-runtime"

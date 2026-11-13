@@ -6,7 +6,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.zip.*;
 
-/** 无第三方依赖;在临时目录运行 javac/java,不生成仓库内构建产物。 */
+/** No third-party dependencies; run javac/java in a temporary directory without repository build artifacts. */
 public class ProjectArchiveTest {
     static int checks;
     interface Checked { void run() throws Exception; }

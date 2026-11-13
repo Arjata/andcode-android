@@ -1,16 +1,16 @@
 /*
- * andcode-launcher — 静态 musl 启动器(DESIGN §4.5 候选①, AGPL-3.0)
+ * andcode-launcher — static musl launcher (DESIGN §4.5 candidate ①, AGPL-3.0)
  *
- * 用途: 取代 git-core 助手的 shell wrapper。git 以 execvp 调用本启动器
- * (argv[0] = "git-remote-https" 等裸名),启动器按 ANDCODE_* 环境变量
- * 组装 loader 参数并 execve 真正的 .bin ELF。执行链中不存在 shell,
- * 规避真机实测的 spawn 异常(dash 从 stdin 读协议帧)与 LD_PRELOAD
- * 泄漏(shim 构造器自清)。
+ * Purpose: replace shell wrappers for git-core helpers. git invokes this launcher via execvp
+ * (argv[0] is a bare name such as "git-remote-https"); the launcher uses ANDCODE_* environment
+ * variables to assemble loader arguments and execve the actual .bin ELF. No shell is involved,
+ * avoiding spawn failures observed on devices (dash reading protocol frames from stdin) and
+ * LD_PRELOAD leakage (the shim constructor clears it).
  *
- * 构建: musl-gcc -static -O2 -o launcher launcher.c   (基线容器 musl-tools)
- * 环境: ANDCODE_ROOT(必须)、ANDCODE_EXE_DIR(默认 ROOT)、
- *       ANDCODE_LOADER(默认 $ROOT/lib/ld-linux-aarch64.so.1)、
- *       ANDCODE_LIBPATH(默认 $ROOT/lib)、ANDCODE_SHIM(可选)
+ * Build: musl-gcc -static -O2 -o launcher launcher.c   (musl-tools in the baseline container)
+ * Environment: ANDCODE_ROOT (required), ANDCODE_EXE_DIR (defaults to ROOT),
+ *       ANDCODE_LOADER (defaults to $ROOT/lib/ld-linux-aarch64.so.1),
+ *       ANDCODE_LIBPATH (defaults to $ROOT/lib), ANDCODE_SHIM (optional)
  */
 #define _GNU_SOURCE
 #include <errno.h>
@@ -27,9 +27,9 @@ static char *xstrdup(const char *s) {
     return p;
 }
 
-/* 已被 ptrace 追踪(proot 父层)则禁止嵌套 proot——env 守卫(ANDCODE_IN_PROOT)
- * 可能被上游 spawn 的 env 净化丢失,TracerPid 是与 env 无关的可靠判定(真机实测
- * 嵌套 proot 互锁死锁) */
+/* Prevent nested proot when already ptrace-traced (by a parent proot). The environment guard
+ * (ANDCODE_IN_PROOT) may be lost to upstream spawn environment sanitization; TracerPid is a
+ * reliable environment-independent check (nested proot deadlocks were observed on devices). */
 static int is_traced(void) {
     FILE *f = fopen("/proc/self/status", "r");
     char line[256];
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     const char *exedir = getenv("ANDCODE_EXE_DIR");
     if (!exedir) exedir = root;
 
-    /* 目标 .bin: $ROOT/usr/libexec/git-core/<argv0 基名>.bin */
+    /* Target .bin: $ROOT/usr/libexec/git-core/<argv0 basename>.bin */
     const char *a0 = strrchr(argv[0], '/');
     a0 = a0 ? a0 + 1 : argv[0];
     char self[CAP];
@@ -68,8 +68,8 @@ int main(int argc, char **argv) {
     snprintf(shim, sizeof shim, "%s", sh ? sh : "");
     if (!sh || !*sh) snprintf(shim, sizeof shim, "%s/shim/libandcode-shim.so", root);
 
-    /* 为 exec 设置 shim/ETC_DIR;shim 构造器会在加载后自行清除 LD_PRELOAD,
-     * 因此本进程派生的 Bionic 子进程不受影响 */
+    /* Set shim/ETC_DIR for exec; the shim constructor clears LD_PRELOAD after loading,
+     * so Bionic children spawned by this process are unaffected. */
     setenv("LD_PRELOAD", shim, 1);
     {
         char etc[CAP];
@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
     }
 
     /* argv: [proot -b ... -w DIR] loader --library-path LIBPATH --inhibit-cache SELF argv[1..]
-     * argv[0] 槽位必须是 proot/loader 本身;先前把 loader 选项前置导致 execv(proot)
-     * 时 argv 全错位(git.bin 收到 argv[0]=loader、"git: '...proot' is not a git command") */
+     * argv[0] must be proot/loader itself; previously prepending loader options shifted all
+     * argv entries at execv(proot) (git.bin received argv[0]=loader, "git: '...proot' is not a git command"). */
     /* Largest prefix: proot + seven option/value pairs + loader/four
      * arguments = 20 entries. Then argc-1 user arguments and the NULL.
      * The former argc+16 allocation overran by four pointers with proot. */
@@ -87,8 +87,8 @@ int main(int argc, char **argv) {
     if (!nargv) { fprintf(stderr, "andcode-launcher: OOM\n"); return 127; }
     int i = 0;
 
-    /* proot bind(/etc):helper 的 glibc 内部读(/etc/resolv.conf 等)只能靠
-     * proot 用户态 bind 重定向(DESIGN §4.5 v0.4.1);嵌套由 ANDCODE_IN_PROOT 守卫 */
+    /* proot bind(/etc): internal glibc reads by helpers (/etc/resolv.conf etc.) can only be
+     * redirected via proot userspace bind (DESIGN §4.5 v0.4.1); ANDCODE_IN_PROOT guards against nesting. */
     char proot[CAP], resolv[CAP], ssl[CAP], usrlibssl[CAP], pwdf[CAP], grpf[CAP], nss[CAP], wdir[CAP];
     snprintf(proot, sizeof proot, "%s/usr/lib/proot/proot", root);
     snprintf(resolv, sizeof resolv, "%s/etc/resolv.conf:/etc/resolv.conf", root);

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- 终端内容层:悬浮球由代码挂到本层(需要 content 引用做拖拽边界) -->
+    <!-- Terminal content layer: code attaches the floating ball here (content defines the drag bounds). -->
     <FrameLayout
         android:id="@+id/termContent"
         android:layout_width="match_parent"

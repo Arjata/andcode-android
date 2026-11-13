@@ -1,4 +1,4 @@
-# andcode — 将 opencode 移植到 Android arm64 的设计方案
+# andcode — Design for porting opencode to Android arm64
 
 > Version: v0.4.55 (design draft) · Date: 2026-11-11
 > v0.4.55 change: adopt the single-APK release goal. One CI-built canonical
@@ -222,384 +222,389 @@
 > canonical rootfs archive and ext4 image from signed Ubuntu repositories.
 > Docker remains the default; no existing Android instance is modified.
 > Snapshot pinning, corresponding source and Android acceptance remain pending.
-> v0.4.42 变更(验证边界更新):真实应用域、显式代理+CA 下新会话连续两轮完整
-> 工具往返成功,旧会话仍 HTTP 400;未修改协议或删除历史,不能声称根因已修复。
-> 诊断 PID8198 已终止,默认 PID20163 保持 CA 关闭及原会话。OpenTUI 排除 GPL
-> 声明 CRC 对象后 Linux CI 与 2304 组 CRC 对照通过,许可/重链接/Android 仍未批准。
-> v0.4.41 变更(OpenTUI 源码实验):固定独立 Zig 0.17.0 与既有 OpenTUI/FFmpeg/
-> zlib 源码,构建期强制视频分支及 16K 对齐,先做 ABI/导出/依赖门禁,后走完整
-> TUI staged maps 验证;不接入正式 APK,源码/重链接/许可与 Android 批准仍为 false。
-> 可选 CA 实机完成默认关闭/SAF/错误摘要拒绝/导入后关闭/启用及关闭重启环境验证;
-> 显式回环代理下关闭 CA 拒绝证书、开启后模型流式/中断/恢复成功,工具执行成功但
-> 结果回传后 provider HTTP 400,完整工具往返未通过。直连仍 DNS EAI_AGAIN。
-> v0.4.40 变更(可选 CA):Tier P 设置提供 SAF 单 PEM CA 导入/文件摘要核对与
-> 默认关闭的追加信任开关;仅新启动 OpenCode Web 后端设置 NODE_EXTRA_CA_CERTS,
-> 保留内置根/主机名校验,不改 Android 全局/WebView/独立终端/Ubuntu 信任。
-> 导入不自动启用,不联网获取 CA,启用后文件缺失/摘要改变/过期拒绝启动;
-> 停用不重启既有会话,需手动停止/启动后端。本机 26 项 Java 校验、APK build/lint
-> 及 Bun 1.4.4 真实 TLS 开/关/主机名拒绝通过;CI 42609380415(常规)与
-> 42609429688(源码实验)已成功,arm64 日志确认上述 CA 门禁;待 P0/P3 实机验证。
-> v0.4.39 变更(实验 fff 来源):固定 fff 源码/lock、zlob feature 和 Zig 0.16.0
-> 工具摘要;离线 Cargo 重建后校验 ELF/16K/导出及 Bun 真实索引/搜索/glob,成功才
-> 替换实验输入。保留选中 crate 归档、Cargo 消息和 GNU LOAD map/可用输入摘要,
-> 临时输入缺失明确记录,不冒称逐节归属或源码/许可闭环;CI 42602199884 已通过
-> Linux 实验门禁,工件 3956 项摘要与清单集合已本机复核,正式 APK 不变,
-> Android 待 P0/P3 实机验证。GNU 合成 linker stubs 单列,不冒称缺失物理输入。
-> v0.4.38 变更(实验 watcher 来源):固定 Parcel watcher 源码、node-addon-api 及
-> Node N-API 头文件归档,显式编译 Linux 源文件列表;16K/glibc/导出检查及 Bun
-> 真实 inotify 创建事件/取消订阅后才替换实验输入。报告区分 npm 与重建来源,
-> 失败不替换,正式 APK 不变,许可与 Android 准入仍未批准。
-> v0.4.37 变更(实验原生来源):固定 bun-pty 源码/lock 在 arm64 Linux CI 离线
-> 构建(先 fetch),16K/glibc/导出门禁后仅替换实验 npm glibc 输入;Bun 再按新摘要
-> 预置,普通 PTY 必须实际映射该副本。保留构建输入/命令/工具/输出,不证明原 npm
-> ELF 可重现,不批准分发或 Android 准入;正式 APK 不变。
-> v0.4.36 变更(源码实验闭包):从独立 Ubuntu 24.04 CI sysroot 收集 glibc/GCC
-> 动态库,记录 image/dpkg/版权/摘要,递归检查 NEEDED 与所需符号版本;实验服务/TUI
-> 固定实验 PT_INTERP 与库目录执行并检查映射(显式 loader 影响上游 self-spawn,
-> 不可等价替代)。不修改正式载荷,仍不批准分发或 Android 准入。
-> v0.4.35 变更(Android libtinfo):v0.4.34 拦截方案被实际初始化门禁证伪(内部绑定
-> 绕过 shim),已移除。改用固定 Ubuntu ncurses 源码/安全补丁自编译,关闭
-> HAVE_SETFSUID,保留上游无身份变更 safe-open 分支与内核权限检查;标准 Linux
-> bundle 不改,Android 替换库与版权/配置/manifest 同步。CI run 42524341097 与旧设备
-> 真实应用域默认交互 Bash/持久 PTY 输入/resize/reconnect/PRoot 开发门禁均已通过。
-> v0.4.34 变更(Tier P shim):真实应用域 trace 确认 libtinfo safe-open 无条件调用
-> setfsuid/setfsgid 触发 SIGSYS;仅拦截 ncurses 两个打开入口,逐次确认线程全部
-> real/effective/saved/fs 身份一致且非 root、capabilities 全空后直接内核 open。
-> 身份不符拒绝,非 Tier P 透传;不拦截或伪造 setfsuid,不改设备策略。待 CI/设备验证。
-> v0.4.33 变更(Tier P shell 入口):持久 PTY 系统 sh 的 WebSocket/resize/reconnect
-> 已实测,但 daemon 直接 exec Bash shebang 包装器立即退出;bin/bash 改用同物理名
-> 静态 ELF 入口,从 /proc/self/exe 定位 loader/Bash/shim 并单进程 --preload,
-> 不释放 ELF、不接入 Ubuntu 后端;新增 Linux 实际执行/参数测试,待新版 APK 验收。
-> v0.4.32 变更(包装器):真实 Bash 子进程仍能继承 wrapper 设置的 LD_PRELOAD,
-> 不再依赖 shim 构造器清环境;direct 分支改用 loader --preload 单进程注入,
-> 环境中移除 LD_PRELOAD,PRoot bind 分支不变。新增 Linux 与应用域 Bionic 子进程
-> 门禁;新版 APK 尚待成功 CI/实机复测。
-> v0.4.31 变更(实验门禁):源码预置实验排除固定 bun-pty musl 分支并保留显式拒绝,
-> .so require 保留 CommonJS 字符串导出;持久 PTY 绑定必须指定预置入口,不再嵌入
-> extensionless ELF。新增 Bun graph 无 ELF/摘要/依赖/16K/glibc 静态门禁与 Linux
-> shell/普通及持久 PTY 实际执行,仍不批准实验产物集成 APK。
-> v0.4.30 变更(交付链):Git preload 隔离修复已通过 APK 真实应用域门禁,原生
-> PRoot 完整 apt/编译/Git HTTPS/PTY 无显式代理验收通过。新增手动固定源码
-> 构建实验,在 Bun 编译期将 .so/.node 导入换成显式预置路径,不伪装 Bun 临时文件;
-> 产物仅诊断,未通过闭包/许可/Android 准入前不得替换正式工件。
-> v0.4.29 变更(交付链):原生 APK 应用域 Bash/V2/PTY 版本执行通过;Git launcher
-> 进入 Bionic PRoot 前清除 glibc LD_PRELOAD,由 bind 提供 /etc,避免 Android
-> linker 加载 glibc shim。新增直接/PRoot 分支环境断言,Git 待新版工件实测。
-> v0.4.28 变更(§4.6):clone3 补丁不再借 close_range 系统调用号,直接将该调用点
-> svc 改为 mov x0,#-ENOSYS,避免现代内核实现 close_range 后回退失效;兼容已有
-> 补丁的调用号但仍校验指令,继续由 CI 和应用域执行门禁确认。
-> v0.4.27 变更(交付链):对 patchelf 搬迁版本定义节却遗留 DT_VERDEF 旧地址的
-> Bun ET_EXEC 增加节表/LOAD 映射校验后修复,仅改动态表地址;修复后设备诊断目录
-> V2.2.6 与静态入口 PTY 0.4.0/protocol 7 实际执行成功,仍待 CI/真实应用域验收。
-> v0.4.26 变更(§4.8):root 安装器/manager 新增显式 ci-validation 固定实例,
-> 仅使用 /data/adb/andcode-ubuntu-ci,不接受任意路径、不覆盖现有开发实例;
-> 用于可信 CI 镜像的独立实机验收,不改变普通用户联网阻塞或开放 APK 特权接口。
-> v0.4.25 变更(交付链):固定摘要 V2.2.6 与 process-daemon 0.4.0 纳入原生载荷,
-> PTY 通过自有静态入口从 /proc/self/exe 定位同目录 loader/daemon,不在 ELF
-> PT_INTERP 固化随机 APK 安装路径,不解包可执行体。新增 V2/PTY 版本执行门禁,
-> 待 CI/真实应用域验证,不提前声称 Web/工具/原生库闭包已自包含完成。
-> v0.4.24 变更(§4.4/交付链):APK 首启动按 manifest/nativeLibraryDir 身份原子发布
-> 只含数据和原生目录链接的农场,拒绝越界/链接父目录/ELF 数据/manifest 冲突,不删除旧版本。
-> 原生模式禁止回退开发载荷,移除默认代理与禁 TLS 校验;Bash 已在旧设备真实应用域
-> 从 nativeLibraryDir 启动,无需 relabel。Git 首测发现 PRoot 私有库搜索旧路径并已修正,
-> 待 CI/实机重跑;V2/PTY/正式签名/locked 交付仍未闭合。
-> v0.4.23 变更(交付链):源码核实 glibc loader 用 libc.so.6 SONAME 识别 libc 并
-> 调用 __libc_early_init,因此 libc 自身 SONAME 也必须保留,仅调用者 NEEDED 改物理名。
-> 上条的重复 loader 是待证假设,不是已证实根因;实际 Bash 执行仍是强制门禁。
-> v0.4.22 变更(交付链):实际执行门禁发现 Tier P Bash SIGSEGV,不允许只靠静态
-> 审计放行;保留 loader 原 SONAME 及 libc 对它的 NEEDED,显式加载仅改物理文件名,
-> 避免重复加载 ld.so。该修正仍需 CI 验证;PRoot IME 往返 resize/SIGWINCH 已实测。
-> v0.4.21 变更(§4.4/CI):新增依赖原生工件的 debug APK 构建/Lint/逐字节载荷核验,
-> 自有终端 JNI 显式 16K LOAD 对齐;修正 V2 loader 路径为注册物理名。仍是中间 APK,
-> 未宣称 V2/PTY/首启动初始化/签名/locked 实机交付已完成。
-> v0.4.20 变更(交付链):Tier P 同步改写 PRoot Bionic 私有共享库 SONAME/NEEDED,
-> glibc 库名按已注册 slug 净化;均需 CI/实机验证,不改变 guest Ubuntu ELF。
-> v0.4.19 变更(§4.4/交付链):Gradle 可显式接收 CI native 中间工件,保留物理名 ELF
-> 不剥离并要求安装解压至 nativeLibraryDir;数据单独经 assets,禁止 ELF 混入数据。
-> 此为打包接线而非可用自包含交付,V2/PTY/启动器/应用首启动数据初始化仍待闭合。
-> v0.4.18 变更(交付链):修复 manifest 对扁平 lib/ 的 kind/SONAME 映射、launcher
-> 与第三方许可证误分类及 git 重复物理名;物理冲突必须失败。修复 launcher PRoot
-> argv 数组越界,新增 Linux ASan/UBSan 参数保真测试,导出 Tier P native 中间工件。
-> Ubuntu 原生 arm64 CI 首跑已通过;仍未验证可信 CI 镜像设备安装或 locked APK。
-> v0.4.17 变更(§4.8):只读诊断确认旧设备受限网络模式/BPF RESTRICTED_MATCH
-> 阻断 UID 60000;APK UID 有放行位。不改网络策略或借 UID 绕过,chroot 联网仍失败。
-> v0.4.16 变更(§4.8/交付链):CI 增加 Android 专用 bundle 副本,seccomp 七处校验
-> 与重复执行摘要不变门禁后才 Tier P 物理化;标准 Linux bundle 不打补丁。
-> 该链仍待 CI 首跑,偏移不匹配必须失败,不动态猜偏移或给 apt 更新后的系统套补丁。
-> v0.4.15 变更(§4.8):PRoot 新终端快照单个私有项目并映射 /workspace/项目名,
-> 拒绝链接/越界/丢失项目;修复 Android /data/user/0 与 /data/data 别名误拒绝。
-> 默认直连 UDP DNS 超时,改 TCP DNS 后应用域 HTTPS/严格 apt update/Git 成功;
-> 此处直连仅指不使用显式 HTTP 代理,未停用设备现有 VPN。chroot 网络身份仍未解决。
-> v0.4.14 变更(§4.8):设置页提供仅新终端生效的轻量 Bash/Ubuntu PRoot 开发选择,
-> 默认 Bash;Ubuntu 缺实例拒绝设置,启动时失效明确失败,不静默切后端。
-> Ubuntu 代理默认关闭且单独显式选择,不改已有终端/OpenCode/Web PTY,不映射项目。
-> v0.4.13 变更(§4.8):真实 untrusted_app/Seccomp=2/Enforcing 下独立 PRoot
-> Ubuntu 已通过显式代理 HTTPS/apt、hello、新编译 ELF、PTY/子进程和 libc 更新;
-> 全程不修改 guest ELF。新增终端 andcode-ubuntu-proot 开发入口,退出返回轻量 Bash,
-> 不接入 OpenCode/root 服务、不映射项目。默认直连、正式自包含与其它设备仍待验证。
-> v0.4.12 变更(§4.8):chroot 实测代理 HTTPS/apt 安装 hello 与 libc 更新通过;
-> 普通用户编译/16K LOAD/capabilities 清零/no-new-privs/PTY/退出码/stdin/前台清理通过,
-> 但 UID 60000 代理网络超时,不得声称完整通过。devpts 改独立 newinstance,
-> 避免 Android 宿主 ptmxmode=000。PRoot 应用域 Seccomp=2 下未修改 ELF 的 Base
-> Bash/id 通过;开发归档将硬链接展开副本并规范绝对链接,完整 apt/编译仍在验证。
-> v0.4.11 变更(§4.8):用户清理后设备可用空间约 54 GiB,解除空间阻塞。
-> 增加固定摘要 Ubuntu Base 设备开发引导路径,不冒充 Docker/CI 镜像验证;
-> 旧系统 Toybox bind mount 不适用,改用已有 bundle BusyBox 的 root 私有副本。
-> loop 显式分配,卸载后检查内核是否已自动 detach,避免将 ENXIO 误判为泄漏。
-> chroot 网络/apt/编译正在实机验证,PRoot 与 APK 后端接入仍待验证。
-> v0.4.10 变更(§4.8):启动 Ubuntu 双后端工作,新增同源 Ubuntu 24.04 arm64
-> 开发镜像配方与 root-only chroot 原型。会话使用私有 mount namespace/串行锁,
-> 默认 setpriv 普通用户且清除 capabilities;admin 仅显式人工入口。不把特权入口
-> 暴露给 APK 或模型。PRoot 仍为待应用域准入,轻量 Bash 不变。设备仅余 0.9 GiB,
-> 完整镜像/apt/编译尚待 P0/P3 实机验证;Linux CI 不替代 Android 验证。
-> v0.4.9 变更(§4.4):终端默认经补丁 loader 拉起预置 Bash --noprofile --rcfile
-> term-bashrc -i;无载荷时明确提示回退系统 sh -i。首帧绑定 client/同步尺寸与绘制,
-> 显式配置提示符;增加两行附加键,CTRL/ALT 点击锁定,方向键使用终端协议。
-> 旧设备应用域发现 Bash 权限探测调用 faccessat2(439) 被 seccomp TRAP;
-> patch-seccomp.sh 增加校验后的 -ENOSYS 回退,七处校验失败即非零退出。
-> 实测新会话无需按回车即显示提示符,Bash 5.2.21/交互标志/PTY、附加键与跨页
-> 同 PID 保留通过。CI 新增 Bash/依赖/许可收录,全打包与其它设备仍待 P3 验证。
-> v0.4.8 变更(§4.4):共享抽屉补齐项目/设置图标;独立终端接通既有双指缩放
-> 回调,按阈值逐级调整并保存 10–28 sp 字号,设置页恢复前台时同步滑块与预览。
-> 旧设备已通过双指触控注入验证放大/缩小、上下界及反向调整、返回既有设置页
-> 同步字号;导航图标已截图确认。其它设备的手势手感仍待 P3 实机验证。
-> v0.4.7 变更(§4.4):新增原生项目导入/导出与设置页。SAF ZIP/目录复制到
-> filesDir/projects,暂存完成后发布且不覆盖;ZIP 防路径穿越,限制 512 MiB /
-> 20000 项/64 层;导出跳过链接/特殊文件,默认排除 .git,明确提示隐藏文件风险。
-> 设置保存终端字号、亮屏、导出 .git 偏好;新终端使用选中项目,旧会话不自动 cd。
-> 旧设备已验证 SAF ZIP 导入/导出内容往返、目录导入、偏好保存及项目终端起始目录;
-> 其它文档提供器/Android 版本及大项目边界待 P3 实机验证。
-> v0.4.6 变更(§4.4):Web/终端抽屉“主页”显式跳转 HomeActivity 并清理其上返回栈,
-> 不再以 finish() 假定主页存在。Web 页销毁前取消自动配对重试,迟到的服务回调/
-> 页面回调检查 Activity 存活状态;WebView 从父视图移除后再 destroy。
-> 旧设备验证无主页返回栈及正常往返场景,应用/serve PID 保持,无新致命异常或
-> destroyed WebView 警告;其它 Android/WebView 版本仍待 P3 实机验证。
-> v0.4.5 变更(§4.4):Web 终端增加 Android IME hints 与本地退格哨兵;
-> 解决 LatinIME 英文整词组合不可见及隐藏 textarea 为空导致退格失效。
-> 旧设备已用屏幕软键盘验证逐字输入、空格、退格、回车和 echo 回显;
-> 中文候选词及其它第三方输入法待 P3 实机验证,不以粘贴成功代替输入法测试。
-> v0.4.4 变更(§4.4):终端页改为手动启动 opencode 的交互 shell,同进程内跨页面
-> 保留 TerminalSession;终端/Web 页均有悬浮球导航。Web PTY 改用上游
-> `OPENCODE_PTY_BIN` 指向可执行预置副本,`OPENCODE_PTY_SOCKET_DIR` 指向
-> filesDir(完整 socket 路径 <104 字节,不使用易清理的 cacheDir)。旧设备应用域
-> 实测创建终端并回显 `ANDCODE_PTY_OK`;当前依赖 root 辅助的开发部署,不代表
-> locked 设备完整自包含 APK 已交付。正式 jniLibs/CI 闭包集成仍待完成。
-> v0.4.3 变更(Tier P 桌面级 Web UI 落地,§4.4 扩充): OpenCode 2.0 桌面界面以
-> **"on-device serve + WebView"** 形态交付——`opencode serve --port 4096
-> --hostname 127.0.0.1` 由 ServeManager 在应用域托管(补丁 loader 直拉,环境同
-> scripts/app-launch-oc.sh),SessionService(specialUse FGS)承接常驻;前端
-> SPA 在 WebView 渲染,`127.0.0.1` 明文仅经 networkSecurityConfig 定向放行
-> (其余流量仍强制 https)。**配对自动化**: serve 每次启动都生成新的 server
-> password,ServeManager 从 serve stdout 实时捕获并注入轮询式 JS,WebView 自动
-> 完成"使用密码"配对(serve 经 ld-linux 直 exec 时 Bun 自 respawn 会把参数当
-> ELF 加载,/proc/self/exe 指向 loader——serve 单进程直跑可绕开,pair 及
-> 自 respawn 场景仍需 launcher ELF 包装,见待办)。真机实测:自动配对 +
-> 端到端模型会话(arjata/gpt-oss-120b)于 APK 内全通,Web 端复用 V1 同一
-> 数据目录(会话历史互通)。
-> v0.4.2 变更(真机 Tier P 应用域攻坚,§4.4/§4.6 扩充): ①**wrapper 渲染补回
-> `#!` 前缀**(pack-bundle printf 丢 `#!` 导致真 tty 下裸 `/bin/sh` 变交互式
-> shell 卡死整条链);②launcher proot 分支 argv 错位修复(argv[0] 槽位必须
-> 是 proot/loader 本身);③**应用域 seccomp 兼容**: 部分 4.9-perf 内核 + GSI
-> 的 zygote seccomp 策略对 set_robust_list/rseq/clone3 直接 TRAP(SIGSYS),
-> glibc 二进制启动即死 —— bundle 的 ld.so/libc.so.6 需打 seccomp 兼容补丁
-> (scripts/patch-seccomp.sh,set_robust_list/rseq→sched_yield、clone3→
-> close_range 触发 ENOSYS 回退)+ `GLIBC_TUNABLES=glibc.pthread.rseq=0`;
-> ④**BUN_TMPDIR 必须指向应用可写目录**(Bun 提取 libopentui 等内嵌原生库
-> 用 BUN_TMPDIR 而非 TMPDIR,否则 dlopen 拿到 /$bunfs 虚拟路径报 ENOENT);
-> ⑤TUI 模式跳过 proot(ANDCODE_IN_PROOT=1),可写状态(HOME/TMPDIR/
-> PROOT_TMP_DIR)全部位于应用 filesDir(bundle 本体 apk_data_file 只读)。
-> 真机实测:opencode TUI 于自研 APK 终端内完整渲染并可用会话。
-> v0.4.1 变更(真机 P0 三大发现,§4.5 重写): ①**LD_PRELOAD 无法拦截 glibc 内部
-> fopen("/etc/resolv.conf")**,shim 对 glibc-internal /etc 读取无效 → Tier A/M 的
-> /etc 重定向改由 **proot 用户态 bind**(Termux bionic 构建,GPL-2.0 独立聚合)承担,
-> shim 保留为深层防御;②git 助手改**静态 musl launcher**(规避 shell spawn 异常);
-> ③**移动/受管网络常阻断 UDP 53**,resolv.conf 强制 `options use-vc`(TCP DNS)。
-> 真机(Android 13 GSI)实测:冒烟 7/7、opencode 运行、git https 全链路打通。
-> v0.4 变更: **平台基线钉死 Android 12+ (minSdk 31)、APK targetSdk/compileSdk 37.2**;
-> 移除 targetSdk 28 取巧,Tier P 改用 jniLibs 提取(nativeLibraryDir 可执行)方案,
-> 新增 W^X/JIT、16K 页对齐、前台服务类型等适配项。
-> v0.3 变更: **去除对 Termux 等独立宿主 App 的依赖**,三种交付形态全部自包含
-> (Magisk 模块 / adb 包 / 自研最小 APK)。Termux 降级为附录中的可选替代。
-> v0.2 变更: 构建基线切换为 Ubuntu 24.04 arm64 (glibc 2.39)。
+> v0.4.42 change (verification-boundary update): in the real app domain with explicit proxy+CA,
+> a fresh session completed two consecutive full tool round trips; old sessions still return HTTP 400.
+> No protocol changes or history deletion; no root-cause fix is claimed. Diagnostic PID8198 was
+> terminated; default PID20163 retains CA disabled and original sessions. Excluding the GPL-noticed
+> CRC object from OpenTUI passed Linux CI and 2304 CRC comparisons; license/relink/Android remain unapproved.
+> v0.4.41 change (OpenTUI source experiment): pin standalone Zig 0.17.0 and existing OpenTUI/FFmpeg/
+> zlib sources; enforce the video branch and 16K alignment at build time, gate ABI/exports/dependencies
+> before full TUI staged-maps verification. No production APK integration; source/relink/license and
+> Android approvals remain false. Optional CA device checks covered default-off/SAF/wrong-digest rejection/
+> disabled-after-import/enabled and disabled restart environments. With explicit loopback proxy, CA-off
+> rejects the certificate; CA-on passes streaming/interruption/resume. Tools execute but result continuation
+> returns provider HTTP 400; full tool round trips failed. Direct connections still fail with DNS EAI_AGAIN.
+> v0.4.40 change (optional CA): Tier P settings offer SAF single-PEM CA import/file-digest verification
+> and a default-off additional-trust switch. Set NODE_EXTRA_CA_CERTS only for newly started OpenCode Web
+> backends; retain built-in roots/hostname checks, without changing Android global/WebView/standalone
+> terminal/Ubuntu trust. Import does not enable trust or fetch CA online; missing/changed/expired files
+> block enabled startup. Disabling does not restart sessions; manually stop/start the backend. Local
+> 26 Java checks, APK build/lint and Bun 1.4.4 real TLS on/off/hostname-rejection tests passed. CI
+> 42609380415 (regular) and 42609429688 (source experiment) succeeded; arm64 logs confirm these CA gates;
+> pending P0/P3 on-device verification.
+> v0.4.39 change (experimental fff provenance): pin fff source/lock, zlob feature and Zig 0.16.0
+> tool digest; offline Cargo rebuild checks ELF/16K/exports and real Bun indexing/search/glob before
+> replacing experimental inputs. Retain selected crate archives, Cargo messages and GNU LOAD map/available
+> input digests; explicitly record missing temporary inputs, without claiming per-section attribution or
+> source/license closure. CI 42602199884 passed Linux experimental gates; the artifact's 3956 digests and
+> manifest set were rechecked locally. Production APK unchanged; Android pending P0/P3 on-device verification.
+> GNU synthetic linker stubs are listed separately, not misreported as missing physical inputs.
+> v0.4.38 change (experimental watcher provenance): pin Parcel watcher source, node-addon-api and
+> Node N-API header archives; compile an explicit Linux source list. Replace experimental inputs only
+> after 16K/glibc/export checks and real Bun inotify creation-event/unsubscription tests. Reports distinguish
+> npm and rebuilt provenance; failure does not replace inputs. Production APK unchanged; license and Android admission unapproved.
+> v0.4.37 change (experimental native provenance): offline-build pinned bun-pty source/lock in arm64
+> Linux CI (fetch first); replace only experimental npm glibc inputs after 16K/glibc/export gates. Bun
+> then prestages by the new digest; ordinary PTY must actually map that copy. Retain build inputs/commands/
+> tools/outputs; no proof of original npm ELF reproducibility or distribution/Android admission approval;
+> production APK unchanged.
+> v0.4.36 change (source-experiment closure): collect glibc/GCC shared libraries from an independent
+> Ubuntu 24.04 CI sysroot; record image/dpkg/copyright/digests and recursively check NEEDED/required
+> symbol versions. Run experimental serve/TUI with fixed experimental PT_INTERP/library directory and
+> inspect mappings (explicit loader affects upstream self-spawn and is not equivalent). Production payload
+> unchanged; distribution and Android admission remain unapproved.
+> v0.4.35 change (Android libtinfo): actual initialization gates disproved v0.4.34 interception (internal
+> binding bypasses shim); removed it. Build pinned Ubuntu ncurses source/security patches with
+> HAVE_SETFSUID disabled, retaining upstream identity-preserving safe-open and kernel permission checks.
+> Standard Linux bundle unchanged; Android replacement library/copyright/config/manifest synchronized.
+> CI run 42524341097 and old-device real-app-domain default interactive Bash/persistent PTY input/
+> resize/reconnect/PRoot development gates all passed.
+> v0.4.34 change (Tier P shim): real-app-domain trace confirms unconditional libtinfo safe-open
+> setfsuid/setfsgid calls trigger SIGSYS. Intercept only two ncurses open entry points; directly kernel-open
+> only after checking all thread real/effective/saved/fs identities match, are non-root and have empty
+> capabilities. Reject identity mismatch; pass through outside Tier P. No setfsuid interception/faking or
+> device-policy changes. Pending CI/device verification.
+> v0.4.33 change (Tier P shell entry): persistent PTY system-sh WebSocket/resize/reconnect verified,
+> but daemon direct exec of the Bash shebang wrapper exits immediately. Replace bin/bash with a static
+> ELF entry under the same physical name, finding loader/Bash/shim via /proc/self/exe and using single-process
+> --preload. No ELF extraction or Ubuntu backend integration; add Linux execution/argument tests;
+> pending new-APK acceptance.
+> v0.4.32 change (wrappers): real Bash children still inherit wrapper-set LD_PRELOAD; stop relying
+> on the shim constructor to clean the environment. Direct branch uses loader --preload for single-process
+> injection and removes LD_PRELOAD from env; PRoot bind branch unchanged. Add Linux/app-domain Bionic-child
+> gates; new APK pending successful CI/device retest.
+> v0.4.31 change (experimental gates): source-prestage experiment excludes the pinned bun-pty musl branch
+> with explicit rejection; .so require retains CommonJS string exports. Persistent PTY binding must specify
+> the prestaged entry, no longer embedding extensionless ELF. Add Bun-graph no-ELF/digest/dependency/16K/glibc
+> static gates and Linux shell/ordinary and persistent PTY execution; experimental APK integration unapproved.
+> v0.4.30 change (delivery chain): Git preload isolation fix passed real APK app-domain gates; native
+> PRoot full apt/compile/Git HTTPS/PTY acceptance passed without explicit proxy. Add a manual pinned-source
+> build experiment replacing .so/.node imports with explicit prestaged paths during Bun compilation,
+> without impersonating Bun temporary files. Diagnostic artifacts only; no production replacement before
+> closure/license/Android admission gates pass.
+> v0.4.29 change (delivery chain): native APK app-domain Bash/V2/PTY version execution passed. Git launcher
+> clears glibc LD_PRELOAD before Bionic PRoot, providing /etc via bind to avoid Android linker loading
+> the glibc shim. Add direct/PRoot environment assertions; Git awaits new-artifact device testing.
+> v0.4.28 change (§4.6): clone3 patch no longer borrows the close_range syscall number; replace the call-site
+> svc directly with mov x0,#-ENOSYS, avoiding failed fallback on modern kernels implementing close_range.
+> Accept existing patched syscall numbers but still verify instructions; retain CI/app-domain execution gates.
+> v0.4.27 change (delivery chain): validate section-table/LOAD mappings and repair Bun ET_EXEC when patchelf
+> moves version definitions but leaves stale DT_VERDEF; change only the dynamic-table address. Device diagnostic
+> directory V2.2.6 and static-entry PTY 0.4.0/protocol 7 execute after repair; CI/real app-domain acceptance pending.
+> v0.4.26 change (§4.8): root installer/manager adds explicit fixed ci-validation instance, using only
+> /data/adb/andcode-ubuntu-ci, accepting no arbitrary path or overwrite of existing development instances.
+> For independent device acceptance of trusted CI images; does not resolve non-root networking blockage
+> or expose privileged APK interfaces.
+> v0.4.25 change (delivery chain): include fixed-digest V2.2.6 and process-daemon 0.4.0 in native payloads.
+> Own static PTY entry finds sibling loader/daemon via /proc/self/exe; no random APK install path fixed in ELF
+> PT_INTERP or executable extraction. Add V2/PTY version-execution gates; CI/real-app-domain checks pending,
+> without prematurely claiming self-contained Web/tool/native-library closure.
+> v0.4.24 change (§4.4/delivery chain): APK first launch atomically publishes a data/native-directory-link
+> farm keyed by manifest/nativeLibraryDir identity. Reject escapes/symlink parents/ELF data/manifest conflicts;
+> retain old versions. Native mode forbids development-payload fallback; remove default proxy and TLS bypass.
+> Bash started from nativeLibraryDir in the old device's real app domain without relabeling. Initial Git test
+> found and fixed stale PRoot private-library search paths; CI/device rerun pending. V2/PTY/production signing/
+> locked delivery remain incomplete.
+> v0.4.23 change (delivery chain): source confirms glibc loader identifies libc by libc.so.6 SONAME to call
+> __libc_early_init; retain libc's own SONAME and rewrite only callers' NEEDED to physical names. The preceding
+> duplicate-loader explanation is an unverified hypothesis, not confirmed root cause; actual Bash execution remains mandatory.
+> v0.4.22 change (delivery chain): execution gate found Tier P Bash SIGSEGV; static audit alone cannot pass it.
+> Retain original loader SONAME and libc's NEEDED for it, changing only physical filename for explicit loading
+> to avoid duplicate ld.so. CI validation pending; PRoot IME round-trip resize/SIGWINCH verified on device.
+> v0.4.21 change (§4.4/CI): add native-artifact-dependent debug APK build/Lint/bytewise payload checks;
+> explicit 16K LOAD alignment for own terminal JNI; correct V2 loader path to registered physical name.
+> Still an intermediate APK; no completed V2/PTY/first-launch initialization/signing/locked-device delivery claim.
+> v0.4.20 change (delivery chain): Tier P rewrites PRoot Bionic private-library SONAME/NEEDED together;
+> sanitize glibc names by registered slug. CI/device checks required; guest Ubuntu ELF unchanged.
+> v0.4.19 change (§4.4/delivery chain): Gradle explicitly accepts CI native intermediate artifacts, preserves
+> physical-name ELF without stripping, requires extraction to nativeLibraryDir at install; data uses assets
+> separately with no ELF. Packaging wiring, not usable self-contained delivery; V2/PTY/launchers/app first-launch
+> data initialization remain incomplete.
+> v0.4.18 change (delivery chain): fix manifest kind/SONAME mapping for flat lib/, misclassified launchers/
+> third-party licenses and duplicate Git physical names; physical collisions must fail. Fix launcher PRoot argv
+> array overflow; add Linux ASan/UBSan argument-fidelity tests and export Tier P native intermediate artifacts.
+> First native Ubuntu arm64 CI passed; trusted CI-image device installation and locked APK remain unverified.
+> v0.4.17 change (§4.8): read-only diagnostics confirm old-device restricted-network mode/BPF RESTRICTED_MATCH
+> blocks UID 60000 while APK UID has an allow bit. No network-policy changes or borrowed-UID bypass; chroot networking still fails.
+> v0.4.16 change (§4.8/delivery chain): CI adds an Android-specific bundle copy; Tier P physicalization follows
+> seven seccomp checks and unchanged-digest repeat-run gate. Standard Linux bundle unpatched. First CI run pending;
+> offset mismatches must fail, with no guessed offsets or patching apt-updated systems.
+> v0.4.15 change (§4.8): new PRoot terminals snapshot one private project and bind /workspace/<project-name>,
+> rejecting links/escapes/missing projects; fix false rejection of Android /data/user/0 and /data/data aliases.
+> Default direct UDP DNS timed out; TCP DNS enabled app-domain HTTPS/strict apt update/Git. Direct means no explicit
+> HTTP proxy, not disabling the device's existing VPN. Chroot network identity remains unresolved.
+> v0.4.14 change (§4.8): settings offer lightweight Bash/Ubuntu PRoot development selection for new terminals
+> only, default Bash. Reject selection when Ubuntu instance missing; explicit startup failure rather than silent
+> backend switch. Ubuntu proxy is a separate default-off opt-in; existing terminals/OpenCode/Web PTY unchanged, no project mapping.
+> v0.4.13 change (§4.8): independent PRoot Ubuntu under real untrusted_app/Seccomp=2/Enforcing passed explicit-proxy
+> HTTPS/apt, hello, freshly compiled ELF, PTY/children and libc update without guest ELF modification. Add terminal
+> andcode-ubuntu-proot development entry returning to lightweight Bash on exit, without OpenCode/root-service integration
+> or project mapping. Default direct mode, production self-containment and other devices remain unverified.
+> v0.4.12 change (§4.8): chroot device tests passed proxy HTTPS/apt hello installation and libc update; non-root
+> compilation/16K LOAD/cleared capabilities/no-new-privs/PTY/exit code/stdin/foreground cleanup passed. UID 60000 proxy
+> networking timed out, so no full-pass claim. Use isolated devpts newinstance to avoid Android host ptmxmode=000.
+> PRoot app-domain Seccomp=2 passed unmodified Base Bash/id; development archive materializes hardlinks and normalizes
+> absolute links. Full apt/compilation verification ongoing.
+> v0.4.11 change (§4.8): user cleanup freed about 54 GiB, removing the space blocker. Add fixed-digest Ubuntu Base
+> device-development bootstrap, not Docker/CI-image validation. Old Toybox bind mount unsuitable; use a root-private
+> copy of existing bundle BusyBox. Allocate loop explicitly and check kernel auto-detach after unmount to avoid
+> treating ENXIO as leakage. Chroot network/apt/compile device checks ongoing; PRoot/APK backend integration pending.
+> v0.4.10 change (§4.8): start Ubuntu dual-backend work with same-source Ubuntu 24.04 arm64 development-image recipe
+> and root-only chroot prototype. Sessions use private mount namespace/serial lock; default setpriv non-root user
+> with capabilities cleared, admin only by explicit manual entry. No privileged APK/model entry. PRoot app-domain
+> admission pending; lightweight Bash unchanged. Only 0.9 GiB free on device; full image/apt/compile pending P0/P3
+> on-device verification; Linux CI does not replace Android validation.
+> v0.4.9 change (§4.4): terminal defaults to prestaged Bash --noprofile --rcfile term-bashrc -i via patched loader;
+> absent payload explicitly announces system sh -i fallback. Bind client/sync size and drawing on first frame,
+> configure prompt, add two extra-key rows with sticky CTRL/ALT and terminal-protocol arrows. Old app domain traps
+> Bash faccessat2(439) permission probes; patch-seccomp.sh adds verified -ENOSYS fallback, failing nonzero on any
+> of seven checks. Device tests show prompt without Enter; Bash 5.2.21/interactive flag/PTY/extra keys and same-PID
+> cross-page retention pass. CI adds Bash/dependencies/licenses; full packaging/other devices pending P3 verification.
+> v0.4.8 change (§4.4): add project/settings drawer icons; wire standalone-terminal pinch callbacks to stepwise
+> 10–28 sp font adjustment/persistence; settings foreground resumption syncs slider/preview. Old-device two-finger
+> injection verified zoom in/out, bounds, reversal and font synchronization on returning to existing settings;
+> icons confirmed by screenshots. Gesture feel on other devices pending P3 on-device verification.
+> v0.4.7 change (§4.4): add native project import/export and settings. SAF ZIP/directories copy to filesDir/projects,
+> publish after staging without overwrite; ZIP traversal protection, limits 512 MiB / 20000 entries / 64 levels.
+> Export skips links/special files, excludes .git by default, explicitly warns of hidden files. Settings retain font,
+> keep-screen-on and export-.git preferences; new terminals use selected project, no automatic cd in existing sessions.
+> Old device verified SAF ZIP content round trip, directory import, preferences and project terminal cwd;
+> other providers/Android versions/large-project boundaries pending P3 on-device verification.
+> v0.4.6 change (§4.4): Web/terminal drawer Home explicitly opens HomeActivity and clears its upper back stack,
+> rather than assuming Home exists with finish(). Cancel pairing retries before Web page destruction; late service/
+> page callbacks check Activity liveness; detach WebView before destroy. Old device tested missing-Home back stack
+> and normal round trips with app/serve PID retained, no new fatal errors or destroyed-WebView warnings;
+> other Android/WebView versions pending P3 on-device verification.
+> v0.4.5 change (§4.4): add Android IME hints/local backspace sentinel to Web terminal, fixing invisible LatinIME
+> English whole-word composition and empty-hidden-textarea backspace failure. Old-device soft keyboard verified
+> character input, space, backspace, Enter and echo output; Chinese candidates/other third-party IMEs pending P3
+> on-device verification. Successful paste is not an IME test substitute.
+> v0.4.4 change (§4.4): terminal becomes an interactive shell with manual opencode launch; retain TerminalSession
+> across pages within one process. Terminal/Web pages have floating navigation. Web PTY uses upstream
+> `OPENCODE_PTY_BIN` for executable prestaged copy and `OPENCODE_PTY_SOCKET_DIR` for filesDir (full socket path
+> <104 bytes, avoiding evictable cacheDir). Old-device app domain created a terminal and echoed `ANDCODE_PTY_OK`;
+> current root-assisted development deployment is not complete locked-device self-contained APK delivery.
+> Production jniLibs/CI closure integration remains pending.
+> v0.4.3 change (Tier P desktop Web UI, §4.4 expanded): deliver OpenCode 2.0 desktop UI as
+> **"on-device serve + WebView"** — `opencode serve --port 4096
+> --hostname 127.0.0.1` managed by ServeManager in the app domain (direct patched-loader launch, same environment
+> as scripts/app-launch-oc.sh), kept resident by SessionService (specialUse FGS). WebView renders the SPA;
+> networkSecurityConfig permits cleartext only for `127.0.0.1` (all other traffic still requires https).
+> **Automated pairing**: each serve start generates a new server password; ServeManager captures stdout live and
+> injects polling JS for automatic WebView password pairing. With direct ld-linux exec, Bun self-respawn treats
+> arguments as ELF because /proc/self/exe points to loader; direct single-process serve avoids it, but pair/
+> self-respawn still require an ELF launcher wrapper (see TODO). Device tests passed automatic pairing and
+> end-to-end model session (arjata/gpt-oss-120b) inside APK; Web shares V1 data directory/session history.
+> v0.4.2 change (Tier P real-app-domain work, §4.4/§4.6 expanded): ①**restore wrapper-rendered `#!` prefix**
+> (pack-bundle printf omitted `#!`, making bare `/bin/sh` interactive on a real tty and hanging the chain);
+> ②fix launcher proot argv shift (argv[0] must be proot/loader itself); ③**app-domain seccomp compatibility**:
+> some 4.9-perf kernels + GSI zygote seccomp directly TRAP(SIGSYS) set_robust_list/rseq/clone3, killing glibc
+> binaries on startup. Bundle ld.so/libc.so.6 require compatibility patch (scripts/patch-seccomp.sh,
+> set_robust_list/rseq→sched_yield, clone3→close_range to trigger ENOSYS fallback) plus
+> `GLIBC_TUNABLES=glibc.pthread.rseq=0`; ④**BUN_TMPDIR must be app-writable** (Bun uses BUN_TMPDIR, not TMPDIR,
+> to extract embedded native libraries such as libopentui; otherwise dlopen receives /$bunfs virtual paths and
+> fails ENOENT); ⑤TUI skips proot (ANDCODE_IN_PROOT=1); all writable state (HOME/TMPDIR/PROOT_TMP_DIR) lives
+> in app filesDir (bundle apk_data_file is read-only). Device test: opencode TUI fully renders and sessions
+> work in our APK terminal.
+> v0.4.1 change (three P0 device findings, §4.5 rewritten): ①**LD_PRELOAD cannot intercept glibc-internal
+> fopen("/etc/resolv.conf")**; shim cannot redirect internal /etc reads. Tier A/M uses **proot userspace bind**
+> (Termux bionic build, independent GPL-2.0 aggregation), retaining shim as defense in depth; ②git helpers use
+> **static musl launcher** to avoid shell-spawn anomalies; ③**mobile/managed networks often block UDP 53**;
+> force `options use-vc` (TCP DNS). Android 13 GSI device passed smoke 7/7, opencode execution and full Git HTTPS chain.
+> v0.4 change: **pin Android 12+ (minSdk 31), APK targetSdk/compileSdk 37.2**; remove targetSdk 28 workaround,
+> use jniLibs extraction (executable nativeLibraryDir) for Tier P, and add W^X/JIT, 16K alignment and FGS-type adaptations.
+> v0.3 change: **remove dependency on standalone host apps such as Termux**; all three delivery forms are
+> self-contained (Magisk module / adb package / own minimal APK). Termux becomes an optional appendix alternative.
+> v0.2 change: switch build baseline to Ubuntu 24.04 arm64 (glibc 2.39).
 >
-> 目标: 在 Android arm64 设备上运行 opencode(终端 AI 编码代理),并提供一套
-> **兼容性 Linux arm64 构建环境**(基线: Ubuntu 24.04 arm64)——该环境下构建出的原生程序可在 glibc ≥ 2.39 的标准 Linux arm64
-> 设备(Ubuntu 24.04+/Debian 13+/云服务器等)上直接运行。
+> Goal: run opencode (terminal AI coding agent) on Android arm64 and provide a
+> **compatible Linux arm64 build environment** (baseline: Ubuntu 24.04 arm64), whose native outputs run directly on standard Linux arm64
+> devices with glibc ≥ 2.39 (Ubuntu 24.04+/Debian 13+/cloud servers, etc.).
 
 ---
 
-## 1. 目标与硬约束
+## 1. Goals and hard constraints
 
-### 1.1 设计原则、平台基线与设备矩阵
+### 1.1 Design principles, platform baseline and device matrix
 
-**核心原则(自包含)**:除 Android 系统本身外,不要求用户安装任何第三方独立程式
-(不用 Termux、不依赖 proot-distro 发行版脚本)。所有宿主能力(终端、SSH、
-自启动、进程守护)要么由系统入口提供,要么内嵌在我们的交付物里。
+**Core principle (self-contained)**: users need no third-party standalone program beyond Android
+(no Termux or proot-distro distribution scripts). All host capabilities (terminal, SSH,
+autostart and process supervision) come from system entry points or are embedded in our deliverables.
 
-**平台基线(钉死)**:
+**Platform baseline (fixed)**:
 
-| 项 | 取值 | 含义 |
+| Item | Value | Meaning |
 |---|---|---|
-| 最低系统 | **Android 12 (API 31)** | Phantom Process Killer(12 引入)全程伴随,必须在所有形态内置对策 |
-| APK compileSdk | **37.2** | 按最新 SDK 构建,可用最新 API/行为 |
-| APK targetSdk | **37.2** | 全量接受新平台行为:数据目录 exec 禁令、W^X、FGS 类型强制、edge-to-edge 等;**不使用 targetSdk 28 取巧** |
-| 交付物运行环境 | arm64-only | 含 4K 与 16K 页设备(见 §1.2.8) |
+| Minimum OS | **Android 12 (API 31)** | Phantom Process Killer (introduced in 12) applies throughout; every form must include mitigations |
+| APK compileSdk | **37.2** | Build with the latest SDK for current APIs/behavior |
+| APK targetSdk | **37.2** | Accept all new platform behavior: data-directory exec prohibition, W^X, mandatory FGS types, edge-to-edge, etc.; **no targetSdk 28 workaround** |
+| Artifact runtime | arm64-only | Includes 4K and 16K page devices (see §1.2.8) |
 
-| 设备类别 | Root | 可用入口 | 适用交付形态 |
+| Device class | Root | Available entry points | Applicable delivery forms |
 |---|---|---|---|
-| A. Bootloader locked | ✗ | ① adb shell(含 Android 11+ 无线调试,免数据线);② 侧载/商店安装我们的 APK | Tier A(adb 包)/ Tier P(自研 APK) |
-| B. Bootloader unlocked + root | ✓ | 上述全部 + su/Magisk/开机脚本 | **Tier M(Magisk 模块,首选)**,兼容 A/P |
+| A. Bootloader locked | ✗ | ① adb shell (including Android 11+ wireless debugging, no cable); ② sideload/store-install our APK | Tier A (adb bundle) / Tier P (custom APK) |
+| B. Bootloader unlocked + root | ✓ | All above + su/Magisk/boot scripts | **Tier M (Magisk module, preferred)**, also supports A/P |
 
-### 1.2 Android 平台硬约束(设计必须遵守)
+### 1.2 Hard Android platform constraints (mandatory for the design)
 
-1. **libc 不同**:Android 用户态是 Bionic,不是 glibc。glibc 链接的二进制必须
-   携带自己的动态链接器与库(本设计的 **glibc sysroot + loader 包装器**,见 §4.1),
-   或运行在 chroot 内。
-2. **/sdcard 系挂载为 noexec**:所有可执行文件必须放在应用私有目录、
-   `/data/local/tmp` 或 `/data/adb/` 下。**任何方案都不允许把 ELF 放在共享存储。**
-3. **数据目录 exec 禁令与 W^X(targetSdk ≥ 29 全量生效)**:
-   - targetSdk ≥ 29 的应用被 SELinux 域禁止 exec 应用可写数据目录内的 ELF;
-     同时强制 W^X(不得匿名 RWX 映射)。
-   - **Tier P 的标准解法:JNI 库提取**——所有随包 ELF(opencode、glibc loader、
-     git、busybox、dropbear 及其 .so)以 `lib*.so` 形式打入 APK 的
-     `jniLibs/arm64-v8a/`,安装时由系统解压到 `nativeLibraryDir`
-     (`/data/app/.../lib/arm64/`),该目录**允许 exec**。
-   - JIT(JSC):若 Bun 的 JIT 在 W^X 下被拒,回退 `BUN_JSC_useJIT=0`
-     (Bun 支持 `BUN_JSC_*` 环境变量),P0 实测定级。
-   - 收益:targetSdk 37.2 使 APK **可上架 Google Play**(需满足 §1.2.8 的 16K
-     页要求);发布渠道双轨:Play + GitHub Releases/F-Droid。
-4. **Android 12+ Phantom Process Killer**:后台 app 的子进程超过阈值(默认
-   32 个 / 10 分钟空闲)会被静默杀掉。opencode 会派生 LSP、git、shell 等子进程,
-   属于高危场景,需要规避(见 §4.6)。
-5. **SELinux**:locked 设备上 shell 域可执行 `/data/local/tmp` 内的 ELF;APK 域
-   可执行 `nativeLibraryDir` 内的 ELF(经 jniLibs 提取,见 §1.2.3);都不能碰
-   `/lib/ld-linux-aarch64.so.1` 这类绝对 interpreter 路径(一律显式 loader 调用)。
-6. **只读的 /etc**:glibc 运行期要读 `/etc/resolv.conf`、`/etc/passwd` 等,
-   Android 的 `/etc` 不可写。用我们自研的 **LD_PRELOAD 重定向 shim** 解决(§4.5),
-   不为此引入 proot。
-7. **真 root(chroot)无上述大部分问题**,Tier M 优先用真 chroot。
-8. **16K 页大小设备(Android 15+ 部分机型,Play 对含 NDK 代码应用强制)**:
-   - Debian/Ubuntu arm64 工具链默认 `-z max-page-size=65536`,基线 glibc/sysroot
-     的 ELF 天然 ≥16K 对齐,**无需重编**;
-   - APK 内自有 NDK 代码(jackpal fork 的本地库)必须以 16K 对齐编译
-     (`-Wl,-z,max-page-size=16384`),CI 加对齐检查;
-   - jniLibs 提取的 glibc ELF 同样受益于上述基线对齐,直接可跑。
+1. **Different libc**: Android userspace uses Bionic, not glibc. glibc-linked binaries must
+   carry their own dynamic linker/libraries (our **glibc sysroot + loader wrapper**, §4.1),
+   or run inside chroot.
+2. **/sdcard mounts are noexec**: executables must reside in app-private directories,
+   `/data/local/tmp` or `/data/adb/`. **No approach may place ELF in shared storage.**
+3. **Data-directory exec prohibition and W^X (fully enforced for targetSdk ≥ 29)**:
+   - SELinux domains prohibit apps targeting ≥29 from executing ELF in app-writable data directories;
+     W^X is also enforced (no anonymous RWX mappings).
+   - **Tier P standard solution: JNI library extraction** — package all ELF (opencode, glibc loader,
+     git, busybox, dropbear and their .so files) as `lib*.so` in APK
+     `jniLibs/arm64-v8a/`; the system extracts them at install into `nativeLibraryDir`
+     (`/data/app/.../lib/arm64/`), which **permits exec**.
+   - JIT (JSC): if W^X rejects Bun JIT, fall back to `BUN_JSC_useJIT=0`
+     (Bun supports `BUN_JSC_*` environment variables); assess through P0 device tests.
+   - Benefit: targetSdk 37.2 makes the APK **eligible for Google Play** (subject to §1.2.8's 16K
+     requirement); dual release channels: Play + GitHub Releases/F-Droid.
+4. **Android 12+ Phantom Process Killer**: background-app children exceeding thresholds (default
+   32 processes / 10 minutes idle) are silently killed. opencode spawns LSP, git, shell and other children,
+   making it high risk and requiring mitigation (§4.6).
+5. **SELinux**: on locked devices, shell domain can execute ELF in `/data/local/tmp`; APK domain
+   can execute ELF in `nativeLibraryDir` (jniLibs extraction, §1.2.3). Neither can use
+   absolute interpreter paths such as `/lib/ld-linux-aarch64.so.1` (always invoke loader explicitly).
+6. **Read-only /etc**: glibc reads `/etc/resolv.conf`, `/etc/passwd`, etc. at runtime,
+   but Android `/etc` is unwritable. Use our **LD_PRELOAD redirection shim** (§4.5),
+   without introducing proot for this purpose.
+7. **Real root (chroot) avoids most of these issues**; Tier M prefers real chroot.
+8. **16K-page devices (some Android 15+ devices; Play requires this for apps with NDK code)**:
+   - Debian/Ubuntu arm64 toolchains default to `-z max-page-size=65536`; baseline glibc/sysroot
+     ELF already has ≥16K alignment, **no rebuild required**;
+   - Own APK NDK code (jackpal-fork native library) must compile with 16K alignment
+     (`-Wl,-z,max-page-size=16384`), checked in CI;
+   - jniLibs-extracted glibc ELF benefits from the same baseline alignment and runs directly.
 
-### 1.3 opencode 侧的事实假设(Phase 0 逐条验证)
+### 1.3 Assumptions about opencode (verify individually in Phase 0)
 
-- opencode 由 TypeScript 核心(以 Bun `--compile` 打包为单一可执行文件)+
-  Go 编写的 Bubble Tea TUI 组成,官方发布 **linux-arm64 (glibc)** 产物。
-- 运行期依赖:`git`(必需)、`rg` 等(增强);认证默认走浏览器 OAuth,
-  但支持 API key / 环境变量注入(可完全绕开浏览器)。
-- 先行者 `claude-code-termux`(MIT)宣称 Bun 编译产物可在无 proot 的
-  glibc 环境下跑通——支持"loader 包装器 + shim"这条最轻路径的可行性。
-- **待 P0 核实的关键项**(§4.1 "运行期不落盘"约束是否可满足):
-  opencode 是否存在运行期释放/调用 ELF 的行为(如释放 Go TUI 二进制),
-  以及是否有预置路径/环境变量机制可指向我们预装的副本。
-- 若上述任一假设不成立,风险与备选见 §7。
+- opencode combines a TypeScript core (single executable via Bun `--compile`) and
+  a Go Bubble Tea TUI; official releases include **linux-arm64 (glibc)** artifacts.
+- Runtime dependencies: `git` (required), `rg`, etc. (enhancements); authentication defaults to browser OAuth,
+  but supports API-key/environment injection (fully bypassing the browser).
+- Predecessor `claude-code-termux` (MIT) claims Bun-compiled outputs run in glibc without proot,
+  supporting feasibility of the lightest "loader wrapper + shim" approach.
+- **Key P0 checks** (whether §4.1's "no runtime executable writes" constraint can be met):
+  whether opencode extracts/invokes ELF at runtime (e.g. Go TUI binary),
+  and whether prestaged-path/environment mechanisms can point to our installed copies.
+- If any assumption fails, see §7 for risks and alternatives.
 
 ---
 
-## 2. 总体架构
+## 2. Overall architecture
 
-一句话:**一套构建基线,一个自包含交付包,三种安装形态。**
+In one sentence: **one build baseline, one self-contained bundle, three installation forms.**
 
 ```
                     ┌────────────────────────────────────────┐
-                    │  兼容性构建基线 (baseline/)              │
+                    │  Compatibility baseline (baseline/)    │
                     │  Ubuntu 24.04 arm64 · glibc 2.39 · GCC13 │
                     └───────────────┬────────────────────────┘
                                     │
                      ┌──────────────▼───────────────┐
-                     │  自包含交付包 andcode-bundle   │
-                     │  (§4.1: 同一份内容,三种宿主)  │
+                     │ Self-contained andcode-bundle│
+                     │ (§4.1: same data, three hosts)│
                      └──┬──────────────┬──────────┬─┘
                         ▼              ▼          ▼
           ┌──────────────────┐ ┌────────────────┐ ┌──────────────────┐
           │ Tier M (root)    │ │ Tier A (locked)│ │ Tier P (locked)  │
-          │ Magisk 模块      │ │ adb 直推包      │ │ 自研最小 APK      │
-          │ /data/adb/andcode│ │ /data/local/tmp│ │ 内嵌交付包+终端   │
-          │ 真 chroot        │ │ loader 包装器   │ │ targetSdk 37.2   │
-          │ 开机自启 sshd    │ │ sshd (dropbear)│ │ 侧载 GitHub/F-Droid│
-          │ 零 App 依赖      │ │ 零 App 依赖     │ │ 唯一交付物=1 个 APK│
+          │ Magisk module    │ │ adb-push bundle│ │ Own minimal APK  │
+          │ /data/adb/andcode│ │ /data/local/tmp│ │ Bundle + terminal│
+          │ Real chroot      │ │ loader wrapper │ │ targetSdk 37.2   │
+          │ Boot-start sshd  │ │ sshd (dropbear)│ │ Sideload GitHub/F-Droid│
+          │ No app dependency│ │ No app dependency│ │ Sole output=1 APK│
           └──────────────────┘ └────────────────┘ └──────────────────┘
 ```
 
-- **交付包是同一个 tarball**:glibc sysroot 闭包 + opencode + git + busybox +
-  dropbear + shim,由三种宿主(模块安装脚本 / adb 推送脚本 / APK 资产)释放。
-- 交互统一走两条路:**本机终端**(仅 Tier P 自带)与 **SSH**(三种形态都内置
-  dropbear,任何 SSH 客户端可连,ConnectBot 等为可选客户端而非依赖)。
-- 对 rooted 设备,Tier M 是零依赖、零 App、开机即用的最优解。
+- **The bundle is the same tarball**: glibc sysroot closure + opencode + git + busybox +
+  dropbear + shim, extracted by three hosts (module installer / adb push script / APK assets).
+- Two interaction paths: **local terminal** (bundled only in Tier P) and **SSH** (all three bundle
+  dropbear; any SSH client works; ConnectBot and others are optional clients, not dependencies).
+- For rooted devices, Tier M is the optimal zero-dependency, zero-app, ready-at-boot solution.
 
 ---
 
-## 3. 兼容性 Linux arm64 构建基线(核心交付物)
+## 3. Compatible Linux arm64 build baseline (core deliverable)
 
-### 3.1 基线规格
+### 3.1 Baseline specifications
 
-| 项 | 取值 | 理由 |
+| Item | Value | Rationale |
 |---|---|---|
-| 基线发行版 | **Ubuntu 24.04 LTS (Noble) arm64** | LTS 支持到 2029;LLVM/GCC/Go/Bun 生态新;GitHub Actions 原生 `ubuntu-24.04-arm` runner 与基线同构,CI 产物与本地逐字节可比 |
-| libc | glibc 2.39(符号版本审计强制) | Ubuntu 24.04 自带版本 |
-| libstdc++ | GCC 13 随包,或随产物捆绑 | bun 等需要 |
-| 三元组 | `aarch64-unknown-linux-gnu` | 标准gnu |
-| 禁止项 | 不得链接 Android NDK/Bionic;不得引入 ≥ 2.40 的 glibc 符号 | 兼容性红线 |
+| Baseline distribution | **Ubuntu 24.04 LTS (Noble) arm64** | LTS through 2029; recent LLVM/GCC/Go/Bun ecosystem; native GitHub Actions `ubuntu-24.04-arm` runner matches baseline, allowing bytewise CI/local comparison |
+| libc | glibc 2.39 (mandatory symbol-version audit) | Ubuntu 24.04 bundled version |
+| libstdc++ | Bundled GCC 13, or shipped with artifacts | Required by bun and others |
+| Triple | `aarch64-unknown-linux-gnu` | Standard GNU |
+| Prohibited | Linking Android NDK/Bionic; introducing glibc symbols ≥ 2.40 | Compatibility boundary |
 
-> **兼容性下限提示(选 Ubuntu 24.04 的代价)**:产物要求目标机 glibc ≥ 2.39,
-> 即标准 Linux arm64 设备需为 Ubuntu ≥ 24.04 / Debian ≥ 13 (trixie) / 同代发行版。
-> 对 Android 侧**无影响**——三种交付形态都随包携带基线 glibc,自包含。
-> 若日后需要支持更老的标准设备(如 glibc 2.36 的 Raspberry Pi OS Bookworm),
-> 追加第二条基线分层发布,不在本期范围。
+> **Compatibility floor (cost of Ubuntu 24.04)**: artifacts require target glibc ≥ 2.39,
+> hence standard Linux arm64 must use Ubuntu ≥ 24.04 / Debian ≥ 13 (trixie) / contemporary distributions.
+> **No effect on Android** — all three forms bundle baseline glibc and are self-contained.
+> Supporting older standard devices later (e.g. Raspberry Pi OS Bookworm with glibc 2.36)
+> would require a second baseline/release tier, outside current scope.
 
-### 3.2 三个等价构建入口(同一 sysroot,产物一致)
+### 3.2 Three equivalent build entry points (same sysroot and outputs)
 
-1. **设备端原生构建**:真 chroot(Tier M)或 qemu 内 `apt install build-essential`
-   后直接构建——这也是"在 Android 上为 Linux arm64 开发"能力本身的一部分。
-2. **PC 端 QEMU 构建**:`debootstrap --arch=arm64 noble` + `qemu-user-static`
-   (binfmt),在 x86 PC 上跑出与设备端逐字节可比的产物。
-3. **CI 构建**:GitHub Actions 原生 `ubuntu-24.04-arm` runner(与基线发行版同构,
-   无需 QEMU;本地/设备端构建走 QEMU 或真机回退),跑 `baseline/Dockerfile`。
+1. **Native device build**: build directly after `apt install build-essential` in real chroot (Tier M)
+   or qemu — part of the capability to "develop for Linux arm64 on Android" itself.
+2. **PC QEMU build**: `debootstrap --arch=arm64 noble` + `qemu-user-static`
+   (binfmt), producing outputs on x86 PCs bytewise-comparable with device builds.
+3. **CI build**: native GitHub Actions `ubuntu-24.04-arm` runner (matching baseline distribution,
+   no QEMU; local/device builds fall back to QEMU or hardware), running `baseline/Dockerfile`.
 
-### 3.3 兼容性审计(强制门禁)
+### 3.3 Compatibility audit (mandatory gate)
 
-`baseline/check-compat.sh` 对每个交付 ELF:
-- `file` 确认 `aarch64`;
+`baseline/check-compat.sh` checks every delivered ELF:
+- `file` confirms `aarch64`;
 - `objdump -T <elf> | grep -oE 'GLIBC_[0-9.]+' | sort -uV | last ≤ 2.39`;
-- `readelf -d` 列出 NEEDED,逐个确认"来自基线 rootfs 或已捆绑到 `lib/`";
-- interpreter 校验:交付包内的 glibc 二进制一律以**相对 loader 包装脚本**启动
-  (见 §4.1),不依赖 `/lib/ld-linux-aarch64.so.1`。
+- `readelf -d` lists NEEDED, each verified as "from baseline rootfs or bundled in `lib/`";
+- Interpreter check: all bundled glibc binaries start through **relative-loader wrapper scripts**
+  (§4.1), without relying on `/lib/ld-linux-aarch64.so.1`.
 
 ---
 
-## 4. 自包含交付包与三种安装形态
+## 4. Self-contained bundle and three installation forms
 
-### 4.1 共同底座:自包含交付包 `andcode-bundle-arm64.tar.zst`
+### 4.1 Shared foundation: self-contained bundle `andcode-bundle-arm64.tar.zst`
 
 ```
 andcode/
 ├── root/
-│   ├── lib/                  # 基线 glibc 2.39 的 ld-linux-aarch64.so.1 + 全部 NEEDED 库
-│   ├── bin/opencode.bin*     # opencode 主体(ELF)
-│   ├── bin/opencode          # §4.1.2 的 loader 包装器
-│   ├── bin/opencode-tui*     # TUI 二进制**预置**(见下方"运行期不落盘"约束)
-│   └── usr/                  # git、rg、dropbear/dbclient、busybox 等配套(同样 glibc 版)
-├── shim/libandcode-shim.so   # §4.5 LD_PRELOAD 重定向 shim
+│   ├── lib/                  # Baseline glibc 2.39 ld-linux-aarch64.so.1 + all NEEDED libraries
+│   ├── bin/opencode.bin*     # Main opencode ELF
+│   ├── bin/opencode          # Loader wrapper from §4.1.2
+│   ├── bin/opencode-tui*     # **Prestaged** TUI binary (see runtime-write constraint below)
+│   └── usr/                  # git, rg, dropbear/dbclient, busybox, etc. (also glibc builds)
+├── shim/libandcode-shim.so   # §4.5 LD_PRELOAD redirection shim
 ├── etc/                      # resolv.conf / passwd / group / nsswitch.conf
-├── sbin/andcode-entry        # 统一入口(命名规范见 docs/NAMING.md §4.2)
-└── manifest                  # 版本、校验和、组件来源(供 notices 生成)
+├── sbin/andcode-entry        # Unified entry (naming: docs/NAMING.md §4.2)
+└── manifest                  # Versions, checksums, component origins (for notices generation)
 ```
 
-> 命名(逻辑名/物理名/slug/环境变量)一律遵循 **docs/NAMING.md**;
-> Tier P 的 jniLibs 物理名与链接农场由该规范定义。
+> All naming (logical/physical names, slugs, environment variables) follows **docs/NAMING.md**;
+> that specification defines Tier P jniLibs physical names and link farms.
 
-**运行期不落盘(exec)约束**:targetSdk 37.2 下,任何**运行时才写出的 ELF 都
-不可执行**(数据目录 exec 禁令,§1.2.3)。因此:
-- opencode 如有运行期解包行为(如把 Go TUI 二进制释放到 `~/.opencode/bin`),
-  必须绕开:预置全部子二进制到交付包,并通过其支持的路径/PATH 机制指向预置版
-  (具体机制在 P0 核实,记入 §1.3 验证清单);
-- `TMPDIR`、`HOME` 指向可写目录没有问题——只要不往那里写**会被 exec 的文件**。
+**No runtime executable writes constraint**: with targetSdk 37.2, **ELF written at runtime
+cannot be executed** (data-directory exec prohibition, §1.2.3). Therefore:
+- Any opencode runtime extraction (e.g. Go TUI into `~/.opencode/bin`) must be bypassed:
+  prestage all child binaries in the bundle and redirect supported path/PATH mechanisms to them
+  (verify exact mechanism in P0 and record in §1.3 checklist);
+- `TMPDIR` and `HOME` may be writable, provided no **files that will be exec'd** are written there.
 
-#### 4.1.2 loader 包装器(无 proot、无 root 运行 glibc 二进制的核心)
+#### 4.1.2 Loader wrapper (core of running glibc binaries without proot or root)
 
 ```sh
 #!/system/bin/sh
@@ -612,31 +617,31 @@ exec "$ROOT/lib/ld-linux-aarch64.so.1" \
      "$ROOT/bin/opencode.bin" "$@"
 ```
 
-- `--inhibit-cache` + `--library-path` 绕开 `/etc/ld.so.cache` 与绝对 interpreter;
-- busybox(静态、GPL-2.0)承担无 glibc 环境下的脚本粘合(sh/readlink/tar 等),
-  以**独立程序聚合**方式随包分发(附源码获取地址,见 REUSE.md §3.4)。
+- `--inhibit-cache` + `--library-path` bypass `/etc/ld.so.cache` and absolute interpreter;
+- busybox (static, GPL-2.0) supplies script glue without glibc (sh/readlink/tar, etc.),
+  distributed as **aggregation of an independent program** with source URL (REUSE.md §3.4).
 
-### 4.2 Tier M — Magisk 模块(rooted 设备首选,零 App 依赖)
+### 4.2 Tier M — Magisk module (preferred for rooted devices, no app dependency)
 
 ```
 magisk-module/
 ├── module.prop
-├── customize.sh              # 释放 bundle 到 /data/adb/andcode,生成 chroot
-├── service.sh                # 开机:组装 chroot 挂载 → 起 dropbear → 起 opencode serve(可选)
+├── customize.sh              # Extract bundle to /data/adb/andcode and create chroot
+├── service.sh                # Boot: mount chroot → start dropbear → optionally start opencode serve
 └── uninstall.sh
 ```
 
-- 运行方式:**真 chroot**(性能最优,无 proot 翻译开销),bind-mount
-  `/dev`、`/proc`、`/sys`,可选 bind `/sdcard/Download` 为工作区(只放源码不放 ELF)。
-- 开机自启由 Magisk `service.d` 机制完成,**无需任何 App**。
-- 管理入口:`su -c /data/adb/andcode/sbin/andcode-entry`,或 `ssh localhost`(dropbear)。
-- 2026-11-11 真机复测(v0.4.48):模型流量必须走显式代理——网关主机名仅在宿主
-  代理侧 fake-IP DNS 可解析,设备直连(public DNS 或 netd)均无法解析;root shell
-  经 `HTTPS_PROXY`(adb reverse loopback)+ `NODE_EXTRA_CA_CERTS` 完成文本与
-  bash 工具两轮完整往返。该结果属 root 手动诊断,不等价于应用域验收;
-  `home/.config/opencode/opencode.json`(0600)为本次写入的 arjata provider 配置。
+- Execution: **real chroot** (best performance, no proot translation overhead), bind-mount
+  `/dev`, `/proc`, `/sys`; optionally bind `/sdcard/Download` as workspace (source only, no ELF).
+- Magisk `service.d` handles boot startup, **no app required**.
+- Management: `su -c /data/adb/andcode/sbin/andcode-entry`, or `ssh localhost` (dropbear).
+- 2026-11-11 device retest (v0.4.48): model traffic requires explicit proxy — gateway hostname resolves only
+  in host-proxy fake-IP DNS, not device-direct public DNS/netd. Root shell completed two full text/bash-tool
+  round trips through `HTTPS_PROXY` (adb reverse loopback) + `NODE_EXTRA_CA_CERTS`.
+  This is manual root diagnostics, not equivalent to app-domain acceptance;
+  `home/.config/opencode/opencode.json` (0600) contains the arjata provider configuration written for this test.
 
-### 4.3 Tier A — adb 直推包(locked 设备,零 App 依赖)
+### 4.3 Tier A — adb-pushed bundle (locked devices, no app dependency)
 
 ```bash
 # scripts/deploy-adb.sh
@@ -644,177 +649,177 @@ adb push andcode-bundle-arm64.tar.zst /data/local/tmp/
 adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin/andcode-entry sshd"
 ```
 
-- 目标目录 `/data/local/tmp`:shell uid 可写可执行,locked 设备即可用;
-  Android 11+ 可用无线调试,免数据线。
-- 交互:PC 端 `adb shell` 直连,或包内 dropbear 起本地 sshd 后用任意 SSH
-  客户端连 `127.0.0.1:2222`(adb `tcp` 转发或局域网)。
-- 局限:adbd 断开不影响已 nohup 的进程,但设备重启后需重推/重跑(可接受,
-  Tier A 定位为"开发者的第二形态")。
+- Target `/data/local/tmp`: writable/executable by shell uid, available on locked devices;
+  Android 11+ wireless debugging needs no cable.
+- Interaction: direct PC `adb shell`, or bundled dropbear local sshd with any SSH
+  client connecting to `127.0.0.1:2222` (adb `tcp` forwarding or LAN).
+- Limitation: adbd disconnect leaves nohup processes intact, but reboot requires re-push/re-run
+  (acceptable: Tier A is the "developer's secondary form").
 
-### 4.4 Tier P — 自研最小 APK(locked 设备的面向用户形态)
+### 4.4 Tier P — Custom minimal APK (user-facing form for locked devices)
 
-平台参数:`minSdk 31 · targetSdk/compileSdk 37.2 · arm64-v8a`(见 §1.1)。
+Platform parameters: `minSdk 31 · targetSdk/compileSdk 37.2 · arm64-v8a` (§1.1).
 
-- **一个 APK 即全部,内嵌交付包**。因数据目录 exec 禁令(§1.2.3),交付包按
-  可执行性一分为二:
-  - **只读执行体 → `jniLibs/arm64-v8a/`,以 `lib*.so` 命名**(如
-    `libopencode.so`、`libgit.so`、`libbusybox.so`、`libld-linux.so` 及 glibc 的
-    `lib*.so` 依赖):安装时系统自动解压到 `nativeLibraryDir`(可 exec);
-    首启动把包装脚本、`etc/`、shim 配置写入 `filesDir` 并回指
-    `nativeLibraryDir` 内的执行体;
-  - **可写数据**(`HOME`、`TMPDIR`、git 仓库、配置、生成的 `resolv.conf`)
-     → `filesDir`,绝无 ELF 落盘后 exec。
-- **打包接线(v0.4.19)**:`pack-apk-libs.sh` 输出 `arm64-v8a`、`manifest.farm`
-  与只含 data 的 `assets/andcode-runtime`;Gradle 显式
-  `-PandcodeNativeDir=<工件目录>` 接收,要求基本载荷存在,不自动下载。使用
-  legacy packaging 让系统安装时提取到 nativeLibraryDir,保留 `libandcode-*`
-  文件内容不 strip。此中间工件尚非 V2/PTY 完整闭包,未宣称可用的自包含 APK。
-- **单 APK 发布形态(v0.4.55,已决策,实施中)**:release APK 内嵌
-  `assets/andcode-rootfs/`(canonical dev-complete rootfs 的 gzip 档,以
-  `.tgz` 后缀嵌入——AGP 资产合并会自动解压 `.gz` 后缀资产,`noCompress tgz`
-  保证档案原样进 APK + SHA-256 + dpkg 版本清单)。首启动用应用内纯 Java
-  gzip/tar 提取器落位
-  `files/proot-rootfs`——无新增第三方依赖、无新增原生提取器,应用自身不解压
-  执行数据目录 ELF(guest 二进制经 proot 已验证执行路径运行);提取前强制
-  §4.8 rootfs-tar 安全检查(路径/重复项/逃逸符号链接/特殊文件;setuid/setgid
-  位剥离计数,Debian alternatives 与 usrmerge 符号链接按 proot 翻译语义保留),
-  摘要匹配则跳过(覆盖升级不重复提取),失败显式报错,PRoot serve 门禁语义
-  不变(缺失→明确失败不回退)。legacy opencode v1(`libandcode-opencode.so`
-  及其 wrapper)经 `pack-apk-libs.sh --exclude` 从 APK 排除——TUI 的
-  `opencode()` 函数与 serve 均运行 oc2 v2,移除需 CI 断言与终端入口回归。
-  体积预算:release APK 约 700–800 MB(以 CI 实测为准),安装后约 2 GB 存储;
-  分发仅 GitHub Release 侧载,不进 Play 渠道。发布版本号随 bundle
-  `--name` 参数统一 bump,消除硬编码。
-- 终端 UI 已改用内嵌的 Termux terminal-emulator/terminal-view 模块
-  (GPLv3,保留版权与 NOTICE,合并作品 AGPL-3.0-only,见 REUSE §2.1),
-  不依赖用户安装 Termux App。
-- **targetSdk 37.2 平台行为适配清单**:
-  - 前台服务必须声明类型:用 `specialUse`(属性说明:承载开发工具长会话),
-    并申请 `POST_NOTIFICATIONS` 运行时权限(通知才可见);
-  - edge-to-edge 强制(targetSdk 35+):终端页按 WindowInsets 适配;
-  - 预测性返回手势(Android 16+):终端页禁用 predictive back 以防误退;
-  - scoped storage:项目通过 SAF 选择 ZIP 或文件夹,**复制**到 `filesDir/projects`,
-    不把 content URI 当 POSIX 路径、不做源目录双向同步、不申请全盘存储权限。
-- 常驻:前台服务(specialUse)+ wake-lock 承载 `opencode serve`/长会话(§4.6)。
-- **双 UI(v0.4.4)**:
-  - **终端页(v0.4.9)**:Termux 终端视图默认承载随包 Bash 交互 shell,不自动启动 TUI;
-    显式补丁 loader + `bash --noprofile --rcfile <files/term-bashrc> -i`,预置副本
-    优先来自 nativeLibraryDir/libandcode-bash.so,开发期使用 bundle/bin/bash.bin;
-    不借用第三方宿主。配置设短提示符 `\W \$ `、HISTFILE,读取用户 ~/.bashrc,
-    提供 `opencode` 函数(前台运行后返回 shell,不再 exec 替换 shell)。无 Bash
-    时回退 `/system/bin/sh -i`,ENV 读取系统 mkshrc 并明确显示降级提示。
-    SHELL 仍为可直接 exec 的系统 sh,避免下游 spawn 裸 glibc Bash 因 PT_INTERP 失败;
-    正式 Bash 子 shell 启动器与完整 jniLibs 闭包仍待接线。
-    首帧前绑定 TerminalViewClient,布局后同步尺寸与绘制,不注入回车模拟提示符。
-    底部两行附加键含 ESC/TAB/CTRL/ALT/四方向、HOME/END/PGUP/PGDN、`/`/`-`/
-    回车/IME;CTRL/ALT 为高亮锁定键(再点解除),其它非文本键由 TerminalView
-    按应用模式编码,触摸按键不抢终端焦点;键盘展开时随 adjustResize 保持在其上方。
-    附加键与注入在 TUI 正常态实机可达(v0.4.52 探针,见文件头 changelog):
-    ← 移动光标、ESC 关闭 TUI 弹层、CTRL 粘滞(紫色高亮)+ 硬件 c 组成 Ctrl+C
-    (编辑器内首次清行、空态重复按退出),TUI 可干净退回 shell 提示符;
-    坐标验证须用设备真实像素(screencap 全分辨率),预览缩放图坐标会整体脱靶;
-    拼音 IME 组合层会截走注入文本且候选栏遮挡附加键行,探针前先切英文 IME。
-    Bash 依赖 libtinfo;基线 CI 收录二者版权与 GPLv3 文本并以 dpkg 实际版本登记。
-    老内核的 faccessat2(439) TRAP 通过 libc 调用点合成 -ENOSYS 进入原生回退;
-    补丁锁定 Ubuntu libc6 2.39-0ubuntu8.9 的字节/偏移,不匹配必须失败。
-    静态 TerminalSession + 委托 ClientBridge
-    让 Activity 离开/重建后复用进程与缓冲区,SessionService 保持宿主常驻;
-    这仅是同一应用进程内的会话保留,不承诺 force-stop/系统杀进程后恢复。
-    终端页和 Web 页的悬浮球均可打开抽屉导航;
-    抽屉“主页”通过共享 `NavDrawer.goHome` 显式启动 HomeActivity
-    (`CLEAR_TOP | SINGLE_TOP`,Home 为 singleTask),关闭来源页;即使来源页经
-    开发入口直接启动、返回栈没有主页,也不会因裸 finish() 掉回系统桌面。
-  - **桌面 Web 页(v0.4.3,已实机验证)**:`opencode serve --port 4096
-    --hostname 127.0.0.1` 作为 OpenCode 2.0 桌面界面后端,前端 SPA 由 WebView
-    加载 `http://127.0.0.1:4096/` 渲染。要点:
-    - serve 由 `ServeManager` 在应用域托管:补丁 loader 直拉
-      (`ld-linux --library-path … --inhibit-cache <oc2> serve …`),环境与
-      scripts/app-launch-oc.sh 一致(HOME/TMPDIR/BUN_TMPDIR 在 filesDir,
-      `GLIBC_TUNABLES=glibc.pthread.rseq=0`,代理走设备本地);stdout 全量落盘
-      files/oc2-serve.log(不消费会撑满管道导致 serve 卡死)并从中解析
+- **One APK contains everything, including the bundle**. Because of the data-directory exec prohibition (§1.2.3),
+  split the bundle by executability:
+  - **Read-only executables → `jniLibs/arm64-v8a/`, named `lib*.so`** (e.g.
+    `libopencode.so`, `libgit.so`, `libbusybox.so`, `libld-linux.so` and glibc
+    `lib*.so` dependencies): system installation extracts them to executable `nativeLibraryDir`;
+    first launch writes wrapper scripts, `etc/` and shim configuration to `filesDir`, pointing back
+    to executables in `nativeLibraryDir`;
+  - **Writable data** (`HOME`, `TMPDIR`, git repositories, configuration, generated `resolv.conf`)
+     → `filesDir`, never writing ELF there for subsequent exec.
+- **Packaging wiring (v0.4.19)**: `pack-apk-libs.sh` emits `arm64-v8a`, `manifest.farm`
+  and data-only `assets/andcode-runtime`; Gradle accepts them explicitly through
+  `-PandcodeNativeDir=<artifact-directory>`, requiring basic payloads without automatic downloads. Use
+  legacy packaging for system extraction into nativeLibraryDir at install; retain `libandcode-*`
+  bytes without stripping. This intermediate artifact is not full V2/PTY closure or a claimed usable self-contained APK.
+- **Single-APK release form (v0.4.55, decided, implementation ongoing)**: release APK embeds
+  `assets/andcode-rootfs/` (canonical dev-complete rootfs gzip archive using
+  `.tgz` suffix — AGP asset merging automatically decompresses `.gz` assets; `noCompress tgz`
+  retains archive bytes in APK, plus SHA-256 and dpkg version manifest). First launch uses an in-app pure Java
+  gzip/tar extractor to install into
+  `files/proot-rootfs` — no new third-party dependency or native extractor; the app itself does not extract
+  and execute data-directory ELF (guest binaries run through the verified proot execution path). Enforce
+  §4.8 rootfs-tar safety checks before extraction (paths/duplicates/escaping symlinks/special files; count stripped
+  setuid/setgid bits; retain Debian alternatives and usrmerge symlinks according to proot translation semantics).
+  Skip on digest match (no repeat extraction on in-place upgrade), fail explicitly; PRoot serve gate semantics
+  remain unchanged (missing → explicit failure, no fallback). Exclude legacy opencode v1 (`libandcode-opencode.so`
+  and wrapper) through `pack-apk-libs.sh --exclude` — both TUI
+  `opencode()` and serve run oc2 v2; removal requires CI assertions and terminal-entry regression tests.
+  Size budget: release APK about 700–800 MB (CI measurements authoritative), about 2 GB installed storage;
+  GitHub Release sideload only, no Play channel. Release version bumps follow bundle
+  `--name` consistently, eliminating hardcoding.
+- Terminal UI now embeds Termux terminal-emulator/terminal-view modules
+  (GPLv3, copyright and NOTICE retained, combined work AGPL-3.0-only; REUSE §2.1),
+  without requiring users to install Termux App.
+- **targetSdk 37.2 platform-behavior adaptation checklist**:
+  - Foreground services must declare a type: `specialUse` (property explanation: long development-tool sessions),
+    and request runtime `POST_NOTIFICATIONS` permission for visible notifications;
+  - Mandatory edge-to-edge (targetSdk 35+): terminal adapts using WindowInsets;
+  - Predictive back (Android 16+): disabled in terminal to avoid accidental exit;
+  - Scoped storage: SAF-selected ZIPs/folders are **copied** to `filesDir/projects`,
+    without treating content URIs as POSIX paths, bidirectional source sync, or all-files storage permission.
+- Residency: foreground service (specialUse) + wake-lock for `opencode serve`/long sessions (§4.6).
+- **Dual UI (v0.4.4)**:
+  - **Terminal page (v0.4.9)**: Termux view defaults to bundled interactive Bash, without auto-starting TUI;
+    explicit patched loader + `bash --noprofile --rcfile <files/term-bashrc> -i`; prestaged copy
+    preferably nativeLibraryDir/libandcode-bash.so, development bundle/bin/bash.bin;
+    no third-party host. Configure short prompt `\W \$ ` and HISTFILE, read user ~/.bashrc,
+    provide `opencode` function (foreground execution returns to shell rather than exec-replacing it). Without Bash,
+    fall back to `/system/bin/sh -i`; ENV reads system mkshrc and explicitly announces degraded mode.
+    SHELL remains directly executable system sh, avoiding downstream bare-glibc-Bash spawn PT_INTERP failures;
+    production Bash subshell launcher/full jniLibs closure wiring remains pending.
+    Bind TerminalViewClient before first frame; sync size/drawing after layout, without injecting Enter to fake a prompt.
+    Two bottom extra-key rows include ESC/TAB/CTRL/ALT/four arrows, HOME/END/PGUP/PGDN, `/`/`-`/
+    Enter/IME; CTRL/ALT are highlighted sticky keys (tap again to release), other non-text keys encoded by TerminalView
+    according to application mode. Touch keys do not steal terminal focus; adjustResize keeps them above the keyboard.
+    Extra keys and injection are reachable on-device in normal TUI state (v0.4.52 probe, top changelog):
+    ← moves cursor, ESC closes TUI overlay, sticky CTRL (purple highlight) + hardware c gives Ctrl+C
+    (first clears editor line; repeat when empty exits); TUI returns cleanly to shell prompt.
+    Coordinates must use actual device pixels (full-resolution screencap); scaled-preview coordinates miss entirely.
+    Pinyin IME composition intercepts injected text and candidate bar covers extra keys; switch to English IME before probes.
+    Bash depends on libtinfo; baseline CI records both copyright texts/GPLv3 and actual dpkg versions.
+    Old-kernel faccessat2(439) TRAP is handled by synthesized -ENOSYS at libc call site, entering native fallback;
+    patch pins Ubuntu libc6 2.39-0ubuntu8.9 bytes/offsets and must fail on mismatch.
+    Static TerminalSession + delegated ClientBridge
+    reuse process/buffer across Activity departure/recreation; SessionService keeps host resident.
+    This is same-app-process retention only, not recovery after force-stop/system process kill.
+    Both terminal and Web floating buttons open drawer navigation;
+    drawer Home explicitly launches HomeActivity through shared `NavDrawer.goHome`
+    (`CLEAR_TOP | SINGLE_TOP`, Home is singleTask), closing source page. Even if a development entry
+    launched the source directly with no Home in back stack, bare finish() no longer drops to system launcher.
+  - **Desktop Web page (v0.4.3, device-verified)**: `opencode serve --port 4096
+    --hostname 127.0.0.1` backs OpenCode 2.0 desktop UI; WebView renders the SPA from
+    `http://127.0.0.1:4096/`. Key points:
+    - `ServeManager` manages serve in app domain via direct patched-loader launch
+      (`ld-linux --library-path … --inhibit-cache <oc2> serve …`), with environment matching
+      scripts/app-launch-oc.sh (HOME/TMPDIR/BUN_TMPDIR in filesDir,
+      `GLIBC_TUNABLES=glibc.pthread.rseq=0`, device-local proxy). All stdout goes to
+      files/oc2-serve.log (unconsumed output fills pipe and hangs serve), parsed for
       server password;
-    - 二进制路径解析兼容两种部署:jniLibs(`nativeLibraryDir/libandcode-oc2.so`
-      + 同目录补丁 loader,最终形态)/ `/data/local/tmp`(开发期,当前实测路径);
-    - **回环明文白名单**:manifest 用 networkSecurityConfig 仅对
-      `127.0.0.1`/`localhost` 放行 cleartext,其余域名仍强制 https;
-    - **配对自动化**:serve 每次启动生成新 server password(旧凭证失效),
-      ServeManager 从 stdout 实时捕获,WebView 注入轮询式 JS(500ms × 20s,
-      React 原生 setter 填充)自动完成"使用密码"配对;localStorage 持久登录
-      (与桌面浏览器行为一致);
-    - 已知缺口:`oc2` 经 ld-linux 直 exec 时 `/proc/self/exe` 指向 loader,
-      Bun 自 respawn(如 `pair`)会把子命令参数当 ELF 路径加载而失败——
-      serve 单进程直跑不触发;需 pair/后台自拉起时,须给 oc2 加 launcher
-      ELF 包装(复用 bundle/launcher/launcher.c 模式,同 bin/git)。
-    - **Web PTY(v0.4.4)**:预置 process-daemon v0.4.0(协议 7,REUSE §2.1),
-      serve 与终端均设置 `OPENCODE_PTY_BIN` 指向可执行副本,不再用缓存 symlink
-      (上游拒绝 symlink,还校验 uid/sha256)。上游另支持
-      `OPENCODE_PTY_SOCKET_DIR`,设置为 `Context.getFilesDir()`;daemon 追加
-      `opencode-pty-<uid>/<32 hex>.sock`,保留非 symlink/uid/0700 校验;
-      Java 注入前检查完整路径 UTF-8 长度 <104 字节。不设置时默认 `/tmp`,
-      Android 上 mkdir 返回 EROFS,daemon 退出后前端报 service.json ENOENT;
-      单设 TMPDIR 不生效。cacheDir 曾观察到活跃 socket 被 unlink,故不用于端点。
-    - **Web 页面退出(v0.4.6)**:配对重试使用 Activity 自有主线程 Handler,
-      onDestroy 先清空队列;服务启动成功/失败、onPageFinished 与配对入口均检查
-      isFinishing/isDestroyed 及 WebView 引用。销毁时先置空引用,停止加载、
-      替换持有 Activity 的 WebViewClient,从父 ViewGroup 移除后再 destroy;
-      不停止 SessionService/serve。旧设备修复前可复现退出到系统桌面,日志另有
-      “Application attempted to call on a destroyed WebView”与 attached destroy
-      警告,但未观察到本轮应用进程致命异常,不把这些警告等同已证实的崩溃栈。
-    - **Web 输入法(v0.4.5)**:`WebActivity` 在本机页面加载后注入 APK asset
-      `andcode-terminal-ime.js`,以 MutationObserver 适配 SPA 新挂载的终端页签。
-      仅匹配 ghostty 的 `textarea[aria-label="Terminal input"]`,设置
-      `inputmode=url`(LatinIME 英文逐字输入)与 `enterkeyhint=enter`;
-      不修改聊天框、不使用密码类型或原生 JS bridge、不自行向 PTY 转发字符。
-      隐藏 textarea 保留一个本地空格哨兵,使 IME 能生成退格 beforeinput;
-      在上游事件处理完成后微任务恢复,组合输入期间不改值。上游继续负责
-      beforeinput/composition/paste 去重与传输。当前 LatinIME 真机验证
-      `echo okx` → 退格 → 回车得到 `ok`;中文候选与其它 IME **待 P3 实机验证**。
-    - **开发部署与交付边界**:当前旧设备以 root 给预置 ELF/依赖设置
-      apk_data_file 标签;PTY PT_INTERP 指向 `/data/local/tmp/ld` 的补丁 loader
-      **普通文件**(原 symlink 在应用域不可达,仅改 PTY 标签不足以修复 EACCES)。
-      库通过 LD_LIBRARY_PATH 寻址,须补齐 glibc 2.39 的 librt.so.1/libutil.so.1。
-      真机已验证真实 untrusted_app 域 daemon → shell → Web 粘贴命令 → 回显;
-      adb input text 经设备 IME 有乱码,不作为正常触屏输入的验证结论。
-      正式 Tier P 必须使用 nativeLibraryDir 的预置副本与 launcher/loader 指路,
-      禁止把 root/chcon 或固定 `/data/local/tmp/ld` 当成 locked 设备发布方案;
-      完整 jniLibs 及 CI 打包后仍**待 P0/P3 实机验证**。
-- **项目页/设置页(v0.4.7)**:共享抽屉增加“项目 · 导入 / 导出”和“设置”。
-  - 共享导航为项目/设置提供与其它条目等尺寸、同主题 tint 的图标。
-    独立终端双指展开/捏合调整字号,累计比例 >1.1 / <0.9 时增减 1 sp 并重置;
-    达到 10–28 sp 边界也重置比例,反向缩放可立即响应。字号保存到相同偏好,
-    设置页恢复前台时同步滑块与预览,不重建终端会话;不改变 Web 缩放行为。
-  - 原生 Material 3 顶栏 + 分组卡片,跟随 DayNight 主题;导入入口并排,项目卡
-    保留“打开终端”主操作、默认项目标识与折叠长路径,复制/导出归入更多菜单。
-    设置按终端显示/导出隐私/工作区分组,字号提供即时预览,开关行可整行点击。
-  - 项目使用唯一名称,先写 filesDir 下随机 `import-` 暂存目录,成功后 move 到
-    projects;失败清理本任务暂存目录,不覆盖已有项目。后台任务用 ViewModel
-    跨 Activity 旋转保留,不保证进程死亡后续传;异常进程退出可能遗留暂存目录。
-  - ZIP 拒绝绝对路径、反斜杠、`.`/`..`、重复路径与目录数据;导入/导出限
-    512 MiB 原始数据、20000 项、64 层。目录导入通过 DocumentsContract 读取。
-    ZIP 不恢复 Unix 权限/符号链接元数据,仅复制数据文件;并不放宽数据目录 exec 禁令。
-  - 导出通过 SAF 新建 ZIP,包含项目根目录;默认排除 .git,不跟随符号链接,
-    跳过 socket 等特殊文件,失败尽力删除残缺输出。导出不是运行中项目的原子快照,
-    不过滤 .env 等其它隐藏文件,UI 明确提示检查密钥。导入保留 ZIP 内原目录结构。
-  - 可复制项目绝对路径到 Web“打开项目”;可设为新终端的 cwd,已有终端会话
-    不注入 cd、不杀进程。ENV profile 不再强制 cd HOME。
-  - 设置保存到 `andcode-settings`:终端字号(10–28 sp)、终端/Web 亮屏开关、
-    导出是否包含 .git。onResume 应用显示设置,不重启会话,Web 内终端字号不受影响;
-    API key 与提供商仍由上游 Web UI 管理,本页不新增凭据存储。
-- **可选后端 CA(v0.4.40–v0.4.42)**:设置通过 SAF 导入单份 PEM,用户输入来自独立
-  可信渠道的文件 SHA-256;64 KiB 上限,验证单证书/CA 签发用途/有效期,拒绝私钥、
-  证书集合和链接。私有副本以内容摘要命名,每次启用启动前重新核对摘要及证书条件。
-  导入不自动启用,产品默认关闭;只为新 OpenCode Web 后端及继承环境的子进程设置
-  `NODE_EXTRA_CA_CERTS`,保留 Bun 内置根与主机名校验。关闭时清除继承的 CA/TLS/Bun
-  覆盖参数,不修改系统/WebView/独立终端/Ubuntu 信任。导入、开关、清除选择不自动
-  停止已有后端;手动停/启生效,清除选择也保留旧副本供仍在运行的进程读取。
-  - 2026-11-09 同签名覆盖安装保留数据后,真实应用域 `untrusted_app`、UID10348、
-    Seccomp=2、SELinux Enforcing 下确认默认关闭、错误摘要拒绝、正确 SAF 导入后
-    仍关闭;显式启用并手动重启后新后端有 CA 环境变量且没有 TLS bypass。
-  - 默认直连模型请求仍 `getaddrinfo EAI_AGAIN one.ai.api.service.arjata`,属于 DNS
-    阶段,不是证书验证结论。隔离诊断后端显式使用 `127.0.0.1:7890` 时,关闭 CA
-    得到 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`,启用后 `arjata/gpt-oss-120b` 返回预期
-    文本,并观察到 SSE 增量文本、中断事件和同会话恢复成功。不把代理成功冒称直连
-    成功,也不把诊断代理写成产品默认值。
+    - Binary-path resolution supports jniLibs (`nativeLibraryDir/libandcode-oc2.so`
+      + sibling patched loader, final form) / `/data/local/tmp` (development, currently tested path);
+    - **Loopback cleartext allowlist**: manifest networkSecurityConfig permits cleartext only for
+      `127.0.0.1`/`localhost`; all other domains require https;
+    - **Automated pairing**: each serve start generates a new password (old credentials expire),
+      captured live from stdout. WebView polling JS (500ms × 20s, React native setter)
+      automatically completes password pairing; localStorage persists login
+      (same as desktop browser);
+    - Known gap: direct ld-linux exec of `oc2` makes `/proc/self/exe` point to loader;
+      Bun self-respawn (e.g. `pair`) treats subcommand arguments as ELF paths and fails.
+      Single-process serve avoids this; pair/background respawn needs an oc2 launcher
+      ELF wrapper (reuse bundle/launcher/launcher.c pattern, as bin/git).
+    - **Web PTY (v0.4.4)**: prestage process-daemon v0.4.0 (protocol 7, REUSE §2.1);
+      serve/terminal set `OPENCODE_PTY_BIN` to executable copy, not cached symlink
+      (upstream rejects symlinks and checks uid/sha256). Upstream also supports
+      `OPENCODE_PTY_SOCKET_DIR`, set to `Context.getFilesDir()`; daemon appends
+      `opencode-pty-<uid>/<32 hex>.sock`, retaining non-symlink/uid/0700 checks.
+      Java checks full UTF-8 path <104 bytes before injection. Unset defaults to `/tmp`,
+      where Android mkdir returns EROFS; daemon exits and frontend reports service.json ENOENT.
+      TMPDIR alone has no effect. Active sockets were observed unlinked in cacheDir, so it is not used for endpoints.
+    - **Web page exit (v0.4.6)**: pairing retries use Activity-owned main-thread Handler;
+      onDestroy clears queue first. Service-start success/failure, onPageFinished and pairing entry check
+      isFinishing/isDestroyed and WebView reference. Destruction nulls reference first, stops loading,
+      replaces Activity-holding WebViewClient, detaches from parent ViewGroup, then destroys;
+      SessionService/serve keep running. Before fix, old device reproduced exit to system launcher; logs also had
+      “Application attempted to call on a destroyed WebView” and attached-destroy warnings,
+      but no app-process fatal exception was observed this round; warnings are not a confirmed crash stack.
+    - **Web IME (v0.4.5)**: `WebActivity` injects APK asset
+      `andcode-terminal-ime.js` after local page load; MutationObserver handles newly mounted SPA terminal tabs.
+      Match only ghostty `textarea[aria-label="Terminal input"]`, setting
+      `inputmode=url` (LatinIME English character input) and `enterkeyhint=enter`;
+      no chat-field changes, password type, native JS bridge, or custom PTY character forwarding.
+      Hidden textarea retains a local space sentinel so IME produces backspace beforeinput;
+      restore in a microtask after upstream handling, without value changes during composition. Upstream retains
+      beforeinput/composition/paste deduplication and transport. Current LatinIME device test:
+      `echo okx` → backspace → Enter yields `ok`; Chinese candidates/other IMEs **pending P3 on-device verification**.
+    - **Development deployment/delivery boundary**: old device currently uses root to label prestaged ELF/dependencies
+      apk_data_file; PTY PT_INTERP points to patched loader **regular file**
+      `/data/local/tmp/ld` (original symlink unreachable in app domain; PTY relabel alone cannot fix EACCES).
+      Libraries resolve via LD_LIBRARY_PATH; glibc 2.39 librt.so.1/libutil.so.1 must be included.
+      Device verified real untrusted_app daemon → shell → Web-pasted command → echo;
+      adb input text is garbled through device IME and is not evidence for normal touchscreen input.
+      Production Tier P must use nativeLibraryDir prestaged copies and launcher/loader redirection;
+      root/chcon or fixed `/data/local/tmp/ld` must not become locked-device release solutions.
+      Full jniLibs/CI packaging remains **pending P0/P3 on-device verification**.
+- **Projects/settings pages (v0.4.7)**: shared drawer adds Projects · Import / Export and Settings.
+  - Project/settings navigation icons match other entries' size and theme tint.
+    Standalone-terminal pinch adjusts font by 1 sp when accumulated scale >1.1 / <0.9, then resets;
+    reaching 10–28 sp bounds also resets scale for immediate reverse response. Persist in the same preferences;
+    settings foreground resumption syncs slider/preview without recreating terminal session; Web zoom unchanged.
+  - Native Material 3 top bar/grouped cards follow DayNight; import entries sit side by side. Project cards
+    retain Open terminal primary action, default-project indicator and collapsed long path; copy/export use More menu.
+    Settings group terminal display/export privacy/workspace, with live font preview and whole-row switches.
+  - Unique project names; first write random `import-` staging under filesDir, then move to
+    projects on success. Failure cleans only this task's staging; no overwrite. ViewModel retains background work
+    across Activity rotation, not guaranteed across process death; abnormal exit may leave staging directories.
+  - ZIP rejects absolute paths, backslashes, `.`/`..`, duplicates and directory data; import/export limits:
+    512 MiB raw data, 20000 entries, 64 levels. Directory import uses DocumentsContract.
+    ZIP restores no Unix permissions/symlink metadata, copies data only, and does not relax data-directory exec prohibition.
+  - Export creates a SAF ZIP including project root; default excludes .git, does not follow symlinks,
+    skips sockets/special files, and best-effort deletes partial output on failure. Not an atomic live-project snapshot;
+    other hidden files such as .env are not filtered; UI explicitly prompts key review. Import preserves ZIP directory layout.
+  - Copy project absolute path to Web Open project; use as new-terminal cwd without injecting cd or killing
+    existing terminal processes. ENV profile no longer forces cd HOME.
+  - `andcode-settings` stores terminal font (10–28 sp), terminal/Web keep-screen-on,
+    and export-.git preference. onResume applies display settings without restart; Web-terminal font unaffected.
+    Upstream Web UI still manages API keys/providers; this page adds no credential storage.
+- **Optional backend CA (v0.4.40–v0.4.42)**: SAF imports a single PEM; user supplies file SHA-256 from an independent
+  trusted channel. Limit 64 KiB; validate single certificate/CA signing usage/validity, reject private keys,
+  certificate bundles and links. Private copy is digest-named; recheck digest/certificate conditions before each enabled start.
+  Import does not enable trust; product defaults off. Set `NODE_EXTRA_CA_CERTS` only for new OpenCode Web backends
+  and inheriting children, retaining Bun roots/hostname checks. Disabled mode clears inherited CA/TLS/Bun
+  overrides without changing system/WebView/standalone-terminal/Ubuntu trust. Import/toggle/clear selection do not
+  stop existing backends; manual stop/start applies changes. Clearing selection retains old copies for running processes.
+  - 2026-11-09 same-signature in-place install preserved data; real `untrusted_app`, UID10348,
+    Seccomp=2, SELinux Enforcing verified default off, wrong-digest rejection and remaining off after correct SAF import.
+    Explicit enable/manual restart gave new backend CA environment with no TLS bypass.
+  - Default direct model requests still fail `getaddrinfo EAI_AGAIN one.ai.api.service.arjata`: DNS-stage failure,
+    not certificate evidence. Isolated diagnostic backend with explicit `127.0.0.1:7890` returns
+    `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` with CA disabled; enabled `arjata/gpt-oss-120b` returns expected
+    text, with SSE incremental text, interruption and same-session resume observed. Proxy success is not direct
+    success, and diagnostic proxy is not the product default.
   - v0.4.53 exposes that diagnostic proxy path as an explicit preference:
     `serve-loopback-proxy` defaults off in the network-trust settings card.
     A newly started managed serve receives `http_proxy`, `https_proxy`,
@@ -839,25 +844,25 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
     (those remain pending P0/P3 on-device verification). This device retains
     both opt-ins enabled; the product defaults remain off. Evidence: local
     `a-33.png`, `a-34.png`, session `ses_e3626d3fdffeQ01kUkHNqN80Fi`.
-  - 模型调用的无副作用 shell 命令返回预期标记,但工具结果回传后的 provider 请求
-    HTTP 400(`provider.invalid-request/openai_error`);完整工具往返未通过,根因待查。
-    验收后停止诊断后端、恢复设置 CA 关闭,手动重启的默认后端 PID20163 无
-    `NODE_EXTRA_CA_CERTS` 或 TLS bypass。保留 CA 导入副本及所有测试会话,未删除
-    用户数据。
-  - 2026-11-10 授权设备 `8c8da214` 恢复连接后,默认 PID20163、模型及 CA 关闭
-    环境保持不变。通过该后端 shell 启动独立诊断 PID8198,再次核对真实
-    `untrusted_app`、UID10348、Seccomp=2,显式代理+既有 CA 下新会话
-    `ses_e3ef3e479ffeeWTmyr2HK8a566` 连续两轮执行限定 `printf`、回传结果并
-    得到最终标记;每轮 SSE 两个步骤完成,均有 tool.success/execution.succeeded,
-    无 provider 错误。旧会话 `ses_e3fa8bb82ffeqj5z8cksogpUPH` 新请求仍在
-    调用工具前 HTTP 400。故完整工具往返仅在上述新会话/网络条件下通过,历史
-    回放根因未闭环,不把重试成功当协议修复或默认直连已恢复。
-  - 经显式代理使用已有合成验收消息重建的 HTTP API 格式对照未执行任何工具,不保存凭据或
-    原始消息;空/NULL 内容及 reasoning 字段最小对照均能成功,历史消息对照
-    也存在 200/400 波动。它不是捕获的精确 OpenCode 请求,不能据此删除字段或
-    静默修改旧会话。结束后 PID8198 已终止、诊断转发已移除;PID20163 可用且
-    无 CA/TLS bypass,保留 CA 文件、全部会话、项目与 Ubuntu 实例。其它设备、
-    网络、IME及旧会话恢复仍待 P0/P3 实机验证。
+  - Model-invoked side-effect-free shell command returned expected marker, but provider continuation after tool result
+    returned HTTP 400 (`provider.invalid-request/openai_error`); full tool round trip failed, root cause pending.
+    After acceptance, stop diagnostic backend, restore CA-off setting; manually restarted default PID20163 has no
+    `NODE_EXTRA_CA_CERTS` or TLS bypass. Retain imported CA and all test sessions; no user
+    data deleted.
+  - After authorized device `8c8da214` reconnected on 2026-11-10, default PID20163/model/CA-off
+    environment remained unchanged. Start independent diagnostic PID8198 through that backend shell; recheck real
+    `untrusted_app`, UID10348, Seccomp=2. With explicit proxy/existing CA, fresh session
+    `ses_e3ef3e479ffeeWTmyr2HK8a566` completed two consecutive constrained `printf` executions, result continuations
+    and final markers; each SSE round completed two steps with tool.success/execution.succeeded,
+    no provider errors. Old session `ses_e3fa8bb82ffeqj5z8cksogpUPH` still returned HTTP 400
+    before tool invocation. Full tool round trips therefore pass only under these fresh-session/network conditions;
+    history-replay root cause remains unresolved. Retry success is not a protocol fix or restored default direct connectivity.
+  - HTTP API format comparisons reconstructed from existing synthetic acceptance messages through explicit proxy executed no tools,
+    retaining no credentials/raw messages. Minimal empty/NULL-content and reasoning-field comparisons succeeded;
+    historical-message comparisons also fluctuated 200/400. These are not captured exact OpenCode requests and
+    do not justify deleting fields or silently modifying old sessions. PID8198 terminated and diagnostic forwarding
+    removed afterward; PID20163 remains available without CA/TLS bypass. CA files, all sessions, projects and Ubuntu
+    instances retained. Other devices/networks/IMEs and old-session recovery pending P0/P3 on-device verification.
 - **Managed Ubuntu PRoot serve (v0.4.54)**: `serve-proot-backend` is an independent,
   default-off setting for newly started managed servers. Manually stop and restart
   after changing it. The app requires the APK payload, runtime farm and installed
@@ -885,54 +890,54 @@ adb shell "cd /data/local/tmp && busybox-arm-static tar --zstd -xf ... && ./sbin
   Bionic PRoot preload/trust overrides; current-process password handling omits
   password lines from new log entries. Historical logs are not rewritten.
   Other devices, locked delivery and abnormal-stop recovery remain pending P0/P3.
-- UI:主页仪表盘 + 终端 + 桌面 Web + 项目 + 设置;sshd 管理/phantom-killer
-  引导等扩展设置仍待实现,不把规划当作已经交付。
+- UI: Home dashboard + terminal + desktop Web + projects + settings; extended settings such as sshd management/
+  phantom-killer guidance remain planned, not delivered.
 
-### 4.5 /etc 重定向:proot bind(主)+ LD_PRELOAD shim(辅)
+### 4.5 /etc redirection: proot bind (primary) + LD_PRELOAD shim (secondary)
 
-**架构修正(v0.4.1,真机实测)**:LD_PRELOAD 只能拦截**跨对象 PLT 调用**;
-`fopen("/etc/resolv.conf")` 等由 **glibc 内部直接发起**(隐藏别名,不走 PLT),
-shim 拦截不到——真机 TEST-NET 探针 244ms 瞬断证实。因此:
+**Architecture correction (v0.4.1, device-tested)**: LD_PRELOAD intercepts only **cross-object PLT calls**;
+`fopen("/etc/resolv.conf")` and similar originate **directly inside glibc** (hidden aliases, no PLT),
+bypassing shim — confirmed by device TEST-NET probe's immediate 244ms disconnect. Therefore:
 
-| 层 | /etc 重定向机制 |
+| Layer | /etc redirection mechanism |
 |---|---|
-| **Tier A/M(主)** | **proot 用户态 bind**:`proot -b $ROOT/etc/resolv.conf:/etc/resolv.conf -b $ROOT/etc/ssl:/etc/ssl …`,覆盖一切子孙进程;proot(Termux bionic 构建,GPL-2.0)+ loader + libtalloc + libandroid-shmem 随 bundle 分发(独立聚合,manifest 记录) |
-| **Tier M(root,可选)** | 真 bind mount(`mount --bind`),零开销 |
-| **shim(辅)** | 保留:拦截**非 glibc 对象**的 /etc 访问(libcrypto/libssl 等走 PLT 的调用);并承担 LD_PRELOAD 自清(Bionic 子进程保护) |
+| **Tier A/M (primary)** | **proot userspace bind**: `proot -b $ROOT/etc/resolv.conf:/etc/resolv.conf -b $ROOT/etc/ssl:/etc/ssl …`, covering all descendants; proot (Termux bionic build, GPL-2.0) + loader + libtalloc + libandroid-shmem bundled as independent aggregation, recorded in manifest |
+| **Tier M (root, optional)** | Real bind mount (`mount --bind`), zero overhead |
+| **shim (secondary)** | Retained to intercept /etc access by **non-glibc objects** (PLT calls from libcrypto/libssl, etc.), and self-clear LD_PRELOAD to protect Bionic children |
 
-**已知约束**:①proot 的 ptrace 拦截**不可嵌套**——wrapper/entry 以
-`ANDCODE_IN_PROOT` 守卫,proot 内不再套 proot;②移动/受管网络常阻断 UDP 53
-出站——`andcode-mkresolv` 生成的 resolv.conf 强制 `options use-vc timeout:3
-attempts:2`(TCP DNS,真机实测必要);③Tier P(jniLibs + 数据目录)无法用
-proot 进程树包住(无终端宿主概念)——Tier P 的 /etc 方案待 P3 设计
-(候选:glibc sysconfdir 重编译或应用侧资产落位 + HOME 内配置)。
+**Known constraints**: ①proot ptrace interception **cannot nest** — wrapper/entry guards with
+`ANDCODE_IN_PROOT`, never nesting proot inside proot; ②mobile/managed networks often block outbound UDP 53 —
+`andcode-mkresolv` forces `options use-vc timeout:3
+attempts:2` in resolv.conf (TCP DNS, device-proven necessary); ③Tier P (jniLibs + data directory) cannot be
+wrapped in a proot process tree (no terminal-host concept) — its /etc solution awaits P3 design
+(candidates: rebuild glibc sysconfdir, or app asset placement + HOME configuration).
 
-### 4.6 Android 12+ Phantom Process Killer 对策(三种形态共用)
+### 4.6 Android 12+ Phantom Process Killer mitigation (all three forms)
 
 ```bash
 adb shell "cmd device_config set_sync_disabled_for_tests persistent"
 adb shell "device_config put activity_manager max_phantom_processes 2147483647"
 ```
 
-- Tier M(root):安装时用 root 直接固化上述设置(并适配个别 ROM 的私有开关),
-  重启后由 service.sh 复查——**唯一能自动持久化的形态**。
-- Tier P(APK):设置页一键引导用户执行 adb 命令(展示可复制命令,含无线调试
-  引导),叠加前台服务降低被杀概率;Android 12+ 为我们支持的最低版本,该对策
-  对所有目标设备必然适用,不存在"老系统不需要"的分支。
-- Tier A:部署脚本顺带执行;文档注明重启后需重跑。
+- Tier M (root): persist these settings with root at install (adapting ROM-specific private switches),
+  recheck with service.sh after reboot — **the only automatically persistent form**.
+- Tier P (APK): settings guide users to execute copyable adb commands, including wireless-debugging
+  guidance; foreground service further reduces kill probability. Android 12+ is our minimum, so this
+  mitigation applies to all targets; no "older OS does not need it" branch.
+- Tier A: deployment script also executes it; document rerun after reboot.
 
-### 4.7 认证与交互
+### 4.7 Authentication and interaction
 
-1. **认证**:a) 从终端复制 OAuth URL 到任意浏览器,回贴回调;b) API key /
-   环境变量注入(Tier P 设置页直接粘贴,完全无浏览器);c) Tier P 可用
-   Intent 拉起默认浏览器完成回调。
-2. **无头/远程**:`opencode serve` + 内置 dropbear → 任何 SSH 客户端或 PC
-   浏览器(同 LAN)接入。这使"手机上的 opencode"也可以完全由 PC 驱动,
-   触屏 TUI 只是其中一种入口而非必需。
+1. **Authentication**: a) copy OAuth URL from terminal to any browser and paste callback back; b) API key /
+   environment injection (paste directly in Tier P settings, no browser); c) Tier P can use
+   Intent to launch default browser for callback.
+2. **Headless/remote**: `opencode serve` + bundled dropbear → any SSH client or PC
+   browser on the same LAN. "opencode on a phone" can thus be fully PC-driven;
+   touchscreen TUI is an optional entry, not a requirement.
 
 ---
 
-### 4.8 Ubuntu 开发环境双后端(实施中,非已交付能力)
+### 4.8 Dual Ubuntu development backends (implementation ongoing, not delivered capability)
 
 - Rootfs tool evaluation: `scripts/build-ubuntu-mmdebstrap.sh` delegates package
   bootstrap/dependency resolution to mmdebstrap in native arm64 CI. It retains
@@ -965,51 +970,51 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
   empty root-owned mode-0700 `lost+found` when absent from the archive. It does
   not certify timestamps, ACLs, xattrs or complete source delivery.
 
-- 保留现有轻量 Bash;Ubuntu 24.04 arm64 来自同一官方镜像与软件源。chroot 使用
-  独立 ext4 镜像,PRoot 使用独立可写实例,不共享 `/etc`、`/usr`、dpkg 数据库。
-  **构建产物层统一(v0.4.55)**:canonical rootfs 档(单 APK 计划的
-  `andcode-rootfs.tar.zst`)是 chroot 与 PRoot 共同的构建来源——一次 CI 构建、
-  一份摘要与清单,按 tier 分发到各自存储(app 私有 / root 侧),设备实例
-  仍互不共享,验收门禁保持双轨(应用域 PRoot 门禁 + root chroot 门禁)。
-  Tier M 可后续评估以同一档解压为目录式 chroot 替代 ext4 镜像,属行为变更,
-  须 P0/P3 真机验证后方可替换;现有 `ubuntu.img` 与全部实例原样保留。
-- `scripts/build-ubuntu-rootfs.sh` 在原生 arm64 CI 生成 4 GiB ext4 压缩镜像、
-  SHA-256、dpkg 源包/二进制包版本清单、Docker digest 与配方 commit;保留许可证。
-  rootfs tar 仅为可信 CI 中间产物,在提取前检查路径、重复项、链接祖先、特殊文件与
-  setuid/setgid 位。APK 项目 ZIP 导入器绝不用于安装 rootfs。
-- root-only `runtime/ubuntu/andcode-ubuntu-install` 固定安装至
-  `/data/adb/andcode-ubuntu`,校验带外摘要、arm64、≥5 GiB 可用空间与精确镜像大小,
-  拒绝覆盖旧实例;失败保留私有残留供检查,不自动删除用户数据。
-- 管理入口 `andcode-ubuntu` 每个前台会话使用独立且递归 private 的 mount namespace,
-  绑定最小 `/dev` 节点、PTY、proc,为 `/run` 与 `/dev/shm` 提供临时挂载;不绑定
-  整个 Android `/data`、`/system` 或 `/sys`,不修改 SELinux。镜像与入口 root 私有,
-  串行锁防止并发挂载同一文件系统。正常退出反向卸载,忙挂载不强制/懒卸载;
-  清理失败保留锁待人工恢复,不宣称后台进程自动回收已解决。
-- `shell`/`exec` 以 UID/GID 60000、Android inet 补充组 3003 运行,清空继承环境,
-  清除 capability bounding/inheritable/ambient set 并设置 no-new-privs;目录 `/workspace`
-  为该用户所有。`admin` 仅显式人工维护入口,允许 apt,不向模型提供 sudo/root。
-  **chroot 不是安全沙箱**:同宿主 UID、proc 可见性、共享内核与 root 管理仍有风险。
-- 尚不接入 APK/root IPC 或 OpenCode:需要先通过签名身份/peer-credential 认证通道、
-  项目范围映射和真实设备准入,不能把 `su -c` 字符串拼接当作生产服务。
-- PRoot 准入必须在真实 zygote 应用域验证 apt、新装 ELF、编译 ELF、PTY/子进程、
-  DNS/HTTPS、libc 更新;不能以 adb root/run-as 成功替代,不能降低 targetSdk 或关闭
-  SELinux 掩盖问题。旧设备真实应用域已通过显式代理模式的 apt/HTTPS、hello、
-  gcc 新编译 ELF、PTY/子进程及 libc 2.39-0ubuntu8.7 → 8.9 更新后执行,guest ELF
-  不打补丁。此结果是开发准入,不是默认直连或 locked 自包含交付认证。
-- APK 终端提供 `andcode-ubuntu-proot [loopback-proxy] [命令...]` 显式开发入口;
-  无参数启动交互 Bash,退出返回轻量 Bash,缺实例明确报错。不自动安装、不 su,
+- Retain lightweight Bash; Ubuntu 24.04 arm64 comes from the same official image/repositories. Chroot uses
+  a separate ext4 image, PRoot a separate writable instance; no shared `/etc`, `/usr` or dpkg database.
+  **Unified build-artifact layer (v0.4.55)**: canonical rootfs archive (single-APK plan's
+  `andcode-rootfs.tar.zst`) is the shared chroot/PRoot build source — one CI build,
+  one digest/manifest, distributed per tier to separate storage (app-private / root-side). Device instances
+  remain independent; dual acceptance gates remain (app-domain PRoot + root chroot).
+  Tier M may later evaluate extracting the same archive into directory-based chroot instead of ext4;
+  this behavior change requires P0/P3 device verification before replacement. Existing `ubuntu.img` and all instances stay intact.
+- `scripts/build-ubuntu-rootfs.sh` produces a compressed 4 GiB ext4 image in native arm64 CI,
+  SHA-256, dpkg source/binary version inventory, Docker digest and recipe commit; retain licenses.
+  Rootfs tar is only a trusted CI intermediate; check paths, duplicates, link ancestors, special files and
+  setuid/setgid bits before extraction. Never use the APK project ZIP importer to install rootfs.
+- Root-only `runtime/ubuntu/andcode-ubuntu-install` installs only to
+  `/data/adb/andcode-ubuntu`, checking out-of-band digest, arm64, ≥5 GiB free and exact image size;
+  reject overwrite, retain private remnants on failure for inspection, never auto-delete user data.
+- Management entry `andcode-ubuntu` gives each foreground session a separate recursively private mount namespace,
+  binding minimal `/dev` nodes, PTY and proc, with temporary mounts for `/run` and `/dev/shm`; no whole
+  Android `/data`, `/system` or `/sys` binds or SELinux changes. Image/entry are root-private;
+  serial lock prevents concurrent mounts of one filesystem. Normal exit unmounts in reverse; no forced/lazy
+  unmount of busy mounts. Failed cleanup retains lock for manual recovery; automatic background-process cleanup is not claimed solved.
+- `shell`/`exec` run as UID/GID 60000 with Android inet supplementary group 3003, clear inherited environment,
+  capability bounding/inheritable/ambient sets and set no-new-privs; `/workspace`
+  belongs to that user. `admin` is explicit manual maintenance only, allowing apt but exposing no sudo/root to models.
+  **Chroot is not a security sandbox**: shared host UID, proc visibility, shared kernel and root administration retain risks.
+- No APK/root IPC or OpenCode integration yet: first require signature/peer-credential authenticated channels,
+  project-scoped mappings and real-device admission; concatenated `su -c` strings are not a production service.
+- PRoot admission must test apt, newly installed/compiled ELF, PTY/children,
+  DNS/HTTPS and libc upgrades in real zygote app domain; adb root/run-as cannot substitute, nor can lower targetSdk
+  or disabled SELinux hide issues. Old-device real app domain passed explicit-proxy apt/HTTPS, hello,
+  freshly gcc-compiled ELF, PTY/children and execution after libc 2.39-0ubuntu8.7 → 8.9 upgrade, without
+  guest ELF patches. This is development admission, not default-direct or locked self-contained delivery certification.
+- APK terminal offers explicit development entry `andcode-ubuntu-proot [loopback-proxy] [command...]`;
+  no arguments starts interactive Bash, exit returns to lightweight Bash, missing instance fails explicitly. No auto-install or su.
   This terminal entry is separate from the managed OpenCode/Web PTY backend.
   APK native payloads use the runtime farm; payload-free development uses
   `/data/local/tmp` PRoot.
-  设置页可为新终端选择轻量 Bash(默认)或 Ubuntu PRoot,独立代理开关默认关闭。
-  不重启已有会话;新会话快照选中项目名,入口仅绑定 `files/projects/<项目名>` 至
-  `/workspace/<项目名>` 并从该目录起步,未选项目则 `/root`。拒绝项目根/父目录链接、
-  越界名/PRoot bind 分隔符与丢失路径。不会递归检查项目内链接,且应用 UID 的宿主
-  权限不变,不声称安全隔离。缺实例拒绝选择,启动后实例/项目丢失则明确失败,
-  不静默降级到宿主执行。OpenCode/Web PTY 不使用此映射。
-  旧设备应用域已验证项目写回/参数保真/stdin/退出码与拒绝错误项目。
-  UDP 公共 DNS 超时,TCP DNS 返回正常答案;`use-vc` 后无显式代理的 HTTPS、严格
-  apt update 与 Git HTTPS 成功,仍依赖设备现有 VPN/网络,不是 VPN 关闭后的测试。
+  Settings select lightweight Bash (default) or Ubuntu PRoot for new terminals, with separate default-off proxy.
+  Existing sessions are not restarted; new sessions snapshot selected project name, bind only `files/projects/<project-name>` to
+  `/workspace/<project-name>` and start there, or `/root` without selection. Reject project-root/parent symlinks,
+  escaping names/PRoot bind separators/missing paths. No recursive internal-link checks; app UID host permissions
+  remain unchanged, so no security-isolation claim. Missing instance blocks selection; missing instance/project at startup
+  fails explicitly without silent host-execution fallback. OpenCode/Web PTY does not use this mapping.
+  Old-device app domain verified project writeback/argument fidelity/stdin/exit codes and invalid-project rejection.
+  Public UDP DNS times out; TCP DNS answers normally. With `use-vc`, HTTPS, strict apt update and Git HTTPS pass
+  without explicit proxy, still relying on existing device VPN/network; not a VPN-disabled test.
   - On 2026-11-11 device `8c8da214`, a PRoot feasibility probe bound
     nativeLibraryDir (`libandcode-oc2.so`), the glibc farm and
     `files/term-serve.env` into the guest. The guest's unpatched
@@ -1020,89 +1025,89 @@ adb shell "device_config put activity_manager max_phantom_processes 2147483647"
     reached that endpoint over TLS (401 without credentials). This initial
     feasibility probe is superseded by the opt-in managed PRoot serve integration
     and bounded on-device acceptance recorded in section 4.4 / v0.4.54.
-- CI 为 Tier P 单独复制标准 bundle,执行 seccomp 七处字节校验/修改,再执行一次并
-  验证 loader/libc SHA-256 不变,之后才重打包和物理化。标准 Linux bundle 保持原样;
-  新基线字节不匹配时构建失败,不把补丁用于 PRoot guest 或 apt 更新后的 libc。
-  Android 专用工件链、完整 jniLibs/Gradle 集成仍待 CI 首跑与 P0/P3 实机验证。
-- Linux CI 独立 workflow 仅测试 rootfs apt 与普通用户编译运行、权限降级与兼容性,
-  不证明 Android 支持。2026-11-09 用户清理后旧设备约有 54 GiB 可用空间。
-  本机无 Docker,新增固定官方 SHA-256 Ubuntu Base 的原生设备开发引导路径,
-  不等同 CI 构建验证。入口复制现有独立 BusyBox 至 root 私有目录处理 bind mount,
-  不依赖第三方 App;旧 Toybox 对字符设备 bind 错误尝试 loop。loop 显式分配,
-  内核自动 detach 后不再重复 detach。chroot UID 60000 网络仍失败,认证服务、
-  项目映射、OpenCode/Web PTY 与自包含集成**待 P0/P3 实机验证**。
-  操作与验收见 `docs/UBUNTU.md`。
+- CI copies standard bundle separately for Tier P, verifies/patches seven seccomp byte sites, reruns and
+  verifies unchanged loader/libc SHA-256 before repackaging/physicalization. Standard Linux bundle unchanged;
+  new-baseline byte mismatch fails build; patches never apply to PRoot guest or apt-updated libc.
+  Android-specific artifact chain/full jniLibs/Gradle integration awaits first CI run and P0/P3 on-device verification.
+- Independent Linux CI workflow tests only rootfs apt/non-root compilation/execution, privilege reduction and compatibility,
+  not Android support. After user cleanup on 2026-11-09, old device had about 54 GiB free.
+  No local Docker; add native-device development bootstrap with official fixed-SHA-256 Ubuntu Base,
+  not equivalent to CI build validation. Copy existing independent BusyBox to root-private directory for bind mount,
+  no third-party app; old Toybox incorrectly attempts loop for character-device bind. Allocate loop explicitly,
+  do not detach again after kernel auto-detach. Chroot UID 60000 networking still fails; authenticated service,
+  project mapping, OpenCode/Web PTY and self-contained integration **pending P0/P3 on-device verification**.
+  Operations/acceptance: `docs/UBUNTU.md`.
 
-## 5. 仓库结构(本仓库交付物)
+## 5. Repository structure (deliverables in this repository)
 
 ```
 andcode/
 ├── docs/                     # DESIGN.md · REUSE.md · NAMING.md
-├── baseline/                 # 兼容性构建基线(§3)
+├── baseline/                 # Compatibility build baseline (§3)
 │   ├── Dockerfile            # ubuntu:24.04 (arm64) + build-essential + git + bun
-│   ├── make-rootfs.sh        # debootstrap arm64 rootfs(交付包 sysroot 来源)
-│   └── check-compat.sh       # glibc/ELF 兼容性审计门禁
-├── bundle/                   # 自包含交付包(§4.1)
-│   ├── pack-bundle.sh        # 从基线 rootfs 抽取 glibc 闭包 + 组件 → tarball
-│   ├── pack-apk-libs.sh      # 规范布局 → Tier P jniLibs 物理名重打包(NAMING §6.2)
-│   ├── wrapper.sh.tpl        # loader 包装器模板
-│   └── shim/                 # LD_PRELOAD 重定向 shim(C, AGPL)
+│   ├── make-rootfs.sh        # debootstrap arm64 rootfs (bundle sysroot source)
+│   └── check-compat.sh       # glibc/ELF compatibility audit gate
+├── bundle/                   # Self-contained bundle (§4.1)
+│   ├── pack-bundle.sh        # Extract glibc closure + components from baseline rootfs → tarball
+│   ├── pack-apk-libs.sh      # Canonical layout → Tier P jniLibs physical-name repackaging (NAMING §6.2)
+│   ├── wrapper.sh.tpl        # Loader wrapper template
+│   └── shim/                 # LD_PRELOAD redirection shim (C, AGPL)
 ├── magisk-module/            # Tier M(§4.2)
-├── runtime/ubuntu/           # root chroot 原型管理/安装入口(§4.8)
+├── runtime/ubuntu/           # Root chroot prototype management/installation entries (§4.8)
 ├── scripts/
 │   ├── deploy-adb.sh         # Tier A(§4.3)
-│   ├── naming-lint.sh        # 命名规范 CI 门禁(NAMING §8)
-│   └── smoke-test.sh         # 三形态共用验收(§6)
-├── app/                      # Tier P 自研 APK(§4.4, Kotlin + jackpal 终端库 fork)
-├── third_party/              # 指南与补丁(不 vendoring 源码,只放构建配方)
-└── .github/workflows/andcode-ci.yml  # 基线 → 交付包 → 审计 → 冒烟 → 发布
+│   ├── naming-lint.sh        # Naming CI gate (NAMING §8)
+│   └── smoke-test.sh         # Acceptance shared by all three forms (§6)
+├── app/                      # Tier P custom APK (§4.4, Kotlin + jackpal terminal-library fork)
+├── third_party/              # Guides/patches (build recipes only, no vendored source)
+└── .github/workflows/andcode-ci.yml  # Baseline → bundle → audit → smoke → release
 ```
 
 ---
 
-## 6. 阶段计划与验收标准
+## 6. Phase plan and acceptance criteria
 
-| 阶段 | 内容 | 验收标准 |
+| Phase | Content | Acceptance criteria |
 |---|---|---|
-| **P0 可行性(2–3 天)** | adb 包(Tier A)手工路径:静态 busybox + sysroot + loader 包装器跑官方 opencode;同时精读 `claude-code-termux` 验证无 proot 路线;**另测 jniLibs 提取 + W^X/JSC JIT + TUI 释放行为**(Tier P 三大前提) | 在真机(任一 locked 设备)上完成一次真实编码会话;§1.3 假设逐条 ✓/✗;shim 缺口与 JIT 定级结论成形 |
-| **P1 基线与交付包(1 周)** | `baseline/` 三件套 + `bundle/pack-bundle.sh` + shim v1 + CI | 产物过 `check-compat.sh`;同一 tarball 在 Tier A、真 chroot、原生 Ubuntu 24.04 arm64 三处均可运行 |
-| **P2 Tier M(1 周)** | Magisk 模块 + service.sh 开机自启 + phantom-killer 固化 | B 类设备刷入后:重启自动 sshd,`ssh` 进会话即用;全程零第三方 App |
-| **P3 Tier P APK(2–3 周)** | APK(minSdk 31 / targetSdk 37.2)、jniLibs 打包、jackpal 终端库最小 fork、设置页、specialUse 前台服务 | A 类设备侧载一个 APK 即完成安装→认证→会话;被切后台 30 分钟进程存活;16K 页设备(或开发者选项模拟)可运行 |
-| **P4 打磨** | DNS/断网重连、OAuth 回调、`serve`+SSH 保底、多会话、发布工程(notices、F-Droid 元数据) | 冒烟矩阵全绿(见 REUSE/CI) |
+| **P0 Feasibility (2–3 days)** | Manual adb bundle (Tier A): static busybox + sysroot + loader wrapper runs official opencode; closely review `claude-code-termux` for no-proot approach; **also test jniLibs extraction + W^X/JSC JIT + TUI extraction behavior** (three Tier P prerequisites) | Complete a real coding session on any locked physical device; mark §1.3 assumptions ✓/✗ individually; establish shim gaps/JIT assessment |
+| **P1 Baseline/bundle (1 week)** | Three `baseline/` components + `bundle/pack-bundle.sh` + shim v1 + CI | Pass `check-compat.sh`; same tarball runs in Tier A, real chroot and native Ubuntu 24.04 arm64 |
+| **P2 Tier M (1 week)** | Magisk module + service.sh boot startup + persistent phantom-killer settings | After flashing class B device: reboot auto-starts sshd, `ssh` session ready to use; no third-party app throughout |
+| **P3 Tier P APK (2–3 weeks)** | APK (minSdk 31 / targetSdk 37.2), jniLibs packaging, minimal jackpal terminal fork, settings, specialUse foreground service | One sideloaded APK on class A completes install→authenticate→session; survives 30 minutes backgrounded; runs on 16K-page device (or developer-option simulation) |
+| **P4 Polish** | DNS/network reconnection, OAuth callback, `serve`+SSH fallback, multiple sessions, release engineering (notices, F-Droid metadata) | All-green smoke matrix (REUSE/CI) |
 
 ---
 
-## 7. 风险与备选
+## 7. Risks and alternatives
 
-| # | 风险 | 影响 | 备选方案 |
+| # | Risk | Impact | Alternative |
 |---|---|---|---|
-| R1 | Bun/opencode 在"无 proot 的裸 glibc sysroot"下依赖未覆盖的系统文件(shim 缺口),或 JSC 在 targetSdk 28 之外的 JIT 受限 | Tier A/P 主路径受阻 | ① P0 即实测并补全 shim;② 引入单个静态 proot 二进制做 bind(GPL-2.0 独立聚合 + 源码提供);③ Tier M 真 chroot 不受影响 |
-| R2 | Ubuntu 24.04 基线把标准设备兼容下限抬到 glibc ≥ 2.39 | 标准 Linux 目标面收窄 | ① Android 侧不受影响(bundle 自带 glibc);② 追加 Debian 12 第二基线分层发布;③ 简单工具改静态 musl |
-| R3 | targetSdk 37.2 的运行期限制:数据目录 exec 禁令、W^X/JIT、运行期释放 ELF | Tier P 主路径受阻 | ① jniLibs 提取(`lib*.so` → `nativeLibraryDir`),可执行体零落盘(§4.4);② JIT 被拒则 `BUN_JSC_useJIT=0`(性能损失,实测定级);③ opencode 若必须运行期释放 ELF 且无法指向预置副本,为其打补丁改走预置路径(补丁归 AGPL) |
-| R4 | ROM 差异(厂商杀后台、device_config 被锁) | 进程存活率 | Tier M root 固化为主推荐;`serve`+SSH 保底;主流 ROM 适配命令文档化 |
-| R5 | opencode 上游快速迭代,产物结构变化 | 维护成本 | CI 定期重跑 P0 冒烟;假设以 `scripts/smoke-test.sh` 代码化 |
-| R6 | jackpal 终端库停更、新 Android(targetSdk 35+ 行为)兼容性回归 | Tier P 终端体验 | 最小 fork 维持并完成 edge-to-edge/predictive back 适配;终端仅是入口之一,SSH/serve 保底;必要时评估 Termux 终端库(GPLv3,需独立 fork 仓库) |
-| R7 | locked 设备 adb 不可用(未开 USB 调试) | Tier A 不可用 | Tier P 不依赖 adb,作为 locked 设备默认形态 |
-| R8 | 16K 页设备上个别组件(非基线工具链产物)4K 对齐不兼容 | 部分 Android 15+ 机型失败 | 基线 glibc/Ubuntu 工具链默认 64K 对齐,理论免疫(§1.2.8);CI 加 `readelf -l` 段对齐检查;自有 NDK 代码强制 16K 对齐编译 |
-| R9 | Android 14+/15+ 对 `device_config` 写入收紧(部分 ROM 需 root) | Tier A/P 的 phantom-killer 对策退化 | 前台服务 + 会话内子进程数量控制;Tier M root 固化为主推荐形态;文档按 ROM 列差异 |
+| R1 | Bun/opencode needs uncovered system files in "bare glibc sysroot without proot" (shim gaps), or JSC JIT restricted beyond targetSdk 28 | Tier A/P main path blocked | ① Device-test/fill shim gaps in P0; ② introduce one static proot binary for bind (independent GPL-2.0 aggregation + source provision); ③ Tier M real chroot unaffected |
+| R2 | Ubuntu 24.04 raises standard-device floor to glibc ≥ 2.39 | Narrower standard Linux targets | ① Android unaffected (bundled glibc); ② add Debian 12 second baseline/release tier; ③ static musl for simple tools |
+| R3 | targetSdk 37.2 runtime constraints: data-directory exec prohibition, W^X/JIT, runtime ELF extraction | Tier P main path blocked | ① jniLibs extraction (`lib*.so` → `nativeLibraryDir`), no executable runtime writes (§4.4); ② `BUN_JSC_useJIT=0` if JIT rejected (performance cost, assess on device); ③ if opencode must extract ELF and cannot redirect, patch to prestaged paths (AGPL patch) |
+| R4 | ROM differences (vendor background killing, locked device_config) | Process survival | Prefer persistent root Tier M; `serve`+SSH fallback; document mainstream ROM adaptation commands |
+| R5 | Rapid upstream opencode changes and artifact-layout shifts | Maintenance cost | Regular CI P0 smoke reruns; encode assumptions in `scripts/smoke-test.sh` |
+| R6 | Unmaintained jackpal terminal library; new Android (targetSdk 35+ behavior) regressions | Tier P terminal experience | Maintain minimal fork with edge-to-edge/predictive-back adaptation; terminal is one entry, SSH/serve fallback; evaluate Termux terminal if needed (GPLv3, separate fork repository required) |
+| R7 | adb unavailable on locked device (USB debugging disabled) | Tier A unavailable | Tier P requires no adb and is default for locked devices |
+| R8 | Some non-baseline-toolchain components have incompatible 4K alignment on 16K devices | Failure on some Android 15+ devices | Baseline glibc/Ubuntu default 64K alignment is theoretically immune (§1.2.8); CI `readelf -l` segment checks; enforce 16K for own NDK code |
+| R9 | Android 14+/15+ restricts `device_config` writes (some ROMs require root) | Weaker Tier A/P phantom-killer mitigation | Foreground service + session child-process count control; prefer persistent root Tier M; document ROM differences |
 
 ---
 
-## 8. 明确不做的事(范围边界)
+## 8. Explicit exclusions (scope boundaries)
 
-- **不依赖 Termux/proot-distro 等第三方宿主 App**:它们至多出现在附录文档作为
-  可选替代;交付物全部自包含(静态 busybox + 自带 sysroot + dropbear + 自研 shim)。
-- 不移植到 Android 原生 Bionic(把 opencode 重链到 bionic):成本极高且破坏
-  "产物可在标准 Linux arm64 运行"的目标。
-- 不做 x86/模拟器路径:目标设备全部是 arm64。
-- 不修改 Android 系统分区:所有方案在 `/data` 与应用沙箱内完成。
+- **No dependency on third-party host apps such as Termux/proot-distro**: appendix-only optional
+  alternatives; all deliverables self-contained (static busybox + bundled sysroot + dropbear + own shim).
+- No native Android Bionic port (relinking opencode to bionic): extremely costly and defeats
+  the goal of running artifacts on standard Linux arm64.
+- No x86/emulator path: all target devices are arm64.
+- No Android system-partition modifications: all approaches stay within `/data` and app sandbox.
 
 ---
 
-## 附录:可选替代路径(非本设计主路径,仅记录)
+## Appendix: optional alternatives (record only, not the main design)
 
-- **Termux + proot-distro**:社区最成熟的宿主,适合不想侧载 APK、能装 F-Droid
-  Termux 的用户;我们的交付包理论上可直接在 proot Debian/Ubuntu 内运行
-  (`bundle/` 设计刻意不假设宿主)。详见 REUSE.md 对 Termux 系许可证义务的分析。
-- **ConnectBot 等第三方 SSH 客户端**:Tier A/M 的推荐客户端,但属可选工具,
-  不构成依赖。
+- **Termux + proot-distro**: most mature community host, for users who prefer not to sideload the APK
+  and can install F-Droid Termux. Our bundle should theoretically run directly in proot Debian/Ubuntu
+  (`bundle/` deliberately makes no host assumptions). See REUSE.md for Termux-family license obligations.
+- **Third-party SSH clients such as ConnectBot**: recommended for Tier A/M, but optional tools,
+  not dependencies.

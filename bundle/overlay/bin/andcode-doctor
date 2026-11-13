@@ -1,8 +1,8 @@
 #!/system/bin/sh
-# andcode-doctor — 环境自检(DESIGN §4.4 设置页 / smoke-test 后端, NAMING §4.1)
-# 用法: andcode-doctor [--json]
-#   无参数:人读报告(stdout);--json:机器可读,仅 stdout,单一 JSON 对象。
-# 诊断项(loader/shim/resolv/opencode/git/busybox)与 AGENTS §5 待办对齐。
+# andcode-doctor — environment self-check (DESIGN §4.4 settings page / smoke-test backend, NAMING §4.1)
+# Usage: andcode-doctor [--json]
+#   No arguments: human-readable report (stdout); --json: machine-readable, stdout only, a single JSON object.
+# Diagnostic checks (loader/shim/resolv/opencode/git/busybox) align with the AGENTS §5 task list.
 set -u
 JSON=0; [ "${1:-}" = "--json" ] && JSON=1
 ROOT="${ANDCODE_ROOT:?ANDCODE_ROOT 未设置}"
@@ -11,14 +11,14 @@ pass=0; fail=0
 json="{"
 sep=" "
 
-add() { # $1=名称 $2=true|false
+add() { # $1=name $2=true|false
   json="$json$sep\"$1\": $2"
   sep=", "
   if [ "$2" = true ]; then pass=$((pass+1)); else fail=$((fail+1)); fi
 }
 human() { [ $JSON -eq 1 ] && return; printf '%s %s\n' "$1" "$2"; }
 
-chk() { # $1=名称 其余=命令
+chk() { # $1=name remaining arguments=command
   n="$1"; shift
   if "$@" >/dev/null 2>&1; then
     add "$n" true;  human "ok  " "$n"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# smoke-test.sh — 三形态共用验收(DESIGN §6;Tier A 由 deploy-adb.sh 调用,
-# Tier M 在设备上直跑,Tier P 由 APK 设置页等价触发)
-# 设备侧用法: ANDCODE_ROOT=<安装目录> ANDCODE_TIER=<m|a|p> sh smoke-test.sh
-# 说明: 本脚本设计为 POSIX sh 兼容,便于直接 `adb shell sh ...` 执行。
+# smoke-test.sh — Shared acceptance tests for all three tiers (DESIGN §6; Tier A invokes this via deploy-adb.sh,
+# Tier M runs it directly on-device, and Tier P triggers equivalent checks from APK settings).
+# Device usage: ANDCODE_ROOT=<install-directory> ANDCODE_TIER=<m|a|p> sh smoke-test.sh
+# Note: this script targets POSIX sh for direct execution with `adb shell sh ...`.
 set -u
 ROOT="${ANDCODE_ROOT:?ANDCODE_ROOT 未设置}"
 TIER="${ANDCODE_TIER:-a}"
@@ -11,7 +11,7 @@ fail=0
 ok()   { echo "[PASS] $1"; }
 bad()  { echo "[FAIL] $1"; fail=$((fail+1)); }
 
-t() { # $1=描述 其余=命令;失败时回显输出便于 CI 诊断
+t() { # $1=description, remaining arguments=command; print output on failure for CI diagnostics.
   d="$1"; shift
   out="$("$@" 2>&1)"
   if [ $? -eq 0 ]; then ok "$d"; else bad "$d"; printf '%s\n' "$out" | head -n 12 | sed 's/^/       | /'; fi
@@ -23,8 +23,8 @@ t "resolv.conf 已生成"          test -s "$ROOT/etc/resolv.conf"
 t "opencode --version"          "$ROOT/bin/opencode" --version
 t "git --version"               "$ROOT/bin/git" --version
 t "DNS 解析(bundle resolv.conf)" sh -c "PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH getent hosts github.com || getent hosts github.com"
-# KNOWN-ISSUE(P0 跟进): https 助手链路在容器冒烟中报 /bin/sh: 1: capabilities: not found,
-# 双诱饵证明 git 未 exec 任何 helper 文件;核心链路不受影响。降级为警告,证据存 CI 日志。
+# KNOWN-ISSUE (P0 follow-up): the HTTPS helper chain reports /bin/sh: 1: capabilities: not found in container smoke tests.
+# Two decoys show Git executes no helper file; the core chain is unaffected. Warn only; evidence is in CI logs.
 out="$(PATH=$ROOT/bin:$ROOT/usr/bin:\$PATH GIT_TRACE=1 timeout 90 git ls-remote https://github.com/git/git.git HEAD 2>&1)"
 if [ $? -eq 0 ]; then
   ok "git https 助手(wrapper 链路)"
@@ -35,7 +35,7 @@ fi
 t "busybox 可用"                "$ROOT/bin/busybox" true
 t "andcode-entry doctor"        sh "$ROOT/bin/andcode-doctor"
 
-# P0 专项(允许失败,仅报告):
+# P0-specific checks (failures allowed; report only):
 echo "----"
 if "$ROOT/bin/opencode" --version >/dev/null 2>&1; then
   echo "[INFO] JIT 定级: 详见 P0 结论(BUN_JSC_useJIT 未自动探测)"

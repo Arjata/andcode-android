@@ -282,8 +282,8 @@ final class RootfsInstaller {
         if (!isDir && published.contains(name)) {
             throw new IOException("Duplicate tar entry: " + name);
         }
-        // 链接祖先解析:Ubuntu 树存在 bin -> usr/bin 等目录符号链接;解析整条
-        // 祖先链,只要最终落点仍在 root 内就放行(逃逸或环路才拒绝)。
+        // Resolve ancestor links: Ubuntu has directory symlinks such as bin -> usr/bin.
+        // Allow the full ancestor chain if its final target stays inside root; reject escapes or cycles.
         if (resolveWithinRoot(name, symlinks) == null) {
             throw new IOException("Escaping symlink ancestor rejected: " + name);
         }

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-proot-verify.sh — proot 内 /etc 可见性与 DNS 分层验证
+# dev-proot-verify.sh — Verify /etc visibility inside proot and layered DNS behavior
 ROOT=/data/local/tmp/andcode
 P="$ROOT/usr/lib/proot/proot"
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a

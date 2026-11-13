@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-full-session.sh — 全自治: serve 常驻 + 建会话 + glm/gpt-oss 模型循环
+# dev-full-session.sh — Fully autonomous: persistent serve + session creation + glm/gpt-oss model loop
 ROOT=/data/local/tmp/andcode
 P="$ROOT/usr/lib/proot/proot"
 BB="$ROOT/bin/busybox"

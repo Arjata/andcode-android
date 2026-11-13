@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-git-https.sh — 真机 git https 链路验证(Tier A)v2
+# dev-git-https.sh — Device Git HTTPS chain verification (Tier A), v2
 ROOT=/data/local/tmp/andcode
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a
 export PATH="$ROOT/bin:$ROOT/usr/bin:$ROOT/usr/libexec/git-core:$PATH"

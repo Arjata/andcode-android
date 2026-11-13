@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-git-proot.sh — Tier A 修复验证:proot bind /etc + git ls-remote https
+# dev-git-proot.sh — Tier A fix verification: proot bind /etc + git ls-remote HTTPS
 ROOT=/data/local/tmp/andcode
 P=/data/local/tmp/andcode-proot
 export ANDCODE_ROOT="$ROOT" ANDCODE_TIER=a

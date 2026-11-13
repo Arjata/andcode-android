@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- WebView 内容层:悬浮球由代码挂到本层(需要 content 引用做拖拽边界) -->
+    <!-- WebView content layer: code attaches the floating ball here (content defines the drag bounds). -->
     <FrameLayout
         android:id="@+id/webContent"
         android:layout_width="match_parent"

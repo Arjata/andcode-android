@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# andcode-entry — bundle 统一入口(DESIGN §4.1, NAMING §4.2)
-# 用法: andcode-entry <sshd|shell|doctor> [args...]
+# andcode-entry — unified bundle entry point (DESIGN §4.1, NAMING §4.2)
+# Usage: andcode-entry <sshd|shell|doctor> [args...]
 set -eu
 
 ROOT="${ANDCODE_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
@@ -17,7 +17,7 @@ case "$cmd" in
     ;;
   sshd)
     "$ROOT/sbin/andcode-mkresolv" >/dev/null
-    # dropbear 由 pack-bundle 包装(ELF 在 sbin/dropbear.bin,包装器 sbin/dropbear)
+    # dropbear is wrapped by pack-bundle (ELF at sbin/dropbear.bin, wrapper at sbin/dropbear)
     HK="$ROOT/etc/dropbear_host_key"
     [ -f "$HK" ] || "$ROOT/sbin/dropbearkey" -t ed25519 -f "$HK"
     exec "$ROOT/sbin/dropbear" -r "$HK" -p 127.0.0.1:2222 -A -N "$ROOT/home" "$@"

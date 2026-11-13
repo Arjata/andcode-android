@@ -8,7 +8,7 @@
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <!-- 抽屉头部:品牌区 -->
+    <!-- Drawer header: branding area. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

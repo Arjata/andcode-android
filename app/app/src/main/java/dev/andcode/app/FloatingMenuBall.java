@@ -13,14 +13,14 @@ import androidx.appcompat.widget.AppCompatImageButton;
 import com.google.android.material.color.MaterialColors;
 
 /**
- * 悬浮抽屉球(自 andapi FloatingMenuBall 移植):悬浮在全屏 WebView 上的
- * 可拖拽菜单入口。完全可拖动;松手吸附到最近左右边缘并自动隐藏
- * (半滑出屏幕 + 变暗),避免压在页面自己的头部菜单上——触摸即恢复显示
- * (隐藏态第一击只恢复,第二击才触发 onOpen)。停靠边与纵向位置持久化
- * 在 "andcode_ui" 偏好里,多页面共用同一位置。
+ * Floating drawer ball (ported from andapi FloatingMenuBall): a draggable menu
+ * entry over the fullscreen WebView. On release, it snaps to the nearest side
+ * and hides (half offscreen and dimmed), avoiding the page's own header menu.
+ * Touch to reveal: the first tap only reveals it, and the second invokes onOpen.
+ * Docking side and vertical position persist in "andcode_ui" preferences across pages.
  *
- * API 29+ 将自身矩形从系统返回手势区排除:贴边停靠时球位于手势 inset
- * 内,若不排除,起手拖动会被系统返回手势吞掉。
+ * On API 29+, exclude its rectangle from system back gestures: when docked,
+ * it sits within the gesture inset, which would otherwise intercept the initial drag.
  */
 public class FloatingMenuBall extends AppCompatImageButton {
 
@@ -81,7 +81,7 @@ public class FloatingMenuBall extends AppCompatImageButton {
                     float dx = ev.getRawX() - mDownRawX;
                     float dy = ev.getRawY() - mDownRawY;
                     if (!mDragging && (Math.abs(dx) > mSlop || Math.abs(dy) > mSlop)) {
-                        // 离开点击区:先吸附到已恢复的停靠位再拖,避免跳动
+                        // Leaving the tap region: snap to the revealed dock position before dragging to avoid jumps.
                         mDragging = true;
                         reveal();
                         mDownRawX = ev.getRawX();
@@ -100,7 +100,7 @@ public class FloatingMenuBall extends AppCompatImageButton {
                         if (!mWasHiddenOnDown) {
                             v.performClick();
                         }
-                        // 隐藏态第一击只恢复显示(见 reveal),第二击才开抽屉
+                        // The first tap while hidden only reveals it (see reveal); the second opens the drawer.
                     } else {
                         mSide = (v.getTranslationX() + v.getWidth() / 2f
                             < mContent.getWidth() / 2f) ? SIDE_LEFT : SIDE_RIGHT;
@@ -127,7 +127,7 @@ public class FloatingMenuBall extends AppCompatImageButton {
 
     private float maxY() { return Math.max(mContent.getHeight() - getHeight(), 0f); }
 
-    /** [side] 侧的停靠 x;隐藏态再向屏幕外滑出半个球 */
+    /** Docked x coordinate on [side]; slide half the ball offscreen when hidden. */
     private float dockX(boolean revealed) {
         if (mSide == SIDE_LEFT) {
             return revealed ? 0f : -getWidth() * BALL_HIDE_SLIDE;
@@ -151,7 +151,7 @@ public class FloatingMenuBall extends AppCompatImageButton {
         updateGestureExclusion();
     }
 
-    /** 保证球在系统返回手势 inset 内仍可用(坐标为 view 本地空间,系统自行换算) */
+    /** Keep the ball usable within the back-gesture inset (view-local coordinates; the system converts them). */
     private void updateGestureExclusion() {
         if (Build.VERSION.SDK_INT < 29) return;
         setSystemGestureExclusionRects(

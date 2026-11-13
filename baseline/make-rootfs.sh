@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# make-rootfs.sh — 生成 Ubuntu 24.04 (noble) arm64 基线 rootfs(DESIGN §3.2)
-# 用法:
+# make-rootfs.sh — Generate the Ubuntu 24.04 (noble) arm64 baseline rootfs (DESIGN §3.2)
+# Usage:
 #   make-rootfs.sh <output-dir>
-# 环境(二选一):
-#   a) arm64 原生(debootstrap 直接跑)
-#   b) x86 PC:需 binfmt + qemu-user-static(Dockerfile 镜像已含)
-# 注意:PC 上更快的替代是 `docker export ubuntu:24.04`(CI 采用该路径),本脚本
-#       供设备端/离线场景使用,产物与 Docker 路径同为官方 noble 用户态。
+# Environment (choose one):
+#   a) Native arm64 (run debootstrap directly)
+#   b) x86 PC: requires binfmt + qemu-user-static (included in the Dockerfile image)
+# Note: `docker export ubuntu:24.04` is faster on PCs (used by CI). This script
+#       supports device/offline use; both paths provide the official noble userland.
 set -euo pipefail
 
 OUT="${1:?usage: make-rootfs.sh <output-dir>}"
@@ -22,7 +22,7 @@ debootstrap --arch="$ARCH" --variant=minbase --include=ca-certificates,git,zstd,
   "$SUITE" "$OUT" "$MIRROR"
 
 rm -rf "$OUT/debootstrap"
-# chroot 内 DNS(供构建期使用;交付包的 etc/ 由 andcode-mkresolv 运行期生成)
+# DNS inside chroot (build-time only; andcode-mkresolv generates the bundle's etc/ at runtime)
 printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "$OUT/etc/resolv.conf"
 
 echo "rootfs 就绪: $OUT"

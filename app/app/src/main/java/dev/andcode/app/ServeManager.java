@@ -17,15 +17,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 托管 opencode V2 serve 进程(桌面级 Web UI 的后端,DESIGN §4 Tier P)。
+ * Manage the opencode V2 serve process (desktop Web UI backend, DESIGN §4 Tier P).
  *
- * - 二进制执行走 bundle 的补丁 loader(seccomp 兼容,见 scripts/patch-seccomp.sh):
+ * - Execute binaries through the bundle's patched loader (seccomp compatibility; see scripts/patch-seccomp.sh):
  *   <LD> --library-path <LIB> --inhibit-cache <OC2> serve --port 4096 --hostname 127.0.0.1
  * - Parse the server password from stdout; drain output to files/oc2-serve.log
  *   without writing password lines to the log.
- * - 就绪判定:GET http://127.0.0.1:4096/ 返回 200。
- * - 兼容两种部署:jniLibs(nativeLibraryDir/libandcode-oc2.so + 同目录补丁 loader)
- *   或开发期 /data/local/tmp(与 scripts/app-launch-oc.sh 同环境)。
+ * - Readiness: GET http://127.0.0.1:4096/ returns 200.
+ * - Support jniLibs (nativeLibraryDir/libandcode-oc2.so and a patched loader alongside it)
+ *   or development deployment in /data/local/tmp (same environment as scripts/app-launch-oc.sh).
  */
 public final class ServeManager {
 
@@ -36,7 +36,7 @@ public final class ServeManager {
     private static volatile boolean sStarting;
     private static Process sProcess;
 
-    /** 就绪回调(主线程) */
+    /** Readiness callback (main thread). */
     public interface ReadyCallback {
         void onReady(String password);
         void onFailed(String reason);
@@ -55,12 +55,12 @@ public final class ServeManager {
             name -> app.getAssets().open("andcode-runtime/" + name)).toFile();
     }
 
-    /** 当前已知密码(可能为 null:server 是上一轮遗留、stdout 未见) */
+    /** Currently known password (may be null for a leftover server whose stdout was not observed). */
     public static synchronized String getPassword() {
         return sPassword;
     }
 
-    /** 探测 server 是否已就绪 */
+    /** Probe whether the server is ready. */
     public static boolean ping() {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(BASE_URL + "/").openConnection();
@@ -74,7 +74,7 @@ public final class ServeManager {
         }
     }
 
-    /** 异步探测,主线程回调(主页状态轮询用) */
+    /** Asynchronous probe with a main-thread callback (for home-page status polling). */
     public static void pingAsync(java.util.function.Consumer<Boolean> cb) {
         new Thread(() -> {
             final boolean up = ping();
@@ -83,9 +83,9 @@ public final class ServeManager {
     }
 
     /**
-     * 停止 serve:优先销毁本进程拉起的子进程;遗留实例(如 run-as 起的)
-     * 退而 pkill 兜底。停止后旧 password 即失效,一并清空;
-     * 同时复位 sStarting,保证随后可立即再次启动。
+     * Stop serve: destroy our own child process first, falling back to pkill for leftover
+     * instances (such as those started by run-as). Clear the now-invalid password as well.
+     * Reset sStarting so another startup can begin immediately.
      */
     public static synchronized void stop(Context ctx) {
         Process p = sProcess;
@@ -120,13 +120,13 @@ public final class ServeManager {
     }
 
     /**
-     * 确保 serve 已启动并在就绪后回调。若已在运行则直接回调成功。
-     * 幂等:并发调用只触发一次启动流程。
+     * Ensure serve is started and invoke the callback when ready; report success immediately if already running.
+     * Idempotent: concurrent calls trigger only one startup sequence.
      */
     public static void ensureStarted(Context ctx, ReadyCallback cb) {
         synchronized (ServeManager.class) {
             if (sStarting) {
-                // 已有启动流程在跑,轮询等它完成
+                // A startup sequence is already running; poll until it completes.
                 waitReady(cb, null);
                 return;
             }
@@ -135,7 +135,7 @@ public final class ServeManager {
         final Context app = ctx.getApplicationContext();
         new Thread(() -> {
             android.util.Log.i("andcode", "ensureStarted: starter thread running");
-            // 初始探测也在后台做(ping 是网络调用,禁止主线程)
+            // Run the initial probe in the background too (ping is a network call, forbidden on the main thread).
             if (ping()) {
                 synchronized (ServeManager.class) { sStarting = false; }
                 runOnMain(() -> cb.onReady(sPassword));
@@ -158,7 +158,7 @@ public final class ServeManager {
         }, "oc2-serve-starter").start();
     }
 
-    /** 启动 serve 子进程;返回 null=成功,否则错误信息 */
+    /** Start the serve child process; return null on success, otherwise an error message. */
     private static String spawn(Context app) throws IOException {
         File files = app.getFilesDir();
         File runtime = prepareRuntime(app);
@@ -169,7 +169,7 @@ public final class ServeManager {
         if (!cfg.isDirectory()) cfg.mkdirs();
         if (!tmp.isDirectory()) tmp.mkdirs();
         if (!demo.isDirectory()) demo.mkdirs();
-        // 配置迁移:bundle 内预置 opencode.json(provider/key)→ 应用 HOME(仅首次)
+        // Migrate bundled opencode.json (provider/key) to app HOME on the first run only.
         File dstCfg = new File(cfg, "opencode.json");
         if (runtime == null && !dstCfg.exists()) {
             File srcCfg = new File("/data/local/tmp/andcode/home/.config/opencode/opencode.json");
@@ -237,17 +237,17 @@ public final class ServeManager {
         env.put("PATH", root + "/bin:" + root + "/usr/bin:/system/bin");
         env.put("HOME", home.getAbsolutePath());
         env.put("TMPDIR", tmp.getAbsolutePath());
-        env.put("BUN_TMPDIR", tmp.getAbsolutePath()); // Bun 内嵌原生库提取目录,必须应用可写
+        env.put("BUN_TMPDIR", tmp.getAbsolutePath()); // Bun embedded native library extraction directory; must be app-writable.
         env.put("ANDCODE_IN_PROOT", "1");
-        env.put("GLIBC_TUNABLES", "glibc.pthread.rseq=0"); // zygote seccomp 对 rseq 直接 SIGSYS
-        env.put("LD_LIBRARY_PATH", p.lib); // glibc 子进程(opencode-pty、git 等)的库解析
-        // opencode-pty 插件二进制"预置副本 + 指路"(DESIGN §1.2):官方支持
-        // OPENCODE_PTY_BIN 覆盖(packages/core/src/persistent-pty/binary.bun.ts
-        // resolveBinary 首行),设置后跳过缓存目录下载/校验,直接 exec 指定路径——
-        // 避开应用域禁 exec 应用数据文件的 targetSdk 37.2 约束(EACCES posix_spawn)
+        env.put("GLIBC_TUNABLES", "glibc.pthread.rseq=0"); // Zygote seccomp immediately raises SIGSYS for rseq.
+        env.put("LD_LIBRARY_PATH", p.lib); // Library resolution for glibc children (opencode-pty, git, etc.).
+        // Bundle and point to the opencode-pty plugin binary (DESIGN §1.2): upstream supports
+        // OPENCODE_PTY_BIN (first line of resolveBinary in packages/core/src/persistent-pty/binary.bun.ts).
+        // Setting it skips cache-directory downloads/verification and directly executes the specified path,
+        // avoiding targetSdk 37.2 restrictions on executing app-data files (EACCES posix_spawn).
         String ptyBin = ptyBinPath(app);
         if (ptyBin != null) env.put("OPENCODE_PTY_BIN", ptyBin);
-        // v0.4.0 默认把 socket 放在 /tmp(忽略 TMPDIR),Android 下不可写。
+        // v0.4.0 defaults to sockets in /tmp (ignoring TMPDIR), which is not writable on Android.
         env.put("OPENCODE_PTY_SOCKET_DIR", ptySocketDir(app));
 
         // Never inherit a disabled TLS verifier from the surrounding app process.
@@ -260,7 +260,7 @@ public final class ServeManager {
         // local mixed-port proxy; TLS verification is never disabled and CA
         // trust stays with the CustomCa NODE_EXTRA_CA_CERTS mechanism below.
         if (AppSettings.serveLoopbackProxy(app)) {
-            // 代理地址与协议由用户配置;未配置时不注入任何假设值。
+            // Users configure the proxy address and scheme; do not inject assumed values when unset.
             String proxy = AppSettings.proxyUrl(app).trim();
             if (!proxy.isEmpty()) {
                 env.put("http_proxy", proxy);
@@ -292,9 +292,9 @@ public final class ServeManager {
         File rootfs = new File(files, "proot-rootfs");
         android.util.Log.i("andcode", "prootServe: rootfs gate=" + rootfs);
         if (!new File(rootfs, "usr/bin/bash").isFile()) {
-            // 单 APK(DESIGN v0.4.55):实例缺失时先从内置 canonical rootfs 归档
-            // 提取(本线程即 oc2-serve-starter 后台线程,主页处于"启动中"状态);
-            // 无内置载荷的开发构建保留原报错。
+            // Single APK (DESIGN v0.4.55): extract a missing instance from the bundled canonical rootfs
+            // archive first (on this oc2-serve-starter background thread, while home shows the starting state).
+            // Development builds without a bundled payload retain the original error.
             try {
                 android.util.Log.i("andcode", "prootServe: auto-install starting");
                 RootfsInstaller.logger = message ->
@@ -330,7 +330,7 @@ public final class ServeManager {
             "-b", exe + ":/mnt/andcode-exe",
             "-b", farm + ":/mnt/andcode-farm",
             "-b", new File(files, "home").getAbsolutePath() + ":/root"));
-        // 设备存储:FUSE 视图受平台权限约束(Download/媒体已实测可读写)。
+        // Device storage: the FUSE view follows platform permissions (Download/media read/write tested).
         File sdcard = new File("/storage/emulated/0");
         if (sdcard.isDirectory()) {
             cmd.add("-b");
@@ -398,9 +398,9 @@ public final class ServeManager {
     }
 
     /**
-     * 轮询就绪(最长 40s)。serve 进程退出则快速失败(附日志尾部定位原因)。
-     * 无论成功失败,结束时都复位 sStarting——否则停止后再启动会永远
-     * 走进"已有启动流程"分支,卡 40s 超时(修复:重启失败且无原因)。
+     * Poll readiness for up to 40s. Fail fast if serve exits, including the log tail for diagnosis.
+     * Reset sStarting on both success and failure; otherwise, restarting after a stop always enters
+     * the existing-startup branch and times out after 40s (fixes unexplained restart failure).
      */
     private static void waitReady(ReadyCallback cb, File log) {
         new Thread(() -> {
@@ -412,7 +412,7 @@ public final class ServeManager {
                 }
                 Process p = sProcess;
                 if (p != null && !p.isAlive()) {
-                    // 进程已退出:再观察 1.5s 确认没有残留监听,然后快速失败
+                    // Process exited: watch for another 1.5s for a remaining listener, then fail fast.
                     long grace = System.currentTimeMillis() + 1_500;
                     boolean revived = false;
                     while (System.currentTimeMillis() < grace) {
@@ -428,7 +428,7 @@ public final class ServeManager {
         }, "oc2-serve-wait").start();
     }
 
-    /** 结束一次启动流程:复位 sStarting 并主线程回调 */
+    /** Finish a startup sequence: reset sStarting and invoke the callback on the main thread. */
     private static void finishStart(ReadyCallback cb, String failure) {
         synchronized (ServeManager.class) { sStarting = false; }
         if (failure == null) {
@@ -438,7 +438,7 @@ public final class ServeManager {
         }
     }
 
-    /** serve 日志尾部(末尾 4KB 内最后 3 行,截 200 字符),失败时给界面展示原因 */
+    /** serve log tail (last 3 lines within the final 4KB, capped at 200 characters) for displaying failure reasons. */
     private static String tailOfLog(File log) {
         if (log == null || !log.exists()) return "";
         try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(log, "r")) {
@@ -478,10 +478,10 @@ public final class ServeManager {
     }
 
     /**
-     * opencode-pty 预置副本路径(指路用,见 spawn 内 OPENCODE_PTY_BIN 注释):
-     * 优先 jniLibs(Tier P,打包链须已完成 interp 改写),回退
-     * /data/local/tmp 开发部署(interp 已指向 /data/local/tmp/ld、
-     * 库解析走 LD_LIBRARY_PATH)。null = 无预置副本(首次会 EACCES)。
+     * Bundled opencode-pty path (see OPENCODE_PTY_BIN comments in spawn):
+     * prefer jniLibs (Tier P; packaging must have rewritten interp), then fall back to
+     * development deployment in /data/local/tmp (interp points to /data/local/tmp/ld,
+     * with libraries resolved via LD_LIBRARY_PATH). Null means no bundled copy (first run hits EACCES).
      */
     static String ptyBinPath(Context app) {
         String nat = app.getApplicationInfo().nativeLibraryDir;
@@ -494,9 +494,9 @@ public final class ServeManager {
         return f.exists() ? f.getAbsolutePath() : null;
     }
 
-    /** 短且应用私有的 socket 基目录;与上游追加的 uid/hash 后缀一起检查 sun_path。 */
+    /** Short, app-private socket base directory; check sun_path including the upstream uid/hash suffix. */
     static String ptySocketDir(Context app) {
-        // 不放 cacheDir:缓存清理可能 unlink 活跃 socket,导致新连接 ENOENT。
+        // Avoid cacheDir: cache cleanup may unlink active sockets, causing ENOENT for new connections.
         String base = app.getFilesDir().getAbsolutePath();
         String socket = base + "/opencode-pty-" + android.os.Process.myUid()
             + "/00000000000000000000000000000000.sock";
@@ -506,7 +506,7 @@ public final class ServeManager {
         return base;
     }
 
-    /** 二进制/loader 路径解析:优先 jniLibs,回退 /data/local/tmp 开发部署(终端页复用) */
+    /** Resolve binary/loader paths: prefer jniLibs, then /data/local/tmp development deployment (shared by the terminal page). */
     static Paths resolvePaths(Context app) {
         List<Paths> candidates = new ArrayList<>();
          // 1) jniLibs V2 deployment. Loader name follows NAMING §6.2;
@@ -523,7 +523,7 @@ public final class ServeManager {
                 nat,
                 nat + "/libandcode-oc2.so"));
         }
-        // 2) 开发期:/data/local/tmp(与 scripts/app-launch-oc.sh / Tier A 同部署)
+        // 2) Development: /data/local/tmp (same deployment as scripts/app-launch-oc.sh / Tier A).
         candidates.add(new Paths(
             "/data/local/tmp/andcode/lib/ld-linux-aarch64.so.1",
             "/data/local/tmp/andcode/lib",

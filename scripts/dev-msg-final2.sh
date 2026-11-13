@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# dev-msg-final2.sh — busybox 绝对路径 + 完整模型循环触发
+# dev-msg-final2.sh — Absolute busybox path + full model loop trigger
 ROOT=/data/local/tmp/andcode
 BB="$ROOT/bin/busybox"
 SID=$(sed 's/.*"id":"\([^"]*\)".*/\1/' /data/local/tmp/sess.json)

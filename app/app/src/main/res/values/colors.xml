@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 状态点配色(对齐 andapi 语义:绿=运行 黄=过渡 灰=停止 红=异常) -->
+    <!-- Status dot colors (matching andapi: green=running, yellow=transitioning, gray=stopped, red=error). -->
     <color name="dot_green">#3DDC84</color>
     <color name="dot_amber">#FFB300</color>
     <color name="dot_gray">#9E9E9E</color>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Material 3 主题(对齐 andapi 布局体系);终端页覆写黑色窗口背景 -->
+    <!-- Material 3 theme (matching andapi layouts); the terminal page overrides the window background to black. -->
     <style name="Theme.AndCode" parent="Theme.Material3.DayNight.NoActionBar" />
 
     <style name="Theme.AndCode.Terminal">

@@ -1,11 +1,11 @@
 # NOTICE — vendored terminal components (GPLv3)
 
-本目录 `terminal-emulator/` 与 `terminal-view/` 源码取自
-https://github.com/termux/termux-app(terminal-emulator、terminal-view 模块),
-以 **GPLv3** 许可发布。
+The `terminal-emulator/` and `terminal-view/` source code in this directory comes from
+https://github.com/termux/termux-app (the terminal-emulator and terminal-view modules),
+released under **GPLv3**.
 
-依 GPLv3 与 AGPL-3.0 的单向兼容性,上述代码并入本项目(AGPL-3.0-only)后,
-**合并后作品整体仍以 AGPL-3.0-only 提供**(向上游用户交付对应源码)。
-原始版权声明保留于各源文件头部。
+Under the one-way compatibility between GPLv3 and AGPL-3.0, after incorporating this code into this project (AGPL-3.0-only),
+**the combined work as a whole remains available under AGPL-3.0-only** (with corresponding source made available to recipients of the combined work).
+Original copyright notices are retained in the headers of the respective source files.
 
-上游版权 © Termux contributors。
+Upstream copyright © Termux contributors.

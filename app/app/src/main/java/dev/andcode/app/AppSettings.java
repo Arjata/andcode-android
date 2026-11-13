@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import java.io.File;
 
-/** 应用级偏好;不与上游 opencode 配置或凭据混用。 */
+/** App-level preferences, separate from upstream opencode configuration and credentials. */
 public final class AppSettings {
     private AppSettings() {}
 
@@ -32,7 +32,7 @@ public final class AppSettings {
         return prefs(context).getString("custom-ca-sha256", "");
     }
 
-    /** 终端后端:未显式选择时,canonical rootfs 就绪即自动进入 Ubuntu(单 APK 默认)。 */
+    /** Terminal backend: without an explicit choice, use Ubuntu when the canonical rootfs is ready (single-APK default). */
     static boolean ubuntuTerminal(Context context) {
         String v = prefs(context).getString("terminal-backend", null);
         if (v != null) return "ubuntu-proot".equals(v);
@@ -48,7 +48,7 @@ public final class AppSettings {
         return prefs(context).getBoolean("serve-loopback-proxy", false);
     }
 
-    /** 用户配置的代理 URL(含协议,如 http:// 或 socks5://);空 = 未配置,不注入。 */
+    /** User-configured proxy URL including its scheme, such as http:// or socks5://; empty means unset, with no injection. */
     static String proxyUrl(Context context) {
         return prefs(context).getString("proxy-url", "");
     }

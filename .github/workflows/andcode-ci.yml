@@ -103,7 +103,7 @@ jobs:
         run: python3 scripts/repair-elf-verdef.test.py
       - name: Seccomp patch exact bytes, idempotence and legacy migration
         run: python3 scripts/patch-seccomp.test.py
-      - name: 项目 ZIP 安全与导出往返测试(平台 JDK,无第三方测试依赖)
+      - name: Project ZIP safety and export round-trip tests (platform JDK, no third-party test dependencies)
         run: |
           mkdir -p "$RUNNER_TEMP/archive-tests"
           javac -encoding UTF-8 -d "$RUNNER_TEMP/archive-tests" \
@@ -133,7 +133,7 @@ jobs:
           java -cp "$RUNNER_TEMP/runtime-tests" dev.andcode.app.RuntimePayloadTest
 
   build-bundle:
-    # 与基线发行版同构(DESIGN §3.2 入口 3),无需 QEMU
+    # Matches the baseline distribution architecture (DESIGN §3.2, entry 3); no QEMU needed.
     runs-on: ubuntu-24.04-arm
     env:
       MAX_GLIBC: "2.39"
@@ -151,23 +151,23 @@ jobs:
             getent hosts ports.ubuntu.com
           fi
 
-      - name: 仓库卫生(LFS 规则,docs/LFS.md §4)
+      - name: Repository hygiene (LFS rules, docs/LFS.md §4)
         run: bash scripts/lfs-check.sh "$GITHUB_WORKSPACE"
 
-      - name: 打包与 seccomp 脚本语法
+      - name: Packaging and seccomp script syntax
         run: |
           bash -n bundle/pack-bundle.sh
           bash -n bundle/pack-apk-libs.sh
           bash -n scripts/patch-seccomp.sh
           sh -n bundle/wrapper.sh.tpl
 
-      - name: 生成基线 rootfs(docker export ubuntu:24.04,arm64 原生)
+      - name: Generate baseline rootfs (docker export ubuntu:24.04, native arm64)
         run: |
           docker pull --platform linux/arm64 ubuntu:24.04
           # Runner DNS has flapped repeatedly; pin public resolvers as fallback.
           CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
-          # 基线必须含 ca-certificates(git/https)与 zstd;纯净镜像没有
+          # The baseline needs ca-certificates (git/HTTPS) and zstd; the pristine image lacks them.
           docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq ca-certificates zstd bash libtinfo6 >/dev/null"
           mkdir -p work
           docker export $CID -o work/rootfs.tar
@@ -176,7 +176,7 @@ jobs:
           tar -xf work/rootfs.tar -C work/rootfs
           test -s work/rootfs/etc/ssl/certs/ca-certificates.crt
 
-      - name: 收录基线 Bash 与许可证(不依赖第三方宿主)
+      - name: Include baseline Bash and licenses (no third-party host dependency)
         run: |
           mkdir -p work/stage/bin work/stage/etc/third-party
           cp work/rootfs/usr/bin/bash work/stage/bin/bash
@@ -184,9 +184,9 @@ jobs:
           cp -L work/rootfs/usr/share/doc/libtinfo6/copyright work/stage/etc/third-party/ncurses-copyright
           cp work/rootfs/usr/share/common-licenses/GPL-3 work/stage/etc/third-party/gpl-3
 
-      - name: 获取 opencode 官方 linux-arm64 产物(P0 冒烟对象)
+      - name: Fetch official opencode linux-arm64 artifact (P0 smoke-test target)
         run: |
-          # 资产名经 2026-11-06 API 实测核实:v1.19.5 起为 opencode-linux-arm64.tar.gz(glibc)
+          # Asset name verified via API on 2026-11-06: opencode-linux-arm64.tar.gz (glibc) since v1.19.5.
           ASSET=$(curl -fsSL https://api.github.com/repos/sst/opencode/releases/latest \
             | jq -r '.assets[] | select(.name == "opencode-linux-arm64.tar.gz") | .browser_download_url')
           [ -n "$ASSET" ] || { curl -fsSL https://api.github.com/repos/sst/opencode/releases/latest \
@@ -202,9 +202,9 @@ jobs:
           cp "$BIN" work/stage/bin/opencode
           echo "opencode ELF: $BIN"
 
-      - name: 获取静态 busybox(Alpine busybox-static 包,musl 静态;来源记入 manifest)
+      - name: Fetch static busybox (Alpine busybox-static package, static musl; source recorded in manifest)
         run: |
-          # 注意: alpine:3.19 的 /bin/busybox 是动态链接 musl;busybox-static 包提供 /bin/busybox.static
+          # Note: alpine:3.19 /bin/busybox uses dynamic musl; busybox-static provides /bin/busybox.static.
           docker run --rm --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 \
             -v "$PWD/work:/out" alpine:3.19 \
             sh -c "apk update -q && apk add -q busybox-static && cp /bin/busybox.static /out/busybox-arm64"
@@ -227,23 +227,23 @@ jobs:
           curl -fLSs https://raw.githubusercontent.com/anomalyco/opencode/v2.2.6/LICENSE -o work/stage/etc/third-party/opencode-v2-license
           cp work/pty/opencode-pty-0.4.0-aarch64-unknown-linux-gnu/LICENSE work/stage/etc/third-party/opencode-pty-license
 
-      - name: 获取 git 前缀(容器内复制,保 GIT_EXEC_PATH 结构)
+      - name: Fetch Git prefix (copy from container, preserve GIT_EXEC_PATH layout)
         run: |
           CID=$(docker create --platform linux/arm64 --dns 8.8.8.8 --dns 1.1.1.1 ubuntu:24.04 sleep infinity)
           docker start $CID && sleep 1
           docker exec $CID bash -c "apt-get update -qq && apt-get install -y -qq git >/dev/null"
-          # 只取 git 家族二进制(/usr/bin/git 与 git-* 助手);/usr/bin 全量拷贝会带入 apt/dpkg
+          # Copy only Git binaries (/usr/bin/git and git-* helpers); copying all of /usr/bin would include apt/dpkg.
           docker exec $CID bash -c "mkdir -p /tmp/gitbin && cp -a /usr/bin/git /usr/bin/git-* /tmp/gitbin/ 2>/dev/null || true"
           mkdir -p work/stage/usr/bin work/stage/usr/libexec work/git-libs
           docker cp $CID:/tmp/gitbin/. work/stage/usr/bin/
           docker cp $CID:/usr/libexec/git-core work/stage/usr/libexec/git-core 2>/dev/null \
             || { docker exec $CID mkdir -p /usr/libexec && docker cp $CID:/usr/lib/git-core work/stage/usr/libexec/git-core; }
-          # git 的私有依赖(libcurl-gnutls/libexpat 等)在 git 容器,rootfs 里没有;
-          # 作为解析源交给 pack-bundle(--extralib),不进 bundle 树
+          # Git's private dependencies (libcurl-gnutls/libexpat, etc.) are in the Git container, not rootfs;
+          # pass them to pack-bundle (--extralib) as a resolution source, outside the bundle tree.
           docker cp $CID:/usr/lib/aarch64-linux-gnu work/git-libs/aarch64-linux-gnu
           docker rm -f $CID
 
-      - name: 获取 proot(Termux bionic 构建,Tier A/M /etc 重定向正解)
+      - name: Fetch proot (Termux bionic build, Tier A/M /etc redirection solution)
         run: |
           mkdir -p work/proot work/proot-x
           curl -sL -o work/proot/proot.deb "https://packages.termux.dev/apt/termux-main/pool/main/p/proot/proot_5.1.107.102_aarch64.deb"
@@ -264,7 +264,7 @@ jobs:
           cp $S/lib/libandroid-shmem.so work/proot-dir/lib/
           chmod 0755 work/proot-dir/proot work/proot-dir/libexec/proot/loader
 
-      - name: 组装 bundle
+      - name: Assemble bundle
         run: |
           # Runner DNS flaps silently broke installs hidden behind "|| true";
           # retry visibly and fail early when the toolchain is unavailable.
@@ -288,19 +288,19 @@ jobs:
             --shebang /bin/sh \
             --name v0.1.1
 
-      - name: 诊断 git 助手链路(定位 capabilities not found)
+      - name: Diagnose Git helper chain (locate capabilities not found)
         run: |
           mkdir -p work/dbg && tar -xzf dist/andcode-bundle-arm64-v0.1.1.tar.gz -C work/dbg --strip-components=1
           docker run --rm --platform linux/arm64 -v "$PWD/work/dbg:/opt" -v "$PWD/scripts:/scripts:ro" \
             -e ANDCODE_ROOT=/opt -e ANDCODE_TIER=a ubuntu:24.04 bash /scripts/ci-git-debug.sh /opt
 
-      - name: 兼容性审计(DESIGN §3.3)
+      - name: Compatibility audit (DESIGN §3.3)
         run: |
           mkdir -p work/audit && tar -xzf dist/andcode-bundle-arm64-v0.1.1.tar.gz -C work/audit
           bash baseline/check-compat.sh --page-align \
             work/audit/andcode/bin work/audit/andcode/usr/bin work/audit/andcode/lib
 
-      - name: 命名规范门禁(NAMING §8)
+      - name: Naming convention gate (NAMING §8)
         run: bash scripts/naming-lint.sh --bundle-dir work/audit/andcode
 
       - name: Manifest kind, license and Tier P identity regression
@@ -326,7 +326,7 @@ jobs:
           print('Manifest kind/license/physical identity OK')
           PY
 
-      - name: Bash 载荷与闭包检查
+      - name: Bash payload and dependency closure checks
         run: |
           B=work/audit/andcode
           test -s "$B/bin/bash.bin"
@@ -338,10 +338,10 @@ jobs:
           "$B/lib/ld-linux-aarch64.so.1" --library-path "$B/lib" --inhibit-cache \
             "$B/bin/bash.bin" --noprofile --norc -c 'test -n "$BASH_VERSION"; printf "Bash %s\n" "$BASH_VERSION"'
 
-      - name: 生成 THIRD-PARTY-NOTICES(REUSE §4)
+      - name: Generate THIRD-PARTY-NOTICES (REUSE §4)
         run: bash scripts/gen-notices.sh work/audit/andcode/manifest > dist/THIRD-PARTY-NOTICES.md && head -n 12 dist/THIRD-PARTY-NOTICES.md
 
-      - name: 冒烟自测(容器内 wrapper 链路,Tier A 等价)
+      - name: Smoke test (wrapper chain in container, Tier A equivalent)
         run: |
           docker run --rm --platform linux/arm64 \
             -v "$PWD/dist:/dist" -v "$PWD/scripts:/scripts:ro" \
@@ -351,7 +351,7 @@ jobs:
               sh /scripts/smoke-test.sh
             '
 
-      - name: Tier P 物理化路线甲(patchelf 重写,NAMING §6.3)
+      - name: Tier P physicalization route A (patchelf rewriting, NAMING §6.3)
         run: |
           for i in 1 2 3 4 5; do
             command -v patchelf >/dev/null && break
