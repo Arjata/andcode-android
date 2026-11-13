@@ -37,22 +37,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 终端页(Termux 式):打开交互式 shell,不自动拉起 opencode TUI——
- * 用户输入 `opencode` 即进入 AI 编码代理(ENV profile 提供 shell 函数,
- * 经补丁 loader 执行,规避应用域 seccomp / 数据目录禁 exec 约束)。
+ * Terminal page (Termux-style): open an interactive shell without automatically starting opencode TUI.
+ * Users enter `opencode` to launch the AI coding agent (a shell function in the ENV profile
+ * uses the patched loader to work around app-domain seccomp and data-directory exec restrictions).
  *
- * - 会话持久化:TerminalSession 存静态引用,离开页面不杀进程,返回页面
- *   重新挂载;进程被系统回收时会话自然结束,下次进入自动新建。
- *   (SessionService 前台服务保活进程,会话通常全程存活。)
- * - 悬浮球 + 共享抽屉(与 WebActivity 同款,andapi 模式)。
- * - 依赖 ServeManager 同一套二进制解析(jniLibs 优先,/data/local/tmp 回退);
- *   无部署时仍是可用的普通 shell。
+ * - Session persistence: a static TerminalSession reference keeps the process alive across page exits
+ *   and reattaches on return. System process reclamation ends the session; the next visit creates one.
+ *   (The SessionService foreground service keeps the process alive, so sessions usually persist.)
+ * - Floating ball and shared drawer (as in WebActivity, following the andapi pattern).
+ * - Uses ServeManager binary resolution (jniLibs first, /data/local/tmp fallback);
+ *   a normal shell remains available without a deployment.
  */
 public class TerminalActivity extends AppCompatActivity {
 
-    /** 跨页面保持的终端会话(静态 = 应用进程生命周期) */
+    /** Terminal session retained across pages (static means app-process lifetime). */
     private static TerminalSession sSession;
-    /** 回调桥:会话常驻而 Activity 会重建,回调始终委托给前台实例 */
+    /** Callback bridge: the session persists while Activities are recreated; delegate to the foreground instance. */
     private static ClientBridge sBridge;
 
     private TerminalView mTerminalView;
@@ -72,7 +72,7 @@ public class TerminalActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_terminal);
         mTerminalView = findViewById(R.id.terminal_view);
-        // attachSession 可能在已布局的 View 上立即初始化模拟器,先绑定 client。
+        // attachSession may initialize the emulator immediately on a laid-out View; bind the client first.
         mTerminalView.setTerminalViewClient(new ViewClient());
         applyTerminalSize();
         mDrawer = findViewById(R.id.rootDrawer);
@@ -88,7 +88,7 @@ public class TerminalActivity extends AppCompatActivity {
             }
         });
 
-        // 悬浮抽屉球(与 WebActivity 共用停靠位置)
+        // Floating drawer ball (shares its dock position with WebActivity).
         FrameLayout content = findViewById(R.id.termContent);
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
             androidx.core.graphics.Insets system = insets.getInsets(
@@ -104,7 +104,7 @@ public class TerminalActivity extends AppCompatActivity {
             () -> mDrawer.openDrawer(GravityCompat.START)));
         NavDrawer.bind(this, mDrawer, new NavDrawer.Callbacks() {
             @Override public void onHomeSelected() { NavDrawer.goHome(TerminalActivity.this); }
-            @Override public void onTerminalSelected() { /* 当前页 */ }
+            @Override public void onTerminalSelected() { /* Current page. */ }
             @Override public void onWebSelected() {
                 startActivity(new Intent(TerminalActivity.this, WebActivity.class));
             }
@@ -119,7 +119,7 @@ public class TerminalActivity extends AppCompatActivity {
             sSession = createSession();
         }
         mTerminalView.attachSession(sSession);
-        // 首帧布局完成后确保尺寸与绘制已就绪,不通过注入回车伪造提示符。
+        // Ensure sizing and rendering are ready after the first layout; do not fake a prompt by injecting Enter.
         mTerminalView.post(() -> {
             if (isFinishing() || isDestroyed()) return;
             mTerminalView.updateSize();
@@ -153,11 +153,11 @@ public class TerminalActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // 不杀会话:离开页面(Termux 式)进程继续运行,返回时重挂
+        // Keep the session alive when leaving (Termux-style); reattach on return.
         if (sBridge != null && sBridge.activity == this) sBridge.activity = null;
     }
 
-    /** 分别生成系统 sh 和 Bash 的只读启动配置,不覆盖用户 ~/.bashrc。 */
+    /** Generate separate read-only startup profiles for system sh and Bash without overwriting the user's ~/.bashrc. */
     private void prepareEnv() {
         File files = getFilesDir();
         try { mRuntimeRoot = ServeManager.prepareRuntime(this); }
@@ -170,6 +170,15 @@ public class TerminalActivity extends AppCompatActivity {
         ServeManager.Paths p = ServeManager.resolvePaths(this);
         StringBuilder sb = new StringBuilder();
         sb.append("# andcode terminal profile\n");
+        // Print one-time output before sourcing ~/.bashrc. The bootstrap marks
+        // ANDCODE_BASHRC before sourcing this profile again, so the nested load
+        // suppresses duplicate startup output.
+        sb.append("if [ -z \"${ANDCODE_BASHRC:-}\" ]; then\n");
+        sb.append("cat <<'ANDCODE_BANNER'\n")
+           .append(buildBanner())
+           .append("ANDCODE_BANNER\n");
+        sb.append("printf '%s\\n' 'Ubuntu dev instance: andcode-ubuntu-proot [proxy=<url>]; errors out if missing.'\n");
+        sb.append("fi\n");
         sb.append("if [ -n \"${BASH_VERSION:-}\" ]; then\n");
         sb.append("  PS1='\\W \\$ '; HISTFILE=\"$HOME/.bash_history\"\n");
         sb.append("  shopt -s checkwinsize\n");
@@ -181,9 +190,6 @@ public class TerminalActivity extends AppCompatActivity {
         sb.append("  PS1='$PWD $ '\n");
         sb.append("  printf '%s\\n' 'Bash payload not installed; using the system sh.'\n");
         sb.append("fi\n");
-        sb.append("cat <<'ANDCODE_BANNER'\n")
-           .append(buildBanner())
-           .append("ANDCODE_BANNER\n");
         if (mRuntimeRoot != null)
             sb.append("export ANDCODE_RUNTIME_ROOT=\"").append(mRuntimeRoot.getAbsolutePath()).append("\"\n");
         // Shell function, not an executable: app data dirs forbid exec (targetSdk 37.2);
@@ -206,7 +212,6 @@ public class TerminalActivity extends AppCompatActivity {
             sb.append("}\n");
         }
         sb.append("andcode-ubuntu-proot() { /system/bin/sh \"$ANDCODE_APP_DATA/term-ubuntu-proot\" \"$@\"; }\n");
-        sb.append("printf '%s\\n' 'Ubuntu dev instance: andcode-ubuntu-proot [proxy=<url>]; errors out if missing.'\n");
         prepareUbuntuProot(files);
         writeFile(new File(files, "term-env.sh"), sb.toString());
         writeFile(new File(files, "term-bashrc"), sb.toString());
@@ -224,17 +229,16 @@ public class TerminalActivity extends AppCompatActivity {
         }
     }
 
-    /** Armbian 风格横幅:字符画 + 设备信息;终端提示词一律英文。 */
+    /** Armbian-style banner: ASCII art and device information; all terminal prompts are in English. */
     private String buildBanner() {
         StringBuilder b = new StringBuilder();
         b.append("\n");
         b.append("\n");
-        b.append("  ##   #    # #####   ####   ####  #####  ######\n");
-        b.append(" #  #  ##   # #    # #    # #    # #    # #\n");
-        b.append("#    # # #  # #    # #      #    # #    # #####\n");
-        b.append("###### #  # # #    # #      #    # #    # #\n");
-        b.append("#    # #   ## #    # #    # #    # #    # #\n");
-        b.append("#    # #    # #####   ####   ####  #####  ######\n");
+        b.append(" ####  ####   ##   #  #  #  #  ####\n");
+        b.append("#   # # # # #   # #     #  # #   # #\n");
+        b.append("##### #  ## #   # #     #  # #   # ####\n");
+        b.append("#   # #   # #   # #     #  # #   # #\n");
+        b.append("#   #  ####   #   #  ###  #  #  ####\n");
         b.append(" andcode · opencode AI coding agent on Android\n");
         b.append("\n");
         b.append(" Android ").append(android.os.Build.VERSION.RELEASE)
@@ -269,7 +273,7 @@ public class TerminalActivity extends AppCompatActivity {
         return b.toString();
     }
 
-    /** 只解释脚本;不 su、不 relabel、不自动下载/解包、不把模型接入特权维护入口。 */
+    /** Interpret the script only: no su, relabeling, automatic download/extraction, or model access to privileged maintenance. */
     private void prepareUbuntuProot(File files) {
         try (InputStream in = getAssets().open("term-ubuntu-proot.sh");
              OutputStream out = new FileOutputStream(new File(files, "term-ubuntu-proot"))) {
@@ -286,7 +290,7 @@ public class TerminalActivity extends AppCompatActivity {
         File home = new File(files, "home");
         ServeManager.Paths p = ServeManager.resolvePaths(this);
 
-        // PATH:bundle 部署存在则前置(git/ssh 等),否则纯系统
+        // PATH: prepend the bundle deployment when present (git/ssh etc.); otherwise use system paths only.
         StringBuilder path = new StringBuilder("/system/bin:/system/xbin");
         String[] bundleBins = {"/data/local/tmp/andcode/usr/bin", "/data/local/tmp/andcode/bin"};
         if (mRuntimeRoot != null) {
@@ -304,7 +308,7 @@ public class TerminalActivity extends AppCompatActivity {
             "GLIBC_TUNABLES=glibc.pthread.rseq=0",
             "LANG=en_US.UTF-8",
             "TMPDIR=" + new File(files, "tmp").getAbsolutePath(),
-            "BUN_TMPDIR=" + new File(files, "tmp").getAbsolutePath(), // Bun 原生库提取目录
+            "BUN_TMPDIR=" + new File(files, "tmp").getAbsolutePath(), // Bun native library extraction directory.
             "ENV=" + new File(files, "term-env.sh").getAbsolutePath(),
             "ANDCODE_APP_DATA=" + files.getAbsolutePath(),
             "ANDCODE_TIER=p"));
@@ -318,18 +322,18 @@ public class TerminalActivity extends AppCompatActivity {
             env.add("LD_LIBRARY_PATH=" + nat);
         }
         if (p != null) {
-            // glibc 子进程(opencode-pty、git 等)的库解析;文件名与 bionic 不冲突
+            // Library resolution for glibc children (opencode-pty, git, etc.); filenames do not conflict with bionic.
             env.add("LD_LIBRARY_PATH=" + p.lib);
-            // 插件二进制指路(见 ServeManager.spawn 内注释):
-            // 终端里跑的 opencode TUI 自身也会 spawn opencode-pty
+            // Point to the plugin binary (see comments in ServeManager.spawn):
+            // opencode TUI running in the terminal also spawns opencode-pty.
             String ptyBin = ServeManager.ptyBinPath(this);
             if (ptyBin != null) env.add("OPENCODE_PTY_BIN=" + ptyBin);
             env.add("OPENCODE_PTY_SOCKET_DIR=" + ServeManager.ptySocketDir(this));
         }
 
         String[] command = bashCommand(files);
-        // 子进程直接 exec 的 SHELL 仍需可用的 PT_INTERP;Bash 本体依赖显式 loader。
-        // 默认交互会话用 command 拉起 Bash,不把裸 glibc ELF 暴露给子进程。
+        // SHELL executed directly by children still needs a valid PT_INTERP; Bash requires an explicit loader.
+        // The default interactive session starts Bash via command, without exposing a bare glibc ELF to children.
         env.add("SHELL=/system/bin/sh");
         if (command == null) command = new String[]{"/system/bin/sh", "-i"};
         File selected = AppSettings.selectedProject(this);
@@ -339,8 +343,8 @@ public class TerminalActivity extends AppCompatActivity {
         if (projectName != null && !projectName.isEmpty())
             env.add("ANDCODE_UBUNTU_PROJECT_NAME=" + projectName);
         if (AppSettings.ubuntuTerminal(this)) {
-            // 单 APK:实例缺失时后台提取,会话内等待 digest 标记后进入;无内置
-            // 归档的开发构建仍由启动器显式报错,不静默换环境。
+            // Single APK: extract a missing instance in the background; the session waits for the digest marker.
+            // Development builds without a bundled archive report a launcher error rather than silently switching environments.
             List<String> ubuntu = new ArrayList<>(List.of("/system/bin/sh",
                 new File(files, "term-ubuntu-proot").getAbsolutePath()));
             if (AppSettings.ubuntuProxy(this)) {
@@ -387,7 +391,7 @@ public class TerminalActivity extends AppCompatActivity {
         );
     }
 
-    /** 不执行 filesDir ELF、不查找第三方宿主;补丁 loader 显式拉起预置 Bash。 */
+    /** No filesDir ELF execution or third-party host lookup; the patched loader explicitly starts bundled Bash. */
     private String[] bashCommand(File files) {
         String nat = getApplicationInfo().nativeLibraryDir;
         String[][] candidates = {
@@ -426,8 +430,8 @@ public class TerminalActivity extends AppCompatActivity {
     }
 
     /**
-     * 会话回调桥(静态):TerminalSession 持有构造时的 client,而 Activity
-     * 随导航反复重建——桥只持有"当前前台实例",重建时换绑,会话无需重建。
+     * Static session callback bridge: TerminalSession retains its original client while navigation
+     * recreates Activities. Rebind only the current foreground instance, without recreating the session.
      */
     private static class ClientBridge implements TerminalSessionClient {
         TerminalActivity activity;
@@ -441,7 +445,7 @@ public class TerminalActivity extends AppCompatActivity {
             if (a != null) a.runOnUiThread(() -> a.setTitle(s.getTitle()));
         }
         @Override public void onSessionFinished(@NonNull TerminalSession s) {
-            if (s == sSession) sSession = null; // 下次进入自动新建
+            if (s == sSession) sSession = null; // Create a new session on the next visit.
             TerminalActivity a = activity;
             if (a != null) a.runOnUiThread(() -> Toast.makeText(a,
                 "会话结束(exit " + s.getExitStatus() + ")", Toast.LENGTH_LONG).show());
@@ -484,10 +488,10 @@ public class TerminalActivity extends AppCompatActivity {
         @Override public void logStackTrace(String tag, Exception e) { }
     }
 
-    /** TerminalViewClient 最小实现(每 Activity 一份,轻量) */
+    /** Minimal, lightweight TerminalViewClient implementation, one per Activity. */
     private class ViewClient implements TerminalViewClient {
         @Override public float onScale(float scale) {
-            // TerminalView 累积缩放比例;越过阈值调整 1 sp 后重置,避免抖动。
+            // TerminalView accumulates scale; adjust by 1 sp past the threshold, then reset to avoid jitter.
             if (scale > 1.1f || scale < 0.9f) {
                 int current = AppSettings.terminalSize(TerminalActivity.this);
                 int next = Math.max(10, Math.min(28, current + (scale > 1f ? 1 : -1)));
@@ -495,15 +499,15 @@ public class TerminalActivity extends AppCompatActivity {
                     AppSettings.prefs(TerminalActivity.this).edit().putInt("terminal-size", next).apply();
                     applyTerminalSize();
                 }
-                // 到达边界也重置,反向手势无需抵消先前累计的比例。
+                // Reset at the bounds too, so reverse gestures need not cancel the previously accumulated scale.
                 return 1f;
             }
             return scale;
         }
         @Override public void onSingleTapUp(MotionEvent e) {
             if (mTerminalView.requestFocus()) {
-                // 自绘 TerminalView 不是 EditText:获得焦点不会自动显示输入法。
-                // 先让焦点/InputConnection 生效,再按用户点击明确请求显示。
+                // The custom-drawn TerminalView is not an EditText; focus does not automatically show the IME.
+                // Let focus/InputConnection take effect, then explicitly request the keyboard for the user's tap.
                 mTerminalView.post(() -> {
                     if (isFinishing() || isDestroyed() || !mTerminalView.hasWindowFocus()) return;
                     InputMethodManager imm = getSystemService(InputMethodManager.class);

@@ -55,18 +55,17 @@ else
 fi
 export PROOT_LOADER="$P/loader" LD_LIBRARY_PATH="$PLIB" PROOT_TMP_DIR="$FILES/tmp"
 export GLIBC_TUNABLES=glibc.pthread.rseq=0
-# 设备存储:FUSE 视图受平台权限约束(Download/媒体已实测可读写)。
+# Device storage: the FUSE view follows platform permissions (Download/media read/write tested).
 SDCARD=/storage/emulated/0
 [ -d "$SDCARD" ] && set -- -b "$SDCARD:/mnt/sdcard" "$@"
 echo ""
 cat <<'ANDCODE_BANNER'
 
-  ##   #    # #####   ####   ####  #####  ######
- #  #  ##   # #    # #    # #    # #    # #
-#    # # #  # #    # #      #    # #    # #####
-###### #  # # #    # #      #    # #    # #
-#    # #   ## #    # #    # #    # #    # #
-#    # #    # #####   ####   ####  #####  ######
+ ####  ####   ##   #  #  #  #  ####
+#   # # # # #   # #     #  # #   # #
+##### #  ## #   # #     #  # #   # ####
+#   # #   # #   # #     #  # #   # #
+#   #  ####   #   #  ###  #  #  ####
  andcode · opencode AI coding agent on Android
  Ubuntu 24.04 dev rootfs (single-APK)
 ANDCODE_BANNER
