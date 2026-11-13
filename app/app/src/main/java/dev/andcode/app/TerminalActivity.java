@@ -218,11 +218,13 @@ public class TerminalActivity extends AppCompatActivity {
     private String buildBanner() {
         StringBuilder b = new StringBuilder();
         b.append("\n");
-        b.append("                 _               _\n");
-        b.append("  __ _ _ __   __| | ___ ___   __| | ___\n");
-        b.append(" / _` | '_ \\ / _` |/ __/ _ \\ / _` |/ _ \\\n");
-        b.append("| (_| | | | | (_| | (_| (_) | (_| |  __/\n");
-        b.append(" \\__,_|_| |_|\\__,_|\\___\\___/ \\__,_|\\___|\n");
+        b.append("\n");
+        b.append("  ##   #    # #####   ####   ####  #####  ######\n");
+        b.append(" #  #  ##   # #    # #    # #    # #    # #\n");
+        b.append("#    # # #  # #    # #      #    # #    # #####\n");
+        b.append("###### #  # # #    # #      #    # #    # #\n");
+        b.append("#    # #   ## #    # #    # #    # #    # #\n");
+        b.append("#    # #    # #####   ####   ####  #####  ######\n");
         b.append(" andcode · opencode AI coding agent on Android\n");
         b.append("\n");
         b.append(" Android ").append(android.os.Build.VERSION.RELEASE)
