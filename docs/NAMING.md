@@ -55,6 +55,10 @@
 | `ProjectsActivity.java`, `SettingsActivity.java`, `AppSettings.java`, `ProjectArchive.java`, `ProjectArchiveTest.java`, `UtilityActivity.java` | APK project/settings components, shared page and ZIP safety tests (Java files follow class names) | `dev.andcode.app` |
 | `ic_more.xml` | APK project-card More vector icon (existing Android-resource snake_case style) | `res/drawable/ic_more.xml` |
 | `ic_nav_projects.xml`, `ic_nav_settings.xml` | Shared-drawer project/settings vector icons (Android-resource snake_case) | `res/drawable/` |
+| `ic_launcher.xml` | Adaptive launcher icon, shared by normal and round launcher entries; includes the monochrome layer used on API 33+ | `res/mipmap-anydpi-v26/` |
+| `ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml` | Original terminal-prompt launcher artwork; 108 dp viewport with artwork inside the adaptive-icon safe zone | `res/drawable/` |
+| `launcher_background` | Launcher background color resource, shared by adaptive icon variants | `res/values/colors.xml` |
+| `andcode-icon.svg` | Original scalable project icon matching the Android launcher artwork; text source, not a packaged runtime asset | `docs/img/` |
 | `TerminalExtraKeys.java` | Own APK extra-key control, reusing TerminalView input protocol | `dev.andcode.app` |
 | `term-env.sh`, `term-bashrc` | Generated system-sh/Bash startup configuration in APK filesDir, shell-read only, not executable | `files/term-env.sh`, `files/term-bashrc` |
 | `etc/third-party/bash-copyright`, `etc/third-party/ncurses-copyright` | Ubuntu copyright/license texts for bundled Bash/libtinfo; data excluded from jniLibs | bundle `etc/third-party/` |

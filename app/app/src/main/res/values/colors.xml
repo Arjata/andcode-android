@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="launcher_background">#101820</color>
     <!-- Status dot colors (matching andapi: green=running, yellow=transitioning, gray=stopped, red=error). -->
     <color name="dot_green">#3DDC84</color>
     <color name="dot_amber">#FFB300</color>

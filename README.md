@@ -1,5 +1,7 @@
 # andcode
 
+<img src="docs/img/andcode-icon.svg" width="112" height="112" alt="andcode terminal icon">
+
 [![CI](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml/badge.svg)](https://github.com/Arjata/andcode-android/actions/workflows/andcode-ci.yml)
 
 **Run OpenCode and a Linux arm64 development environment on Android.**
